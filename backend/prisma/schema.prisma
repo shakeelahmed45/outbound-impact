@@ -1,0 +1,174 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(uuid())
+  email             String   @unique
+  password          String
+  name              String
+  role              Role     @default(INDIVIDUAL)
+  stripeCustomerId  String?  @unique
+  subscriptionId    String?
+  subscriptionStatus String?
+  storageUsed       BigInt   @default(0)
+  storageLimit      BigInt   @default(2147483648)
+  profilePicture    String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  items             Item[]
+  campaigns         Campaign[]
+  teamMembers       TeamMember[]
+  feedback          Feedback[]
+  chatConversations ChatConversation[]
+  
+  @@index([email])
+}
+
+enum Role {
+  INDIVIDUAL
+  ORG_SMALL
+  ORG_MEDIUM
+  ORG_ENTERPRISE
+  ADMIN
+}
+
+model Item {
+  id          String    @id @default(uuid())
+  userId      String
+  slug        String    @unique
+  title       String
+  description String?
+  type        MediaType
+  mediaUrl    String
+  qrCodeUrl   String?
+  fileSize    BigInt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  user        User      @relation(fields: [userId], references: [id])
+  campaign    Campaign? @relation(fields: [campaignId], references: [id])
+  campaignId  String?
+  analytics   Analytics[]
+  
+  @@index([userId])
+  @@index([slug])
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  AUDIO
+  TEXT
+  OTHER
+}
+
+model Campaign {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  category    String?
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  user        User     @relation(fields: [userId], references: [id])
+  items       Item[]
+  
+  @@index([userId])
+  @@index([category])
+}
+
+model TeamMember {
+  id        String   @id @default(uuid())
+  email     String
+  role      String
+  userId    String
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Analytics {
+  id        String   @id @default(uuid())
+  itemId    String
+  country   String?
+  device    String?
+  browser   String?
+  os        String?
+  createdAt DateTime @default(now())
+  
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  
+  @@index([itemId])
+  @@index([createdAt])
+}
+
+model Feedback {
+  id        String   @id @default(uuid())
+  userId    String
+  subject   String
+  message   String
+  status    FeedbackStatus @default(PENDING)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum FeedbackStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+}
+
+model ChatConversation {
+  id            String   @id @default(uuid())
+  userId        String
+  status        ChatStatus @default(ACTIVE)
+  lastMessageAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages      ChatMessage[]
+  
+  @@index([userId])
+  @@index([status])
+  @@index([lastMessageAt])
+}
+
+enum ChatStatus {
+  ACTIVE
+  CLOSED
+}
+
+model ChatMessage {
+  id             String   @id @default(uuid())
+  conversationId String
+  senderId       String
+  senderType     SenderType
+  message        String
+  isRead         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+enum SenderType {
+  USER
+  ADMIN
+}
