@@ -10,6 +10,8 @@ const SignUp = () => {
     password: '',
     confirmPassword: '',
   });
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [isOver18, setIsOver18] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -25,7 +27,6 @@ const SignUp = () => {
     e.preventDefault();
     setError('');
 
-    // Validation
     if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
       setError('All fields are required');
       return;
@@ -41,7 +42,16 @@ const SignUp = () => {
       return;
     }
 
-    // Store signup data and navigate to plans
+    if (!isOver18) {
+      setError('You must be 18 years or older to create an account');
+      return;
+    }
+
+    if (!agreeTerms) {
+      setError('You must agree to the Terms & Conditions');
+      return;
+    }
+
     localStorage.setItem('signupData', JSON.stringify({
       name: formData.name,
       email: formData.email,
@@ -54,13 +64,12 @@ const SignUp = () => {
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
-        {/* Logo */}
         <div className="text-center mb-8">
           <img 
             src="/logo.webp" 
             alt="Outbound Impact" 
             className="w-45 h-24 mx-auto mb-4 animate-pulse-slow"
-            onError={(e) => e.target.style.display = 'none'}
+            onError={(e) => { e.target.style.display = 'none'; }}
           />
           <h1 className="text-4xl font-bold text-primary mb-2">
             Create Account
@@ -70,7 +79,6 @@ const SignUp = () => {
           </p>
         </div>
 
-        {/* Form */}
         <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -133,6 +141,40 @@ const SignUp = () => {
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 placeholder="••••••••"
               />
+            </div>
+
+            <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <input
+                type="checkbox"
+                id="age-verification"
+                checked={isOver18}
+                onChange={(e) => setIsOver18(e.target.checked)}
+                className="mt-1 w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
+              />
+              <label htmlFor="age-verification" className="text-sm text-gray-700 cursor-pointer">
+                I confirm that I am <span className="font-semibold">18 years or older</span>
+              </label>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <input
+                type="checkbox"
+                id="terms"
+                checked={agreeTerms}
+                onChange={(e) => setAgreeTerms(e.target.checked)}
+                className="mt-1 w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
+              />
+              <label htmlFor="terms" className="text-sm text-gray-700 cursor-pointer">
+                I agree to the{' '}
+                <a
+                  href="https://outboundimpact.org/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary font-semibold underline hover:text-secondary transition-colors"
+                >
+                  Terms & Conditions
+                </a>
+              </label>
             </div>
 
             <button
