@@ -191,11 +191,7 @@ const OrganizationDashboard = () => {
             className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center"
           >
             <Eye className="mx-auto mb-2 text-primary" size={24} />
-            <span className="text-sm font-semibold text-gray-700">
-              {(user?.role === 'ORG_SMALL' || user?.role === 'ORG_MEDIUM' || user?.role === 'ORG_ENTERPRISE') 
-                ? 'Advanced Analytics' 
-                : 'Analytics'}
-            </span>
+            <span className="text-sm font-semibold text-gray-700">Advanced Analytics</span>
           </button>
         </div>
       </div>
