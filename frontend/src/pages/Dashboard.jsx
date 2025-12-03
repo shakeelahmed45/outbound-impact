@@ -197,11 +197,13 @@ const Dashboard = () => {
               <span className="text-sm font-semibold text-gray-700">My Items</span>
             </button>
             <button
-              onClick={() => navigate('/dashboard/analytics')}
+              onClick={() => navigate(isOrganization ? '/dashboard/advanced-analytics' : '/dashboard/analytics')}
               className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center"
             >
               <BarChart3 className="mx-auto mb-2 text-primary" size={24} />
-              <span className="text-sm font-semibold text-gray-700">Analytics</span>
+              <span className="text-sm font-semibold text-gray-700">
+                {isOrganization ? 'Advanced Analytics' : 'Analytics'}
+              </span>
             </button>
             <button
               onClick={() => navigate('/dashboard/campaigns')}
