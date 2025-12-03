@@ -26,6 +26,7 @@ const uploadToBunny = async (file, fileName, folder = 'uploads') => {
         },
         maxBodyLength: Infinity,
         maxContentLength: Infinity,
+        timeout: 300000, // 5 minutes timeout for large video uploads
       }
     );
 
