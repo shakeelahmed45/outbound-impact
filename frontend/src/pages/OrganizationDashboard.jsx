@@ -12,7 +12,7 @@ const OrganizationDashboard = () => {
     totalUploads: 0,
     totalViews: 0,
     storageUsed: 0,
-    storageLimit: 10737418240, // 10GB default for small org
+    storageLimit: 10737418240,
     qrCodesGenerated: 0,
     teamMembers: 0,
     campaigns: 0,
@@ -47,8 +47,6 @@ const OrganizationDashboard = () => {
   const storagePercentage = stats.storageLimit > 0 
     ? (stats.storageUsed / stats.storageLimit) * 100 
     : 0;
-
-  const isOrgUser = user?.role === 'ORG_SMALL' || user?.role === 'ORG_MEDIUM' || user?.role === 'ORG_ENTERPRISE';
 
   const statCards = [
     {
@@ -95,7 +93,6 @@ const OrganizationDashboard = () => {
 
   return (
     <DashboardLayout>
-      {/* Welcome Section */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-primary mb-2">
           {user?.role === 'ORG_SMALL' && '🏢 Small Organization Dashboard'}
@@ -107,7 +104,6 @@ const OrganizationDashboard = () => {
         </p>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
         {statCards.map((card, index) => {
           const Icon = card.icon;
@@ -128,7 +124,6 @@ const OrganizationDashboard = () => {
         })}
       </div>
 
-      {/* Storage Usage */}
       <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 mb-8">
         <h3 className="text-xl font-bold text-primary mb-4">Storage Usage</h3>
         <div className="relative">
@@ -163,7 +158,6 @@ const OrganizationDashboard = () => {
         )}
       </div>
 
-      {/* Quick Actions */}
       <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
         <h3 className="text-xl font-bold text-primary mb-4">Quick Actions</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -193,9 +187,7 @@ const OrganizationDashboard = () => {
             className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center"
           >
             <Eye className="mx-auto mb-2 text-primary" size={24} />
-            <span className="text-sm font-semibold text-gray-700">
-              {isOrgUser ? 'Advanced Analytics' : 'Analytics'}
-            </span>
+            <span className="text-sm font-semibold text-gray-700">Advanced Analytics</span>
           </button>
         </div>
       </div>
