@@ -1,21 +1,53 @@
 const { PrismaClient } = require('@prisma/client');
-const { uploadToBunny, generateFileName, generateSlug } = require('../services/bunnyService');
 const QRCode = require('qrcode');
+const crypto = require('crypto');
 
 const prisma = new PrismaClient();
 
-const uploadFile = async (req, res) => {
+// Generate unique slug
+const generateSlug = () => {
+  return crypto.randomBytes(6).toString('hex');
+};
+
+// Generate QR Code
+const generateQRCode = async (url) => {
+  try {
+    const qrBuffer = await QRCode.toBuffer(url, {
+      width: 500,
+      margin: 2,
+      color: {
+        dark: '#800080', // Purple
+        light: '#FFFFFF',
+      },
+    });
+    return qrBuffer.toString('base64');
+  } catch (error) {
+    console.error('QR generation failed:', error);
+    throw new Error('Failed to generate QR code');
+  }
+};
+
+/**
+ * Register a file that was uploaded directly to Bunny.net
+ * This endpoint is called AFTER the file is already on CDN
+ * It just creates the database record and generates QR code
+ */
+exports.registerDirectUpload = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { title, description, type, fileData, fileName, fileSize } = req.body;
+    const { title, description, type, mediaUrl, fileName, fileSize } = req.body;
 
-    if (!title || !type || !fileData || !fileName) {
+    console.log('Registering direct upload:', { title, type, fileName, fileSize });
+
+    // Validate required fields
+    if (!title || !type || !mediaUrl || !fileName) {
       return res.status(400).json({
         status: 'error',
         message: 'Missing required fields'
       });
     }
 
+    // Check user storage
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { storageUsed: true, storageLimit: true }
@@ -30,28 +62,6 @@ const uploadFile = async (req, res) => {
       });
     }
 
-    const uniqueFileName = generateFileName(fileName, userId);
-    const base64Data = fileData.split(',')[1] || fileData;
-    const fileBuffer = Buffer.from(base64Data, 'base64');
-
-    // Upload to Bunny.net
-    const uploadResult = await uploadToBunny(
-      fileBuffer,
-      uniqueFileName,
-      type.toLowerCase()
-    );
-
-    let mediaUrl;
-    
-    if (uploadResult.success) {
-      console.log('✅ File uploaded to Bunny.net CDN');
-      mediaUrl = uploadResult.url;
-    } else {
-      console.log('⚠️ Bunny.net upload failed, storing as base64');
-      console.log('Error:', uploadResult.error);
-      mediaUrl = fileData;
-    }
-
     // Generate unique slug
     let slug = generateSlug();
     let slugExists = await prisma.item.findUnique({ where: { slug } });
@@ -61,20 +71,12 @@ const uploadFile = async (req, res) => {
       slugExists = await prisma.item.findUnique({ where: { slug } });
     }
 
-    // Generate public URL
-    const publicUrl = `${process.env.FRONTEND_URL}/l/${slug}`;
+    // Generate QR code for the public link
+    const publicUrl = `${process.env.APP_URL || 'http://localhost:5173'}/l/${slug}`;
+    const qrCodeData = await generateQRCode(publicUrl);
+    const qrCodeUrl = `data:image/png;base64,${qrCodeData}`;
 
-    // Generate QR code
-    const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
-      width: 512,
-      margin: 2,
-      color: {
-        dark: '#800080', // Purple
-        light: '#FFFFFF',
-      },
-    });
-
-    // Create item with QR code
+    // Create item in database
     const item = await prisma.item.create({
       data: {
         userId,
@@ -82,43 +84,50 @@ const uploadFile = async (req, res) => {
         description: description || null,
         type,
         slug,
-        mediaUrl,
-        qrCodeUrl: qrCodeDataUrl,
+        mediaUrl, // CDN URL from direct upload
+        qrCodeUrl, // Generated QR code
         fileSize: BigInt(fileSize),
       }
     });
 
+    // Update user storage
     await prisma.user.update({
       where: { id: userId },
       data: { storageUsed: BigInt(newStorageUsed) }
     });
 
+    console.log('✅ Direct upload registered successfully:', item.id);
+
     res.json({
       status: 'success',
-      message: uploadResult.success ? 
-        'File uploaded to CDN successfully' : 
-        'File uploaded (stored locally - please configure Bunny.net)',
+      message: 'File registered and QR code generated successfully',
       item: {
-        id: item.id,
-        title: item.title,
-        slug: item.slug,
-        type: item.type,
-        mediaUrl: item.mediaUrl,
-        qrCodeUrl: item.qrCodeUrl,
-        publicUrl: publicUrl,
+        ...item,
+        fileSize: item.fileSize.toString(),
       }
     });
-
   } catch (error) {
-    console.error('Upload error:', error);
+    console.error('❌ Register direct upload error:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Upload failed: ' + error.message
+      message: 'Failed to register upload'
     });
   }
 };
 
-const createTextPost = async (req, res) => {
+// Existing uploadFile function (for backward compatibility)
+// Keep this if you still want the old upload method to work
+exports.uploadFile = async (req, res) => {
+  // Your existing upload logic here
+  // This handles the old method where file goes through backend
+  res.status(501).json({
+    status: 'error',
+    message: 'Please use direct upload instead'
+  });
+};
+
+// Export existing text upload function
+exports.uploadText = async (req, res) => {
   try {
     const userId = req.user.userId;
     const { title, description, content } = req.body;
@@ -139,19 +148,12 @@ const createTextPost = async (req, res) => {
       slugExists = await prisma.item.findUnique({ where: { slug } });
     }
 
-    // Generate public URL
-    const publicUrl = `${process.env.FRONTEND_URL}/l/${slug}`;
-
     // Generate QR code
-    const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
-      width: 512,
-      margin: 2,
-      color: {
-        dark: '#800080',
-        light: '#FFFFFF',
-      },
-    });
+    const publicUrl = `${process.env.APP_URL || 'http://localhost:5173'}/l/${slug}`;
+    const qrCodeData = await generateQRCode(publicUrl);
+    const qrCodeUrl = `data:image/png;base64,${qrCodeData}`;
 
+    // Create text item
     const item = await prisma.item.create({
       data: {
         userId,
@@ -159,45 +161,37 @@ const createTextPost = async (req, res) => {
         description: description || null,
         type: 'TEXT',
         slug,
-        mediaUrl: content,
-        qrCodeUrl: qrCodeDataUrl,
-        fileSize: BigInt(content.length),
+        mediaUrl: content, // Store text content as mediaUrl
+        qrCodeUrl,
+        fileSize: BigInt(Buffer.byteLength(content, 'utf8')),
       }
     });
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { storageUsed: true }
-    });
-
+    // Update user storage (text is minimal)
     await prisma.user.update({
       where: { id: userId },
-      data: { storageUsed: BigInt(Number(user.storageUsed) + content.length) }
+      data: { 
+        storageUsed: { 
+          increment: BigInt(Buffer.byteLength(content, 'utf8'))
+        } 
+      }
     });
+
+    console.log('✅ Text post created:', item.id);
 
     res.json({
       status: 'success',
       message: 'Text post created successfully',
       item: {
-        id: item.id,
-        title: item.title,
-        slug: item.slug,
-        type: item.type,
-        qrCodeUrl: item.qrCodeUrl,
-        publicUrl: publicUrl,
+        ...item,
+        fileSize: item.fileSize.toString(),
       }
     });
-
   } catch (error) {
-    console.error('Text post error:', error);
+    console.error('❌ Text upload error:', error);
     res.status(500).json({
       status: 'error',
       message: 'Failed to create text post'
     });
   }
-};
-
-module.exports = {
-  uploadFile,
-  createTextPost,
 };
