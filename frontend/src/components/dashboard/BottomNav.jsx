@@ -8,14 +8,15 @@ const BottomNav = () => {
   const { user } = useAuthStore();
 
   const isOrg = user?.role === 'ORG_SMALL' || user?.role === 'ORG_MEDIUM' || user?.role === 'ORG_ENTERPRISE';
-  const isEnterprise = user?.role === 'ORG_ENTERPRISE';
+  const isSmallOrAbove = user?.role === 'ORG_SMALL' || user?.role === 'ORG_MEDIUM' || user?.role === 'ORG_ENTERPRISE';
 
   const navItems = [
     { path: '/dashboard', icon: Home, label: 'Home' },
     { path: '/dashboard/upload', icon: Upload, label: 'Upload' },
     { path: '/dashboard/items', icon: FolderOpen, label: 'Items' },
-    // Show Advanced Analytics for Enterprise users, regular Analytics for others
-    isEnterprise 
+    // Show Advanced Analytics for Small, Medium, and Enterprise
+    // Show regular Analytics for Individual users only
+    isSmallOrAbove
       ? { path: '/dashboard/advanced-analytics', icon: BarChart3, label: 'Analytics' }
       : { path: '/dashboard/analytics', icon: BarChart3, label: 'Analytics' },
   ];

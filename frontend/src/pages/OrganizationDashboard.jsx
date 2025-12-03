@@ -98,7 +98,7 @@ const OrganizationDashboard = () => {
         <h1 className="text-3xl font-bold text-primary mb-2">
           {user?.role === 'ORG_SMALL' && '🏢 Small Organization Dashboard'}
           {user?.role === 'ORG_MEDIUM' && '🏛️ Medium Organization Dashboard'}
-          {user?.role === 'ORG_ENTERPRISE' && '�� Enterprise Dashboard'}
+          {user?.role === 'ORG_ENTERPRISE' && '🏢 Enterprise Dashboard'}
         </h1>
         <p className="text-secondary text-lg">
           Welcome back, {user?.name}!
@@ -187,11 +187,11 @@ const OrganizationDashboard = () => {
             <span className="text-sm font-semibold text-gray-700">Upload</span>
           </button>
           <button 
-            onClick={() => navigate('/dashboard/analytics')}
+            onClick={() => navigate('/dashboard/advanced-analytics')}
             className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center"
           >
             <Eye className="mx-auto mb-2 text-primary" size={24} />
-            <span className="text-sm font-semibold text-gray-700">Analytics</span>
+            <span className="text-sm font-semibold text-gray-700">Advanced Analytics</span>
           </button>
         </div>
       </div>
