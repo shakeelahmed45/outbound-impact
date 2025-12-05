@@ -3,7 +3,8 @@
  * Handles NFC tag data generation and management
  */
 
-const prisma = require('../config/database');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 class NFCService {
   /**
@@ -12,7 +13,7 @@ class NFCService {
    * @returns {string} - NFC-enabled URL
    */
   generateNFCUrl(slug) {
-    const baseUrl = process.env.APP_URL || 'https://outboundimpact.net';
+    const baseUrl = process.env.FRONTEND_URL || 'https://outboundimpact.net';
     return `${baseUrl}/l/${slug}?source=nfc`;
   }
 
@@ -132,25 +133,12 @@ class NFCService {
       throw new Error('Item not found');
     }
 
-    // Get detailed NFC analytics
-    const nfcAnalytics = await prisma.analytics.findMany({
-      where: {
-        itemId: itemId,
-        source: 'nfc'
-      },
-      orderBy: {
-        createdAt: 'desc'
-      },
-      take: 100
-    });
-
     return {
       totalNfcViews: item.viewsNfc || 0,
       totalQrViews: item.viewsQr || 0,
       totalDirectViews: item.viewsDirect || 0,
       totalViews: item.views || 0,
       nfcPercentage: item.views > 0 ? ((item.viewsNfc / item.views) * 100).toFixed(1) : 0,
-      recentNfcViews: nfcAnalytics
     };
   }
 
