@@ -49,6 +49,14 @@ model Item {
   mediaUrl    String
   qrCodeUrl   String?
   fileSize    BigInt
+  
+  nfcEnabled  Boolean   @default(true)
+  nfcUrl      String?
+  views       Int       @default(0)
+  viewsQr     Int       @default(0)
+  viewsNfc    Int       @default(0)
+  viewsDirect Int       @default(0)
+  
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   
@@ -59,6 +67,7 @@ model Item {
   
   @@index([userId])
   @@index([slug])
+  @@index([nfcEnabled])
 }
 
 enum MediaType {
@@ -98,6 +107,7 @@ model TeamMember {
 model Analytics {
   id        String   @id @default(uuid())
   itemId    String
+  source    String   @default("direct")
   country   String?
   device    String?
   browser   String?
@@ -107,6 +117,7 @@ model Analytics {
   item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
   
   @@index([itemId])
+  @@index([source])
   @@index([createdAt])
 }
 

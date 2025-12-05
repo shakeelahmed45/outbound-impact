@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const QRCode = require('qrcode');
 const { deleteFromBunny } = require('../services/bunnyService');
+const nfcService = require('../services/nfcService');
 
 const prisma = new PrismaClient();
 
@@ -34,6 +35,12 @@ const getUserItems = async (req, res) => {
         fileSize: true,
         campaignId: true,
         createdAt: true,
+        nfcEnabled: true,
+        nfcUrl: true,
+        views: true,
+        viewsQr: true,
+        viewsNfc: true,
+        viewsDirect: true,
       }
     });
 
@@ -104,6 +111,7 @@ const getItemById = async (req, res) => {
 const getPublicItem = async (req, res) => {
   try {
     const { slug } = req.params;
+    const { source } = req.query;
 
     const item = await prisma.item.findUnique({
       where: { slug },
@@ -123,6 +131,32 @@ const getPublicItem = async (req, res) => {
         message: 'Item not found'
       });
     }
+
+    // Track view source (qr, nfc, or direct)
+    let viewSource = 'direct';
+    if (source === 'qr') {
+      viewSource = 'qr';
+    } else if (source === 'nfc') {
+      viewSource = 'nfc';
+    }
+
+    // Update view counts based on source
+    const updateData = {
+      views: { increment: 1 }
+    };
+
+    if (viewSource === 'qr') {
+      updateData.viewsQr = { increment: 1 };
+    } else if (viewSource === 'nfc') {
+      updateData.viewsNfc = { increment: 1 };
+    } else {
+      updateData.viewsDirect = { increment: 1 };
+    }
+
+    await prisma.item.update({
+      where: { id: item.id },
+      data: updateData
+    });
 
     res.json({
       status: 'success',
@@ -157,7 +191,7 @@ const generateQRCode = async (req, res) => {
       });
     }
 
-    const publicUrl = `${process.env.FRONTEND_URL}/l/${item.slug}`;
+    const publicUrl = `${process.env.FRONTEND_URL}/l/${item.slug}?source=qr`;
     const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
       width: 512,
       margin: 2,
@@ -280,6 +314,206 @@ const deleteItem = async (req, res) => {
   }
 };
 
+// ==========================================
+// NFC ENDPOINTS
+// ==========================================
+
+const getNFCData = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.userId;
+
+    const item = await prisma.item.findUnique({
+      where: { id }
+    });
+
+    if (!item) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Item not found'
+      });
+    }
+
+    if (item.userId !== userId) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Not authorized'
+      });
+    }
+
+    const nfcData = await nfcService.getNFCData(id);
+
+    res.json({
+      status: 'success',
+      data: nfcData
+    });
+  } catch (error) {
+    console.error('Get NFC data error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to get NFC data'
+    });
+  }
+};
+
+const enableNFC = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.userId;
+
+    const item = await prisma.item.findUnique({
+      where: { id }
+    });
+
+    if (!item) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Item not found'
+      });
+    }
+
+    if (item.userId !== userId) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Not authorized'
+      });
+    }
+
+    const updatedItem = await nfcService.enableNFC(id);
+
+    res.json({
+      status: 'success',
+      message: 'NFC enabled successfully',
+      data: updatedItem
+    });
+  } catch (error) {
+    console.error('Enable NFC error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to enable NFC'
+    });
+  }
+};
+
+const disableNFC = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.userId;
+
+    const item = await prisma.item.findUnique({
+      where: { id }
+    });
+
+    if (!item) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Item not found'
+      });
+    }
+
+    if (item.userId !== userId) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Not authorized'
+      });
+    }
+
+    const updatedItem = await nfcService.disableNFC(id);
+
+    res.json({
+      status: 'success',
+      message: 'NFC disabled successfully',
+      data: updatedItem
+    });
+  } catch (error) {
+    console.error('Disable NFC error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to disable NFC'
+    });
+  }
+};
+
+const getNFCStats = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.userId;
+
+    const item = await prisma.item.findUnique({
+      where: { id }
+    });
+
+    if (!item) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Item not found'
+      });
+    }
+
+    if (item.userId !== userId) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Not authorized'
+      });
+    }
+
+    const stats = await nfcService.getNFCStats(id);
+
+    res.json({
+      status: 'success',
+      data: stats
+    });
+  } catch (error) {
+    console.error('Get NFC stats error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get NFC statistics'
+    });
+  }
+};
+
+const bulkEnableNFC = async (req, res) => {
+  try {
+    const { itemIds } = req.body;
+    const userId = req.user.userId;
+
+    if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Item IDs array is required'
+      });
+    }
+
+    const items = await prisma.item.findMany({
+      where: {
+        id: { in: itemIds },
+        userId: userId
+      }
+    });
+
+    if (items.length !== itemIds.length) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Not authorized for one or more items'
+      });
+    }
+
+    const results = await nfcService.bulkGenerateNFC(itemIds);
+
+    res.json({
+      status: 'success',
+      message: `NFC enabled for ${results.length} items`,
+      data: results
+    });
+  } catch (error) {
+    console.error('Bulk enable NFC error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to bulk enable NFC'
+    });
+  }
+};
+
 module.exports = {
   getUserItems,
   getItemById,
@@ -287,4 +521,9 @@ module.exports = {
   generateQRCode,
   updateItem,
   deleteItem,
+  getNFCData,
+  enableNFC,
+  disableNFC,
+  getNFCStats,
+  bulkEnableNFC,
 };
