@@ -2,11 +2,21 @@ import { useEffect, useState } from 'react';
 import { Download, Trash2, ExternalLink, QrCode as QrCodeIcon, Copy, FolderOpen } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import api from '../services/api';
+import usePullToRefresh from '../hooks/usePullToRefresh';
+import PullToRefresh from '../components/PullToRefresh';
 
 const ItemsPage = () => {
   const [items, setItems] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Pull-to-refresh hook
+  const { isRefreshing, pullDistance, isPulling } = usePullToRefresh(
+    async () => {
+      // Refresh data when pulled
+      await fetchData();
+    }
+  );
 
   useEffect(() => {
     fetchData();
@@ -100,6 +110,14 @@ const ItemsPage = () => {
 
   return (
     <DashboardLayout>
+      {/* Pull-to-refresh indicator */}
+      <PullToRefresh 
+        isRefreshing={isRefreshing} 
+        pullDistance={pullDistance} 
+        isPulling={isPulling}
+      />
+      
+      {/* Main content - NO REF NEEDED! */}
       <div>
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -148,73 +166,74 @@ const ItemsPage = () => {
                       {item.description && (
                         <p className="text-secondary mb-3 text-sm md:text-base">{item.description}</p>
                       )}
-                      <div className="flex flex-wrap items-center gap-2 md:gap-4 text-xs md:text-sm text-gray-600">
-                        <span className="px-3 py-1 bg-purple-100 text-primary rounded-full font-medium">
+
+                      <div className="flex flex-wrap gap-2 text-sm text-gray-600">
+                        <span className="bg-gradient-to-r from-primary/10 to-secondary/10 px-3 py-1 rounded-full font-semibold">
                           {item.type}
                         </span>
-                        <span>{formatBytes(Number(item.fileSize))}</span>
-                        <span>{new Date(item.createdAt).toLocaleDateString()}</span>
+                        <span className="bg-gray-100 px-3 py-1 rounded-full">
+                          {formatBytes(parseInt(item.size))}
+                        </span>
+                        <span className="bg-gray-100 px-3 py-1 rounded-full">
+                          {item.views || 0} views
+                        </span>
                       </div>
                     </div>
 
-                    <div className="bg-gray-50 rounded-lg p-3 mb-4">
-                      <div className="flex flex-col md:flex-row gap-3 mb-3">
-                        <div className="flex-1">
-                          <p className="text-xs text-gray-600 mb-1">Assign to Campaign:</p>
-                          <select
-                            value={item.campaignId || ''}
-                            onChange={(e) => assignToCampaign(item.id, e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
-                          >
-                            <option value="">No Campaign</option>
-                            {campaigns.map((campaign) => (
-                              <option key={campaign.id} value={campaign.id}>
-                                {campaign.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-xs text-gray-600 mb-1">Public Link:</p>
-                          <div className="flex items-center gap-2">
-                            <code className="flex-1 text-xs text-primary font-mono bg-white px-2 md:px-3 py-2 rounded border border-gray-200 overflow-hidden text-ellipsis whitespace-nowrap">
-                              {item.publicUrl}
-                            </code>
-                            <button
-                              onClick={() => copyPublicLink(item.publicUrl)}
-                              className="px-2 md:px-3 py-2 bg-primary text-white rounded-lg font-semibold hover:bg-opacity-90 transition-all flex items-center gap-1 md:gap-2 text-xs md:text-sm flex-shrink-0"
-                            >
-                              <Copy size={14} />
-                              <span className="hidden sm:inline">Copy</span>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-2 md:gap-3">
-                      {item.qrCodeUrl && (
-                        <button
-                          onClick={() => downloadQRCode(item)}
-                          className="flex-1 bg-gradient-to-r from-primary to-secondary text-white px-3 md:px-4 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 hover:shadow-lg transition-all text-sm md:text-base"
-                        >
-                          <Download size={16} className="md:w-[18px] md:h-[18px]" />
-                          Download QR
-                        </button>
-                      )}
-                      <button
-                        onClick={() => window.open(item.publicUrl, '_blank')}
-                        className="flex-1 border-2 border-primary text-primary px-3 md:px-4 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-purple-50 transition-all text-sm md:text-base"
+                    {/* Campaign Assignment */}
+                    <div className="mb-4">
+                      <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                        <FolderOpen size={16} />
+                        Campaign
+                      </label>
+                      <select
+                        value={item.campaignId || ''}
+                        onChange={(e) => assignToCampaign(item.id, e.target.value || null)}
+                        className="w-full md:w-64 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
                       >
-                        <ExternalLink size={16} className="md:w-[18px] md:h-[18px]" />
-                        View Public
+                        <option value="">No Campaign</option>
+                        {campaigns.map((campaign) => (
+                          <option key={campaign.id} value={campaign.id}>
+                            {campaign.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-wrap gap-2 md:gap-3">
+                      <button
+                        onClick={() => copyPublicLink(item.publicUrl)}
+                        className="flex items-center gap-2 px-3 md:px-4 py-2 bg-gradient-to-r from-primary to-secondary text-white rounded-lg hover:shadow-lg transition-all text-sm md:text-base"
+                      >
+                        <Copy size={16} />
+                        Copy Link
                       </button>
+
+                      <a
+                        href={item.publicUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-3 md:px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all text-sm md:text-base"
+                      >
+                        <ExternalLink size={16} />
+                        View
+                      </a>
+
+                      <button
+                        onClick={() => downloadQRCode(item)}
+                        className="flex items-center gap-2 px-3 md:px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all text-sm md:text-base"
+                      >
+                        <Download size={16} />
+                        QR Code
+                      </button>
+
                       <button
                         onClick={() => deleteItem(item.id)}
-                        className="px-3 md:px-4 py-2 border-2 border-red-300 text-red-600 rounded-lg font-semibold hover:bg-red-50 transition-all flex items-center justify-center gap-2 text-sm md:text-base"
+                        className="flex items-center gap-2 px-3 md:px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all text-sm md:text-base"
                       >
-                        <Trash2 size={16} className="md:w-[18px] md:h-[18px]" />
-                        <span className="sm:hidden">Delete</span>
+                        <Trash2 size={16} />
+                        Delete
                       </button>
                     </div>
                   </div>
