@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 
 /**
  * Custom hook for pull-to-refresh functionality
- * Works with window scrolling (not container scrolling)
  * @param {Function} onRefresh - Function to call when refresh is triggered
  * @param {Object} options - Configuration options
  * @returns {Object} - { isRefreshing, pullDistance, containerRef }
@@ -16,19 +15,22 @@ const usePullToRefresh = (onRefresh, options = {}) => {
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
+  const [startY, setStartY] = useState(0);
   const [isPulling, setIsPulling] = useState(false);
   const containerRef = useRef(null);
 
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
     let touchStartY = 0;
     let currentY = 0;
 
     const handleTouchStart = (e) => {
-      // Only start if scrolled to top of window
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      
-      if (scrollTop <= 0) {
+      // Only start if scrolled to top
+      if (container.scrollTop <= 0) {
         touchStartY = e.touches[0].clientY;
+        setStartY(touchStartY);
         setIsPulling(true);
       }
     };
@@ -39,11 +41,8 @@ const usePullToRefresh = (onRefresh, options = {}) => {
       currentY = e.touches[0].clientY;
       const deltaY = currentY - touchStartY;
 
-      // Check if at top of window
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-
       // Only pull down when at top of page
-      if (deltaY > 0 && scrollTop <= 0) {
+      if (deltaY > 0 && container.scrollTop <= 0) {
         // Prevent default scrolling while pulling
         e.preventDefault();
         
@@ -84,11 +83,10 @@ const usePullToRefresh = (onRefresh, options = {}) => {
     let mouseStartY = 0;
 
     const handleMouseDown = (e) => {
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      
-      if (scrollTop <= 0) {
+      if (container.scrollTop <= 0) {
         isMouseDown = true;
         mouseStartY = e.clientY;
+        setStartY(mouseStartY);
         setIsPulling(true);
       }
     };
@@ -97,9 +95,8 @@ const usePullToRefresh = (onRefresh, options = {}) => {
       if (!isMouseDown || !isPulling || isRefreshing) return;
 
       const deltaY = e.clientY - mouseStartY;
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
 
-      if (deltaY > 0 && scrollTop <= 0) {
+      if (deltaY > 0 && container.scrollTop <= 0) {
         const distance = Math.min(deltaY / resistance, maxPullDistance);
         setPullDistance(distance);
       }
@@ -129,21 +126,21 @@ const usePullToRefresh = (onRefresh, options = {}) => {
       }
     };
 
-    // Touch events - attach to document for global capture
-    document.addEventListener('touchstart', handleTouchStart, { passive: true });
-    document.addEventListener('touchmove', handleTouchMove, { passive: false });
-    document.addEventListener('touchend', handleTouchEnd);
+    // Touch events
+    container.addEventListener('touchstart', handleTouchStart, { passive: true });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTouchEnd);
 
     // Mouse events (for desktop testing)
-    document.addEventListener('mousedown', handleMouseDown);
+    container.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
 
     return () => {
-      document.removeEventListener('touchstart', handleTouchStart);
-      document.removeEventListener('touchmove', handleTouchMove);
-      document.removeEventListener('touchend', handleTouchEnd);
-      document.removeEventListener('mousedown', handleMouseDown);
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
+      container.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
