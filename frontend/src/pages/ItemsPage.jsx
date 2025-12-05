@@ -1,22 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Download, Trash2, ExternalLink, QrCode as QrCodeIcon, Copy, FolderOpen } from 'lucide-react';
+import { Download, Trash2, ExternalLink, QrCode as QrCodeIcon, Copy, FolderOpen, RefreshCw } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import api from '../services/api';
-import usePullToRefresh from '../hooks/usePullToRefresh';
-import PullToRefresh from '../components/PullToRefresh';
 
 const ItemsPage = () => {
   const [items, setItems] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // Pull-to-refresh hook
-  const { isRefreshing, pullDistance, isPulling } = usePullToRefresh(
-    async () => {
-      // Refresh data when pulled
-      await fetchData();
-    }
-  );
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -41,6 +32,12 @@ const ItemsPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchData();
+    setTimeout(() => setRefreshing(false), 500);
   };
 
   const deleteItem = async (id) => {
@@ -110,20 +107,22 @@ const ItemsPage = () => {
 
   return (
     <DashboardLayout>
-      {/* Pull-to-refresh indicator */}
-      <PullToRefresh 
-        isRefreshing={isRefreshing} 
-        pullDistance={pullDistance} 
-        isPulling={isPulling}
-      />
-      
-      {/* Main content - NO REF NEEDED! */}
       <div>
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-primary mb-2">My Items</h1>
             <p className="text-secondary">Manage your uploaded content and QR codes</p>
           </div>
+          
+          {/* Simple Refresh Button */}
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary to-secondary text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50"
+          >
+            <RefreshCw className={refreshing ? 'animate-spin' : ''} size={20} />
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
         </div>
 
         {items.length === 0 ? (
