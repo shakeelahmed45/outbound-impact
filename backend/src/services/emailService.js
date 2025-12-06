@@ -3,9 +3,9 @@ const nodemailer = require('nodemailer');
 // Try multiple SMTP configurations (Railway might block some ports)
 const SMTP_CONFIGS = [
   {
-    name: 'Port 587 with STARTTLS',
+    name: 'Port 465 with STARTTLS',
     host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
-    port: 587,
+    port: 465,
     secure: false,
     auth: {
       user: process.env.EMAIL_USER || 'noreply@outboundimpact.org',
