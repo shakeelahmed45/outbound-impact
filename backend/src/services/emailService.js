@@ -3,9 +3,9 @@ const nodemailer = require('nodemailer');
 // Try multiple SMTP configurations in order of likelihood to work
 const SMTP_CONFIGS = [
   {
-    name: 'Port 587 with STARTTLS (Most Common)',
+    name: 'Port 465 with STARTTLS (Most Common)',
     host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
-    port: 587,
+    port: 465,
     secure: false, // Use STARTTLS
     auth: {
       user: process.env.EMAIL_USER || 'noreply@outboundimpact.org',
