@@ -1,12 +1,12 @@
 const nodemailer = require('nodemailer');
 
-// Try multiple SMTP configurations (Railway might block some ports)
+// Try multiple SMTP configurations in order of likelihood to work
 const SMTP_CONFIGS = [
   {
-    name: 'Port 465 with STARTTLS',
+    name: 'Port 587 with STARTTLS (Most Common)',
     host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
-    port: 465,
-    secure: false,
+    port: 587,
+    secure: false, // Use STARTTLS
     auth: {
       user: process.env.EMAIL_USER || 'noreply@outboundimpact.org',
       pass: process.env.EMAIL_PASS,
@@ -15,7 +15,7 @@ const SMTP_CONFIGS = [
       rejectUnauthorized: false,
       ciphers: 'SSLv3'
     },
-    connectionTimeout: 10000, // 10 seconds
+    connectionTimeout: 10000,
     greetingTimeout: 10000,
     socketTimeout: 10000,
   },
@@ -23,7 +23,7 @@ const SMTP_CONFIGS = [
     name: 'Port 465 with SSL',
     host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
     port: 465,
-    secure: true,
+    secure: true, // Use SSL
     auth: {
       user: process.env.EMAIL_USER || 'noreply@outboundimpact.org',
       pass: process.env.EMAIL_PASS,
@@ -36,7 +36,7 @@ const SMTP_CONFIGS = [
     socketTimeout: 10000,
   },
   {
-    name: 'Port 2525 (Alternative)',
+    name: 'Port 2525 (Alternative SMTP)',
     host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
     port: 2525,
     secure: false,
@@ -64,7 +64,7 @@ const findWorkingConfig = async () => {
       console.log(`📧 Testing SMTP: ${config.name}...`);
       const transporter = nodemailer.createTransport(config);
       await transporter.verify();
-      console.log(`✅ SMTP working: ${config.name}`);
+      console.log(`✅ SMTP working: ${config.name} (Port ${config.port})`);
       workingTransporter = transporter;
       workingConfigIndex = i;
       return transporter;
@@ -223,7 +223,7 @@ const sendAdminNotification = async (userData) => {
       return { success: false, error: 'Email service unavailable' };
     }
 
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@outboundimpact.org';
+    const adminEmail = process.env.ADMIN_EMAIL || 'shakeel@outboundimpact.org';
 
     const planNames = {
       INDIVIDUAL: 'Individual',
