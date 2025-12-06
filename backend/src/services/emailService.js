@@ -299,3 +299,12 @@ const sendAdminNotification = async (userData) => {
     return { success: false, error: error.message };
   }
 };
+
+// Initialize email service
+testConnection();
+
+module.exports = {
+  sendWelcomeEmail,
+  sendAdminNotification,
+  testConnection
+};
