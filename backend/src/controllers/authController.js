@@ -2,6 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const { generateAccessToken, generateRefreshToken } = require('../utils/jwt');
 const { createCheckoutSession, getCheckoutSession } = require('../services/stripeService');
+const emailService = require('../services/emailService');
 
 const prisma = new PrismaClient();
 
@@ -150,6 +151,29 @@ const completeSignup = async (req, res) => {
     });
 
     delete global.pendingSignups[sessionId];
+
+    // 🆕 SEND WELCOME EMAIL TO USER
+    try {
+      await emailService.sendWelcomeEmail(user.email, user.name, user.role);
+      console.log('✅ Welcome email sent to:', user.email);
+    } catch (emailError) {
+      console.error('❌ Failed to send welcome email:', emailError);
+      // Don't fail signup if email fails
+    }
+
+    // 🆕 SEND ADMIN NOTIFICATION
+    try {
+      await emailService.sendAdminNotification({
+        userName: user.name,
+        userEmail: user.email,
+        userRole: user.role,
+        subscriptionId: session.subscription
+      });
+      console.log('✅ Admin notification sent');
+    } catch (emailError) {
+      console.error('❌ Failed to send admin notification:', emailError);
+      // Don't fail signup if email fails
+    }
 
     const accessToken = generateAccessToken(user.id, user.email, user.role);
     const refreshToken = generateRefreshToken(user.id);
