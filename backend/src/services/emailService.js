@@ -1,30 +1,103 @@
 const nodemailer = require('nodemailer');
 
-// Create transporter with Hostinger SMTP
-const createTransporter = () => {
-  return nodemailer.createTransport({
+// Try multiple SMTP configurations (Railway might block some ports)
+const SMTP_CONFIGS = [
+  {
+    name: 'Port 587 with STARTTLS',
     host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
-    port: parseInt(process.env.EMAIL_PORT) || 587, // Using 587 instead of 465
-    secure: false, // Use TLS instead of SSL
+    port: 587,
+    secure: false,
     auth: {
       user: process.env.EMAIL_USER || 'noreply@outboundimpact.org',
       pass: process.env.EMAIL_PASS,
     },
     tls: {
-      rejectUnauthorized: false // Allow self-signed certificates
+      rejectUnauthorized: false,
+      ciphers: 'SSLv3'
+    },
+    connectionTimeout: 10000, // 10 seconds
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
+  },
+  {
+    name: 'Port 465 with SSL',
+    host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
+    port: 465,
+    secure: true,
+    auth: {
+      user: process.env.EMAIL_USER || 'noreply@outboundimpact.org',
+      pass: process.env.EMAIL_PASS,
+    },
+    tls: {
+      rejectUnauthorized: false
+    },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
+  },
+  {
+    name: 'Port 2525 (Alternative)',
+    host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
+    port: 2525,
+    secure: false,
+    auth: {
+      user: process.env.EMAIL_USER || 'noreply@outboundimpact.org',
+      pass: process.env.EMAIL_PASS,
+    },
+    tls: {
+      rejectUnauthorized: false
+    },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
+  }
+];
+
+let workingTransporter = null;
+let workingConfigIndex = -1;
+
+// Try to find a working SMTP configuration
+const findWorkingConfig = async () => {
+  for (let i = 0; i < SMTP_CONFIGS.length; i++) {
+    const config = SMTP_CONFIGS[i];
+    try {
+      console.log(`📧 Testing SMTP: ${config.name}...`);
+      const transporter = nodemailer.createTransport(config);
+      await transporter.verify();
+      console.log(`✅ SMTP working: ${config.name}`);
+      workingTransporter = transporter;
+      workingConfigIndex = i;
+      return transporter;
+    } catch (error) {
+      console.log(`❌ SMTP failed: ${config.name} - ${error.message}`);
     }
-  });
+  }
+  
+  console.error('❌ No working SMTP configuration found!');
+  console.error('⚠️ Emails will be disabled. Signup will still work.');
+  return null;
 };
 
-// Test email connection
+// Get or create transporter
+const getTransporter = async () => {
+  if (workingTransporter) {
+    return workingTransporter;
+  }
+  return await findWorkingConfig();
+};
+
+// Test connection on startup
 const testConnection = async () => {
   try {
-    const transporter = createTransporter();
-    await transporter.verify();
-    console.log('✅ Email server connection successful');
-    return true;
+    const transporter = await getTransporter();
+    if (transporter) {
+      console.log('✅ Email service ready');
+      return true;
+    }
+    console.log('⚠️ Email service disabled - signup will still work');
+    return false;
   } catch (error) {
-    console.error('❌ Email server connection failed:', error.message);
+    console.error('❌ Email test failed:', error.message);
     return false;
   }
 };
@@ -32,7 +105,12 @@ const testConnection = async () => {
 // Send welcome email to new user
 const sendWelcomeEmail = async (userEmail, userName, userRole) => {
   try {
-    const transporter = createTransporter();
+    const transporter = await getTransporter();
+    
+    if (!transporter) {
+      console.log('⚠️ Email service unavailable - skipping welcome email');
+      return { success: false, error: 'Email service unavailable' };
+    }
 
     const planNames = {
       INDIVIDUAL: 'Individual',
@@ -130,17 +208,22 @@ const sendWelcomeEmail = async (userEmail, userName, userRole) => {
     console.log('✅ Welcome email sent to:', userEmail);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('❌ Failed to send welcome email:', error);
-    throw error;
+    console.error('❌ Failed to send welcome email:', error.message);
+    return { success: false, error: error.message };
   }
 };
 
 // Send admin notification
 const sendAdminNotification = async (userData) => {
   try {
-    const transporter = createTransporter();
+    const transporter = await getTransporter();
+    
+    if (!transporter) {
+      console.log('⚠️ Email service unavailable - skipping admin notification');
+      return { success: false, error: 'Email service unavailable' };
+    }
 
-    const adminEmail = process.env.ADMIN_EMAIL || 'shakeel@outboundimpact.org';
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@outboundimpact.org';
 
     const planNames = {
       INDIVIDUAL: 'Individual',
@@ -212,12 +295,12 @@ const sendAdminNotification = async (userData) => {
     console.log('✅ Admin notification sent to:', adminEmail);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('❌ Failed to send admin notification:', error);
-    throw error;
+    console.error('❌ Failed to send admin notification:', error.message);
+    return { success: false, error: error.message };
   }
 };
 
-// Test connection when service loads
+// Initialize email service
 testConnection();
 
 module.exports = {
