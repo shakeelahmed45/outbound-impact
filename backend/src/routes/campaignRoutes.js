@@ -3,6 +3,10 @@ const router = express.Router();
 const campaignController = require('../controllers/campaignController');
 const authMiddleware = require('../middleware/auth');
 
+// Public route (NO auth required)
+router.get('/public/:slug', campaignController.getPublicCampaign);
+
+// Protected routes (auth required)
 router.get('/', authMiddleware, campaignController.getUserCampaigns);
 router.post('/', authMiddleware, campaignController.createCampaign);
 router.put('/:id', authMiddleware, campaignController.updateCampaign);
