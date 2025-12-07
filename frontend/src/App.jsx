@@ -16,6 +16,7 @@ import CampaignsPage from './pages/CampaignsPage';
 import SettingsPage from './pages/SettingsPage';
 import LiveChatPage from './pages/LiveChatPage';
 import PublicViewer from './pages/PublicViewer';
+import PublicCampaignViewer from './pages/PublicCampaignViewer';
 import EnterprisePage from './pages/EnterprisePage';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -56,7 +57,9 @@ function App() {
         <Route path="/enterprise" element={<EnterprisePage />} />
         <Route path="/auth/success" element={<AuthSuccess />} />
         
+        {/* Public Routes */}
         <Route path="/l/:slug" element={<PublicViewer />} />
+        <Route path="/c/:slug" element={<PublicCampaignViewer />} />
         
         {/* User Dashboard Routes */}
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

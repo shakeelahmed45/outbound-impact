@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Folder, Trash2, Edit2, FileText, Tag, Eye, TrendingUp } from 'lucide-react';
+import { Plus, Folder, Trash2, Edit2, FileText, Tag, Eye, TrendingUp, Download, Share2, ExternalLink } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import api from '../services/api';
 
@@ -210,23 +210,20 @@ const CampaignsPage = () => {
       }
 
       // Refresh data
-      setLoading(true);
       await fetchData();
-      setLoading(false);
 
-      // Close modal and reset
       setShowAddItemsModal(false);
       setSelectedCampaign(null);
       setSelectedItems([]);
 
       // Show success message
-      let message = 'Campaign updated successfully!';
+      let message = 'Campaign items updated!';
       if (addedCount > 0 && removedCount > 0) {
-        message = `Added ${addedCount} and removed ${removedCount} items!`;
+        message = `Added ${addedCount} item(s) and removed ${removedCount} item(s)`;
       } else if (addedCount > 0) {
-        message = `Added ${addedCount} item(s) to campaign!`;
+        message = `Added ${addedCount} item(s) to campaign`;
       } else if (removedCount > 0) {
-        message = `Removed ${removedCount} item(s) from campaign!`;
+        message = `Removed ${removedCount} item(s) from campaign`;
       }
       
       alert(message);
@@ -247,6 +244,41 @@ const CampaignsPage = () => {
     return campaignItems.reduce((total, item) => {
       return total + (analytics[item.id] || 0);
     }, 0);
+  };
+
+  // 🆕 NEW FUNCTIONS FOR QR CODE HANDLING
+  const downloadCampaignQR = (campaign) => {
+    if (!campaign.qrCodeUrl) return;
+    
+    const link = document.createElement('a');
+    link.href = campaign.qrCodeUrl;
+    link.download = `${campaign.name}-qr-code.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const shareCampaign = async (campaign) => {
+    const campaignUrl = `${window.location.origin}/c/${campaign.slug}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: campaign.name,
+          text: campaign.description || `Check out ${campaign.name}`,
+          url: campaignUrl,
+        });
+      } catch (err) {
+        console.log('Share cancelled');
+      }
+    } else {
+      navigator.clipboard.writeText(campaignUrl);
+      alert('Link copied to clipboard!');
+    }
+  };
+
+  const openPublicCampaign = (campaign) => {
+    window.open(`/c/${campaign.slug}`, '_blank');
   };
 
   if (loading) {
@@ -331,6 +363,54 @@ const CampaignsPage = () => {
                     </div>
                   </div>
 
+                  {/* 🆕 CAMPAIGN QR CODE & ACTIONS */}
+                  {campaign.qrCodeUrl && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <div className="flex items-center gap-4">
+                        <img 
+                          src={campaign.qrCodeUrl} 
+                          alt="Campaign QR Code" 
+                          className="w-20 h-20 rounded-lg shadow-md cursor-pointer hover:scale-105 transition"
+                          onClick={() => downloadCampaignQR(campaign)}
+                          title="Click to download"
+                        />
+                        
+                        <div className="flex-1 flex flex-wrap gap-2">
+                          <button
+                            onClick={() => downloadCampaignQR(campaign)}
+                            className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-primary to-secondary text-white rounded-lg text-sm font-medium hover:opacity-90 transition"
+                          >
+                            <Download size={16} />
+                            <span>Download QR</span>
+                          </button>
+                          
+                          <button
+                            onClick={() => shareCampaign(campaign)}
+                            className="flex items-center gap-2 px-3 py-2 border-2 border-primary text-primary rounded-lg text-sm font-medium hover:bg-purple-50 transition"
+                          >
+                            <Share2 size={16} />
+                            <span>Share</span>
+                          </button>
+                          
+                          <button
+                            onClick={() => openPublicCampaign(campaign)}
+                            className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
+                          >
+                            <ExternalLink size={16} />
+                            <span>Preview</span>
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-3 p-2 bg-gray-50 rounded-lg">
+                        <p className="text-xs text-gray-600 mb-1">Campaign URL:</p>
+                        <code className="text-xs text-primary font-mono">
+                          {window.location.origin}/c/{campaign.slug}
+                        </code>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex gap-2 mt-4">
                     <button
                       onClick={() => openViewItemsModal(campaign)}
@@ -379,7 +459,7 @@ const CampaignsPage = () => {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    placeholder="e.g., Summer Concert Tickets"
+                    placeholder="e.g., Summer Sale 2024"
                     required
                   />
                 </div>
@@ -400,7 +480,6 @@ const CampaignsPage = () => {
                       </option>
                     ))}
                   </select>
-                  <p className="text-sm text-gray-500 mt-1">Organize your QR codes by purpose</p>
                 </div>
 
                 <div>
@@ -411,7 +490,7 @@ const CampaignsPage = () => {
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent h-24 resize-none"
-                    placeholder="What is this campaign for?"
+                    placeholder="Optional description..."
                   />
                 </div>
 

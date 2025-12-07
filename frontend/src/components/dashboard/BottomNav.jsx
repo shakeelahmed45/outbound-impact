@@ -13,7 +13,7 @@ const BottomNav = () => {
   const navItems = [
     { path: '/dashboard', icon: Home, label: 'Home' },
     { path: '/dashboard/upload', icon: Upload, label: 'Upload' },
-    { path: '/dashboard/items', icon: FolderOpen, label: 'Items' },
+    { path: '/dashboard/items', icon: FolderOpen, label: 'Messages' },
     // Show Advanced Analytics for Small, Medium, and Enterprise
     // Show regular Analytics for Individual users only
     isSmallOrAbove
