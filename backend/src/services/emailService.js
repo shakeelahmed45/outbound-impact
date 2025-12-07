@@ -111,7 +111,7 @@ const sendWelcomeEmail = async (userEmail, userName, userRole) => {
             
             <div class="footer">
               <p>Questions? Email us at <a href="mailto:support@outboundimpact.org" style="color: #800080;">support@outboundimpact.org</a></p>
-              <p style="color: #999; font-size: 12px;">© 2024 Outbound Impact. All rights reserved.</p>
+              <p style="color: #999; font-size: 12px;">© 2025 Outbound Impact. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -140,7 +140,7 @@ const sendAdminNotification = async (userData) => {
       return { success: false, error: 'Resend not configured' };
     }
 
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@outboundimpact.org';
+    const adminEmail = process.env.ADMIN_EMAIL || 'business.shakeelahmed@gmail.com';
 
     const planNames = {
       INDIVIDUAL: 'Individual',
