@@ -1,103 +1,20 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-// Try multiple SMTP configurations in order of likelihood to work
-const SMTP_CONFIGS = [
-  {
-    name: 'Port 465 with STARTTLS (Most Common)',
-    host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
-    port: 465,
-    secure: false, // Use STARTTLS
-    auth: {
-      user: process.env.EMAIL_USER || 'noreply@outboundimpact.org',
-      pass: process.env.EMAIL_PASS,
-    },
-    tls: {
-      rejectUnauthorized: false,
-      ciphers: 'SSLv3'
-    },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
-  },
-  {
-    name: 'Port 465 with SSL',
-    host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
-    port: 465,
-    secure: true, // Use SSL
-    auth: {
-      user: process.env.EMAIL_USER || 'noreply@outboundimpact.org',
-      pass: process.env.EMAIL_PASS,
-    },
-    tls: {
-      rejectUnauthorized: false
-    },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
-  },
-  {
-    name: 'Port 2525 (Alternative SMTP)',
-    host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
-    port: 2525,
-    secure: false,
-    auth: {
-      user: process.env.EMAIL_USER || 'noreply@outboundimpact.org',
-      pass: process.env.EMAIL_PASS,
-    },
-    tls: {
-      rejectUnauthorized: false
-    },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
-  }
-];
+// Initialize Resend with API key
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-let workingTransporter = null;
-let workingConfigIndex = -1;
-
-// Try to find a working SMTP configuration
-const findWorkingConfig = async () => {
-  for (let i = 0; i < SMTP_CONFIGS.length; i++) {
-    const config = SMTP_CONFIGS[i];
-    try {
-      console.log(`📧 Testing SMTP: ${config.name}...`);
-      const transporter = nodemailer.createTransport(config);
-      await transporter.verify();
-      console.log(`✅ SMTP working: ${config.name} (Port ${config.port})`);
-      workingTransporter = transporter;
-      workingConfigIndex = i;
-      return transporter;
-    } catch (error) {
-      console.log(`❌ SMTP failed: ${config.name} - ${error.message}`);
-    }
-  }
-  
-  console.error('❌ No working SMTP configuration found!');
-  console.error('⚠️ Emails will be disabled. Signup will still work.');
-  return null;
-};
-
-// Get or create transporter
-const getTransporter = async () => {
-  if (workingTransporter) {
-    return workingTransporter;
-  }
-  return await findWorkingConfig();
-};
-
-// Test connection on startup
+// Test Resend connection
 const testConnection = async () => {
   try {
-    const transporter = await getTransporter();
-    if (transporter) {
-      console.log('✅ Email service ready');
-      return true;
+    if (!process.env.RESEND_API_KEY) {
+      console.error('❌ RESEND_API_KEY not found in environment variables');
+      return false;
     }
-    console.log('⚠️ Email service disabled - signup will still work');
-    return false;
+    console.log('✅ Resend API key configured');
+    console.log('✅ Email service ready (using Resend)');
+    return true;
   } catch (error) {
-    console.error('❌ Email test failed:', error.message);
+    console.error('❌ Resend initialization failed:', error.message);
     return false;
   }
 };
@@ -105,11 +22,9 @@ const testConnection = async () => {
 // Send welcome email to new user
 const sendWelcomeEmail = async (userEmail, userName, userRole) => {
   try {
-    const transporter = await getTransporter();
-    
-    if (!transporter) {
-      console.log('⚠️ Email service unavailable - skipping welcome email');
-      return { success: false, error: 'Email service unavailable' };
+    if (!process.env.RESEND_API_KEY) {
+      console.log('⚠️ Resend not configured - skipping welcome email');
+      return { success: false, error: 'Resend not configured' };
     }
 
     const planNames = {
@@ -121,9 +36,9 @@ const sendWelcomeEmail = async (userEmail, userName, userRole) => {
 
     const planName = planNames[userRole] || 'Individual';
 
-    const mailOptions = {
-      from: `"Outbound Impact" <${process.env.EMAIL_FROM || 'noreply@outboundimpact.org'}>`,
-      to: userEmail,
+    const { data, error } = await resend.emails.send({
+      from: 'Outbound Impact <noreply@outboundimpact.org>',
+      to: [userEmail],
       replyTo: 'support@outboundimpact.org',
       subject: '🎉 Welcome to Outbound Impact!',
       html: `
@@ -202,11 +117,15 @@ const sendWelcomeEmail = async (userEmail, userName, userRole) => {
         </body>
         </html>
       `
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Welcome email sent to:', userEmail);
-    return { success: true, messageId: info.messageId };
+    if (error) {
+      console.error('❌ Failed to send welcome email:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('✅ Welcome email sent to:', userEmail, '(ID:', data.id, ')');
+    return { success: true, messageId: data.id };
   } catch (error) {
     console.error('❌ Failed to send welcome email:', error.message);
     return { success: false, error: error.message };
@@ -216,14 +135,12 @@ const sendWelcomeEmail = async (userEmail, userName, userRole) => {
 // Send admin notification
 const sendAdminNotification = async (userData) => {
   try {
-    const transporter = await getTransporter();
-    
-    if (!transporter) {
-      console.log('⚠️ Email service unavailable - skipping admin notification');
-      return { success: false, error: 'Email service unavailable' };
+    if (!process.env.RESEND_API_KEY) {
+      console.log('⚠️ Resend not configured - skipping admin notification');
+      return { success: false, error: 'Resend not configured' };
     }
 
-    const adminEmail = process.env.ADMIN_EMAIL || 'shakeel@outboundimpact.org';
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@outboundimpact.org';
 
     const planNames = {
       INDIVIDUAL: 'Individual',
@@ -234,9 +151,9 @@ const sendAdminNotification = async (userData) => {
 
     const planName = planNames[userData.userRole] || userData.userRole;
 
-    const mailOptions = {
-      from: `"Outbound Impact System" <${process.env.EMAIL_FROM || 'noreply@outboundimpact.org'}>`,
-      to: adminEmail,
+    const { data, error } = await resend.emails.send({
+      from: 'Outbound Impact System <noreply@outboundimpact.org>',
+      to: [adminEmail],
       subject: `🔔 New User Signup - ${planName} Plan`,
       html: `
         <!DOCTYPE html>
@@ -289,18 +206,22 @@ const sendAdminNotification = async (userData) => {
         </body>
         </html>
       `
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Admin notification sent to:', adminEmail);
-    return { success: true, messageId: info.messageId };
+    if (error) {
+      console.error('❌ Failed to send admin notification:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('✅ Admin notification sent to:', adminEmail, '(ID:', data.id, ')');
+    return { success: true, messageId: data.id };
   } catch (error) {
     console.error('❌ Failed to send admin notification:', error.message);
     return { success: false, error: error.message };
   }
 };
 
-// Initialize email service
+// Test connection when service loads
 testConnection();
 
 module.exports = {
