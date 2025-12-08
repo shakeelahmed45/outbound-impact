@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Download, Share2, Calendar, Folder, Play, FileText, Music, Image as ImageIcon } from 'lucide-react';
+import { Download, Share2, Calendar, Folder, Play, FileText, Music, Image as ImageIcon, ArrowLeft, Home } from 'lucide-react';
 import axios from 'axios';
 
 const PublicCampaignViewer = () => {
@@ -133,6 +133,17 @@ const PublicCampaignViewer = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-violet-50 py-12 px-4">
       <div className="max-w-7xl mx-auto">
+        {/* Back Button */}
+        <div className="mb-6">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 px-4 py-2 bg-white text-primary rounded-lg font-semibold shadow-md hover:shadow-lg transition-all hover:bg-purple-50"
+          >
+            <ArrowLeft size={20} />
+            <span>Back</span>
+          </button>
+        </div>
+
         {/* Campaign Header */}
         <div className="bg-white rounded-3xl shadow-2xl p-8 mb-8">
           <div className="flex flex-col md:flex-row items-start justify-between gap-6 mb-6">
