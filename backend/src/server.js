@@ -81,9 +81,8 @@ app.use((err, req, res, next) => {
 if (process.env.VERCEL) {
   module.exports = app;
 } else {
-  // CRITICAL: Bind to 0.0.0.0 for Railway/Docker environments!
-  // Without this, the server only listens on localhost and Railway can't access it
-  app.listen(PORT, '0.0.0.0', () => {
+  // Start server for local development
+  app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL}`);
     console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
