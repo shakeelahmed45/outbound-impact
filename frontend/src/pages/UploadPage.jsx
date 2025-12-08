@@ -330,11 +330,11 @@ const UploadPage = () => {
           </button>
         </div>
       ) : (
-        <div className="flex gap-3">
+        <div className="space-y-3">
           <select
             value={selectedCampaignId}
             onChange={(e) => setSelectedCampaignId(e.target.value)}
-            className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
             required
           >
             <option value="">-- Select a campaign --</option>
@@ -347,10 +347,10 @@ const UploadPage = () => {
           <button
             type="button"
             onClick={() => setShowCreateCampaignModal(true)}
-            className="px-4 py-3 border-2 border-primary text-primary rounded-lg font-semibold hover:bg-purple-50 transition flex items-center gap-2"
+            className="w-full px-4 py-3 border-2 border-primary text-primary rounded-lg font-semibold hover:bg-purple-50 transition flex items-center justify-center gap-2"
           >
             <Plus size={20} />
-            <span>New</span>
+            <span>Create New Campaign</span>
           </button>
         </div>
       )}
@@ -536,6 +536,61 @@ const UploadPage = () => {
               </div>
             </div>
           </form>
+        )}
+
+        {uploadType && uploadType !== 'TEXT' && !selectedFile && (
+          <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-bold text-primary">Upload {uploadType}</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setUploadType(null);
+                  setTitle('');
+                  setDescription('');
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Campaign Selector */}
+            <CampaignSelector />
+
+            <div
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
+              className={`border-4 border-dashed rounded-2xl p-12 text-center transition-all ${
+                dragActive ? 'border-primary bg-purple-50' : 'border-gray-300'
+              }`}
+            >
+              <Upload className="mx-auto mb-4 text-primary" size={48} />
+              <p className="text-xl font-semibold text-gray-700 mb-2">
+                Drag and drop your {uploadType.toLowerCase()} file here
+              </p>
+              <p className="text-gray-500 mb-6">or click to browse</p>
+              <input
+                type="file"
+                accept={
+                  uploadType === 'IMAGE' ? 'image/*' :
+                  uploadType === 'VIDEO' ? 'video/*' :
+                  uploadType === 'AUDIO' ? 'audio/*' : '*'
+                }
+                onChange={(e) => e.target.files[0] && handleFileSelect(e.target.files[0])}
+                className="hidden"
+                id="file-upload-selected"
+              />
+              <label
+                htmlFor="file-upload-selected"
+                className="gradient-btn text-white px-6 py-3 rounded-lg font-semibold cursor-pointer inline-block"
+              >
+                Browse Files
+              </label>
+            </div>
+          </div>
         )}
 
         {uploadType && uploadType !== 'TEXT' && selectedFile && (
