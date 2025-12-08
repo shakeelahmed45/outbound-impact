@@ -96,10 +96,6 @@ const ItemsPage = () => {
     document.body.removeChild(link);
   };
 
-  const openItem = (url) => {
-    window.open(url, '_blank');
-  };
-
   const copyPublicLink = (url) => {
     navigator.clipboard.writeText(url);
     alert('Link copied to clipboard!');
@@ -278,13 +274,15 @@ const ItemsPage = () => {
                       Copy Link
                     </button>
 
-                    <button
-                      onClick={() => openItem(item.publicUrl)}
+                    <a
+                      href={item.publicUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="flex items-center gap-2 px-3 md:px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all text-sm md:text-base"
                     >
                       <ExternalLink size={16} />
                       View
-                    </button>
+                    </a>
 
                     <button
                       onClick={() => downloadQRCode(item)}
