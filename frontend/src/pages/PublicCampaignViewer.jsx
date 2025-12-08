@@ -105,12 +105,19 @@ const PublicCampaignViewer = () => {
   };
 
   const handleBack = () => {
-    // Check if we can go back in history
-    if (window.history.length > 1) {
-      navigate(-1);
+    // Check if we're in a popup/new tab opened from dashboard
+    if (window.opener && !window.opener.closed) {
+      // We have a parent window - close this tab and focus parent
+      window.opener.focus();
+      window.close();
     } else {
-      // No history, go to dashboard
-      navigate('/dashboard/campaigns');
+      // No parent window or it's closed - navigate back
+      const token = localStorage.getItem('token');
+      if (token) {
+        window.location.href = '/dashboard/campaigns';
+      } else {
+        window.location.href = '/';
+      }
     }
   };
 
