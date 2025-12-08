@@ -1,10 +1,25 @@
-import { useState } from 'react';
-import { Upload, Image, Video, Music, FileText, X, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Upload, Image, Video, Music, FileText, X, Loader2, Plus, Folder } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import api from '../services/api';
 import { useToast } from '../hooks/useToast';
 import Toast from '../components/common/Toast';
+
+const CAMPAIGN_CATEGORIES = [
+  'Tickets',
+  'Restaurant Menus',
+  'Products',
+  'Events',
+  'Marketing',
+  'Education',
+  'Healthcare',
+  'Real Estate',
+  'Travel',
+  'Entertainment',
+  'Business Cards',
+  'Other',
+];
 
 const UploadPage = () => {
   const navigate = useNavigate();
@@ -19,6 +34,70 @@ const UploadPage = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [content, setContent] = useState('');
+
+  // 🆕 Campaign selection state
+  const [campaigns, setCampaigns] = useState([]);
+  const [selectedCampaignId, setSelectedCampaignId] = useState('');
+  const [loadingCampaigns, setLoadingCampaigns] = useState(true);
+  const [showCreateCampaignModal, setShowCreateCampaignModal] = useState(false);
+  const [newCampaignData, setNewCampaignData] = useState({
+    name: '',
+    description: '',
+    category: '',
+  });
+  const [creatingCampaign, setCreatingCampaign] = useState(false);
+
+  // 🆕 Fetch campaigns on mount
+  useEffect(() => {
+    fetchCampaigns();
+  }, []);
+
+  const fetchCampaigns = async () => {
+    try {
+      setLoadingCampaigns(true);
+      const response = await api.get('/campaigns');
+      if (response.data.status === 'success') {
+        setCampaigns(response.data.campaigns);
+        // Auto-select first campaign if available
+        if (response.data.campaigns.length > 0 && !selectedCampaignId) {
+          setSelectedCampaignId(response.data.campaigns[0].id);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch campaigns:', error);
+    } finally {
+      setLoadingCampaigns(false);
+    }
+  };
+
+  // 🆕 Create new campaign
+  const handleCreateCampaign = async (e) => {
+    e.preventDefault();
+    
+    if (!newCampaignData.name) {
+      showToast('Please enter campaign name', 'error');
+      return;
+    }
+
+    setCreatingCampaign(true);
+
+    try {
+      const response = await api.post('/campaigns', newCampaignData);
+      if (response.data.status === 'success') {
+        const newCampaign = response.data.campaign;
+        setCampaigns([newCampaign, ...campaigns]);
+        setSelectedCampaignId(newCampaign.id);
+        setShowCreateCampaignModal(false);
+        setNewCampaignData({ name: '', description: '', category: '' });
+        showToast('Campaign created successfully!', 'success');
+      }
+    } catch (error) {
+      console.error('Failed to create campaign:', error);
+      showToast('Failed to create campaign', 'error');
+    } finally {
+      setCreatingCampaign(false);
+    }
+  };
 
   const simulateProgress = (startProgress, endProgress, duration) => {
     return new Promise((resolve) => {
@@ -95,6 +174,12 @@ const UploadPage = () => {
       return;
     }
 
+    // 🆕 Check campaign selection
+    if (!selectedCampaignId) {
+      showToast('Please select a campaign', 'error');
+      return;
+    }
+
     setUploading(true);
     setUploadProgress(0);
 
@@ -127,7 +212,15 @@ const UploadPage = () => {
         setUploadProgress(100); // Complete
 
         if (response.data.status === 'success') {
-          showToast('File uploaded successfully! QR code generated.', 'success');
+          const itemId = response.data.item.id;
+
+          // 🆕 Assign item to campaign
+          await api.post('/campaigns/assign', {
+            itemId,
+            campaignId: selectedCampaignId,
+          });
+
+          showToast('File uploaded and added to campaign!', 'success');
           
           setTimeout(() => {
             setTitle('');
@@ -136,7 +229,8 @@ const UploadPage = () => {
             setPreview(null);
             setUploadType(null);
             setUploadProgress(0);
-            navigate('/dashboard/items');
+            // 🆕 Redirect to campaigns page
+            navigate('/dashboard/campaigns');
           }, 1000);
         }
       };
@@ -155,6 +249,12 @@ const UploadPage = () => {
 
     if (!title || !content) {
       showToast('Please enter title and content', 'error');
+      return;
+    }
+
+    // 🆕 Check campaign selection
+    if (!selectedCampaignId) {
+      showToast('Please select a campaign', 'error');
       return;
     }
 
@@ -177,7 +277,15 @@ const UploadPage = () => {
       setUploadProgress(100);
 
       if (response.data.status === 'success') {
-        showToast('Text post created successfully! QR code generated.', 'success');
+        const itemId = response.data.item.id;
+
+        // 🆕 Assign item to campaign
+        await api.post('/campaigns/assign', {
+          itemId,
+          campaignId: selectedCampaignId,
+        });
+
+        showToast('Text post created and added to campaign!', 'success');
         
         setTimeout(() => {
           setTitle('');
@@ -185,7 +293,8 @@ const UploadPage = () => {
           setContent('');
           setUploadType(null);
           setUploadProgress(0);
-          navigate('/dashboard/items');
+          // 🆕 Redirect to campaigns page
+          navigate('/dashboard/campaigns');
         }, 1000);
       }
     } catch (error) {
@@ -196,6 +305,57 @@ const UploadPage = () => {
       setUploading(false);
     }
   };
+
+  // 🆕 Campaign Selection Component
+  const CampaignSelector = () => (
+    <div className="mb-6">
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        Select Campaign *
+      </label>
+      {loadingCampaigns ? (
+        <div className="flex items-center justify-center py-4">
+          <Loader2 className="animate-spin text-primary" size={24} />
+        </div>
+      ) : campaigns.length === 0 ? (
+        <div className="text-center py-6 bg-purple-50 rounded-lg border border-purple-200">
+          <Folder className="mx-auto mb-3 text-primary" size={32} />
+          <p className="text-gray-700 mb-4">No campaigns yet. Create your first campaign!</p>
+          <button
+            type="button"
+            onClick={() => setShowCreateCampaignModal(true)}
+            className="gradient-btn text-white px-6 py-3 rounded-lg font-semibold inline-flex items-center gap-2"
+          >
+            <Plus size={20} />
+            <span>Create Campaign</span>
+          </button>
+        </div>
+      ) : (
+        <div className="flex gap-3">
+          <select
+            value={selectedCampaignId}
+            onChange={(e) => setSelectedCampaignId(e.target.value)}
+            className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            required
+          >
+            <option value="">-- Select a campaign --</option>
+            {campaigns.map((campaign) => (
+              <option key={campaign.id} value={campaign.id}>
+                {campaign.name} {campaign.category && `(${campaign.category})`}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => setShowCreateCampaignModal(true)}
+            className="px-4 py-3 border-2 border-primary text-primary rounded-lg font-semibold hover:bg-purple-50 transition flex items-center gap-2"
+          >
+            <Plus size={20} />
+            <span>New</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <DashboardLayout>
@@ -285,6 +445,9 @@ const UploadPage = () => {
             </div>
 
             <div className="space-y-6">
+              {/* 🆕 Campaign Selector */}
+              <CampaignSelector />
+
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Title *
@@ -351,23 +514,23 @@ const UploadPage = () => {
                     setDescription('');
                     setContent('');
                   }}
-                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50"
+                  className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-all"
                   disabled={uploading}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={uploading}
-                  className="flex-1 gradient-btn text-white px-6 py-3 rounded-lg font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                  disabled={uploading || !selectedCampaignId}
+                  className="flex-1 gradient-btn text-white px-6 py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {uploading ? (
-                    <>
+                    <span className="flex items-center justify-center gap-2">
                       <Loader2 className="animate-spin" size={20} />
                       Creating...
-                    </>
+                    </span>
                   ) : (
-                    'Create Text Post'
+                    'Create Post'
                   )}
                 </button>
               </div>
@@ -375,10 +538,10 @@ const UploadPage = () => {
           </form>
         )}
 
-        {(uploadType === 'IMAGE' || uploadType === 'VIDEO' || uploadType === 'AUDIO' || uploadType === 'OTHER') && (
+        {uploadType && uploadType !== 'TEXT' && selectedFile && (
           <form onSubmit={handleFileUpload} className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-primary">Upload File</h3>
+              <h3 className="text-2xl font-bold text-primary">Upload {uploadType}</h3>
               <button
                 type="button"
                 onClick={() => {
@@ -394,154 +557,186 @@ const UploadPage = () => {
               </button>
             </div>
 
-            {!selectedFile && (
-              <div
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-                className={`border-4 border-dashed rounded-2xl p-12 text-center transition-all mb-6 ${
-                  dragActive ? 'border-primary bg-purple-50' : 'border-gray-300'
-                }`}
-              >
-                <Upload className="mx-auto mb-4 text-primary" size={48} />
-                <p className="text-xl font-semibold text-gray-700 mb-2">
-                  Drop your file here
-                </p>
-                <p className="text-gray-500 mb-6">or click to browse</p>
-                <input
-                  type="file"
-                  onChange={(e) => e.target.files[0] && handleFileSelect(e.target.files[0])}
-                  className="hidden"
-                  id="file-upload-modal"
-                  accept={
-                    uploadType === 'IMAGE' ? 'image/*' :
-                    uploadType === 'VIDEO' ? 'video/*' :
-                    uploadType === 'AUDIO' ? 'audio/*' : '*'
-                  }
-                />
-                <label
-                  htmlFor="file-upload-modal"
-                  className="gradient-btn text-white px-6 py-3 rounded-lg font-semibold cursor-pointer inline-block"
-                >
-                  Browse Files
-                </label>
-              </div>
-            )}
+            <div className="space-y-6">
+              {/* 🆕 Campaign Selector */}
+              <CampaignSelector />
 
-            {selectedFile && (
-              <>
-                {preview && uploadType === 'IMAGE' && (
-                  <div className="mb-6">
-                    <img src={preview} alt="Preview" className="w-full max-h-96 object-contain rounded-lg" />
-                  </div>
-                )}
-
-                {preview && uploadType === 'VIDEO' && (
-                  <div className="mb-6">
-                    <video controls className="w-full max-h-96 rounded-lg">
-                      <source src={preview} />
-                    </video>
-                  </div>
-                )}
-
-                {selectedFile && (
-                  <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-600">Selected file:</p>
-                    <p className="font-semibold text-gray-800">{selectedFile.name}</p>
-                    <p className="text-sm text-gray-500">
-                      {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                    </p>
-                  </div>
-                )}
-
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Title *
-                    </label>
-                    <input
-                      type="text"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                      placeholder="Enter title"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Description (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                      placeholder="Add a description"
-                    />
-                  </div>
-
-                  {uploading && uploadProgress > 0 && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-semibold text-gray-700">Uploading file...</span>
-                        <span className="text-sm font-bold text-primary">{Math.round(uploadProgress)}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                        <div
-                          className="bg-gradient-to-r from-primary to-secondary h-full rounded-full transition-all duration-300 ease-out"
-                          style={{ width: `${uploadProgress}%` }}
-                        />
-                      </div>
-                      <p className="text-xs text-gray-600 mt-2">Please wait while we upload your file to the cloud...</p>
-                    </div>
+              {preview && (uploadType === 'IMAGE' || uploadType === 'VIDEO') && (
+                <div className="mb-6">
+                  {uploadType === 'IMAGE' && (
+                    <img src={preview} alt="Preview" className="w-full max-h-64 object-contain rounded-lg" />
                   )}
-
-                  <div className="flex gap-4">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedFile(null);
-                        setPreview(null);
-                      }}
-                      className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50"
-                      disabled={uploading}
-                    >
-                      Change File
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={uploading}
-                      className="flex-1 gradient-btn text-white px-6 py-3 rounded-lg font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                      {uploading ? (
-                        <>
-                          <Loader2 className="animate-spin" size={20} />
-                          Uploading...
-                        </>
-                      ) : (
-                        'Upload File'
-                      )}
-                    </button>
-                  </div>
+                  {uploadType === 'VIDEO' && (
+                    <video src={preview} controls className="w-full max-h-64 rounded-lg" />
+                  )}
                 </div>
-              </>
-            )}
+              )}
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Title *
+                </label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="Enter title"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Description (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="Add a description"
+                />
+              </div>
+
+              <div className="text-sm text-gray-600 bg-gray-50 p-4 rounded-lg">
+                <p><strong>File:</strong> {selectedFile.name}</p>
+                <p><strong>Size:</strong> {(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+              </div>
+
+              {uploading && uploadProgress > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-gray-700">Uploading...</span>
+                    <span className="text-sm font-bold text-primary">{Math.round(uploadProgress)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div
+                      className="bg-gradient-to-r from-primary to-secondary h-full rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-600 mt-2">Please wait while we upload your file...</p>
+                </div>
+              )}
+
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUploadType(null);
+                    setSelectedFile(null);
+                    setPreview(null);
+                    setTitle('');
+                    setDescription('');
+                  }}
+                  className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-all"
+                  disabled={uploading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={uploading || !selectedCampaignId}
+                  className="flex-1 gradient-btn text-white px-6 py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {uploading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="animate-spin" size={20} />
+                      Uploading...
+                    </span>
+                  ) : (
+                    'Upload File'
+                  )}
+                </button>
+              </div>
+            </div>
           </form>
         )}
 
-        <div className="fixed top-4 right-4 z-50 space-y-2">
-          {toasts.map((toast) => (
-            <Toast
-              key={toast.id}
-              message={toast.message}
-              type={toast.type}
-              onClose={() => removeToast(toast.id)}
-            />
-          ))}
-        </div>
+        {/* 🆕 Create Campaign Modal */}
+        {showCreateCampaignModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl p-8 max-w-md w-full">
+              <h2 className="text-2xl font-bold text-primary mb-6">Create New Campaign</h2>
+              <form onSubmit={handleCreateCampaign} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Campaign Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={newCampaignData.name}
+                    onChange={(e) => setNewCampaignData({ ...newCampaignData, name: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="e.g., Summer Sale 2024"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Category
+                  </label>
+                  <select
+                    value={newCampaignData.category}
+                    onChange={(e) => setNewCampaignData({ ...newCampaignData, category: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  >
+                    <option value="">Select a category</option>
+                    {CAMPAIGN_CATEGORIES.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    value={newCampaignData.description}
+                    onChange={(e) => setNewCampaignData({ ...newCampaignData, description: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent h-24 resize-none"
+                    placeholder="Optional description..."
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateCampaignModal(false);
+                      setNewCampaignData({ name: '', description: '', category: '' });
+                    }}
+                    className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-all"
+                    disabled={creatingCampaign}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 gradient-btn text-white px-6 py-3 rounded-lg font-semibold disabled:opacity-50"
+                    disabled={creatingCampaign}
+                  >
+                    {creatingCampaign ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="animate-spin" size={20} />
+                        Creating...
+                      </span>
+                    ) : (
+                      'Create'
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        <Toast toasts={toasts} removeToast={removeToast} />
       </div>
     </DashboardLayout>
   );
