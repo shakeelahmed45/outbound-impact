@@ -104,6 +104,16 @@ const PublicCampaignViewer = () => {
     );
   };
 
+  const handleBack = () => {
+    // Check if we can go back in history
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      // No history, go to dashboard
+      navigate('/dashboard/campaigns');
+    }
+  };
+
   const openItem = (item) => {
     navigate(`/l/${item.slug}`);
   };
@@ -136,11 +146,11 @@ const PublicCampaignViewer = () => {
         {/* Back Button */}
         <div className="mb-6">
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="flex items-center gap-2 px-4 py-2 bg-white text-primary rounded-lg font-semibold shadow-md hover:shadow-lg transition-all hover:bg-purple-50"
           >
             <ArrowLeft size={20} />
-            <span>Back</span>
+            <span>Back to Dashboard</span>
           </button>
         </div>
 
