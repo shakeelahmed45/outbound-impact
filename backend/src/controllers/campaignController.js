@@ -1,7 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const QRCode = require('qrcode');
 const axios = require('axios');
-const FormData = require('form-data');
 const { nanoid } = require('nanoid');
 
 const prisma = new PrismaClient();
@@ -39,24 +38,23 @@ const generateCampaignQRCode = async (slug) => {
     });
 
     // Upload to Bunny CDN
-    const form = new FormData();
-    form.append('file', qrCodeBuffer, {
-      filename: `campaign-qr-${slug}.png`,
-      contentType: 'image/png',
-    });
+    const bunnyHostname = process.env.BUNNY_HOSTNAME || 'storage.bunnycdn.com';
+    const bunnyStorageZone = process.env.BUNNY_STORAGE_ZONE;
+    const bunnyStoragePassword = process.env.BUNNY_STORAGE_PASSWORD;
+    const bunnyPullZone = process.env.BUNNY_PULL_ZONE;
 
-    const response = await axios.post(
-      `https://storage.bunnycdn.com/${process.env.BUNNY_STORAGE_ZONE}/qr-codes/campaign-qr-${slug}.png`,
+    const response = await axios.put(
+      `https://${bunnyHostname}/${bunnyStorageZone}/qr-codes/campaign-qr-${slug}.png`,
       qrCodeBuffer,
       {
         headers: {
-          'AccessKey': process.env.BUNNY_API_KEY,
+          'AccessKey': bunnyStoragePassword,
           'Content-Type': 'image/png',
         },
       }
     );
 
-    const qrCodeUrl = `https://${process.env.BUNNY_CDN_HOSTNAME}/qr-codes/campaign-qr-${slug}.png`;
+    const qrCodeUrl = `https://${bunnyPullZone}/qr-codes/campaign-qr-${slug}.png`;
     return qrCodeUrl;
   } catch (error) {
     console.error('QR code generation error:', error);
