@@ -267,36 +267,70 @@ const getPublicCampaign = async (req, res) => {
   try {
     const { slug } = req.params;
 
+    console.log('📋 Fetching campaign with slug:', slug);
+
     const campaign = await prisma.campaign.findUnique({
       where: { slug },
       include: {
         items: {
           orderBy: { createdAt: 'desc' },
         },
-        user: {
-          select: {
-            name: true,
-          },
-        },
       },
     });
 
     if (!campaign) {
+      console.log('❌ Campaign not found:', slug);
       return res.status(404).json({
         status: 'error',
         message: 'Campaign not found',
       });
     }
 
+    console.log('✅ Campaign found:', campaign.name);
+    console.log('📦 Items count:', campaign.items.length);
+
+    // Get user name separately (safer)
+    let userName = 'Unknown';
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: campaign.userId },
+        select: { name: true },
+      });
+      if (user) {
+        userName = user.name;
+      }
+    } catch (userError) {
+      console.error('⚠️ Could not fetch user name:', userError.message);
+    }
+
+    // Convert BigInt values to strings for JSON serialization
+    const campaignData = {
+      ...campaign,
+      items: campaign.items.map(item => ({
+        ...item,
+        fileSize: item.fileSize ? item.fileSize.toString() : '0',
+      })),
+      user: {
+        name: userName,
+      },
+    };
+
+    console.log('✅ Sending campaign data');
+
     res.json({
       status: 'success',
-      campaign,
+      campaign: campaignData,
     });
   } catch (error) {
-    console.error('Get public campaign error:', error);
+    console.error('❌ Get public campaign error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+    });
     res.status(500).json({
       status: 'error',
       message: 'Failed to fetch campaign',
+      error: error.message,
     });
   }
 };
