@@ -65,14 +65,8 @@ const PublicViewer = () => {
   };
 
   const handleBack = () => {
-    // Check if there's history to go back to
-    if (window.history.length > 2) {
-      // Has history - go back
-      window.history.back();
-    } else {
-      // No history (QR code scan) - go to home
-      window.location.href = '/';
-    }
+    // Use React Router navigate to preserve auth state
+    navigate(-1);
   };
 
   if (loading) {
