@@ -65,16 +65,13 @@ const PublicViewer = () => {
   };
 
   const handleBack = () => {
-    if (window.opener && !window.opener.closed) {
-      window.opener.focus();
-      window.close();
+    // Check if there's history to go back to
+    if (window.history.length > 2) {
+      // Has history - go back
+      window.history.back();
     } else {
-      const token = localStorage.getItem('token');
-      if (token) {
-        window.location.href = '/dashboard';
-      } else {
-        window.location.href = '/';
-      }
+      // No history (QR code scan) - go to home
+      window.location.href = '/';
     }
   };
 
