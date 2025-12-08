@@ -65,8 +65,15 @@ const PublicViewer = () => {
   };
 
   const handleBack = () => {
-    // Use React Router navigate to preserve auth state
-    navigate(-1);
+    // Check if opened in new tab from Items page or Campaign viewer
+    if (window.opener && !window.opener.closed) {
+      // Opened from another page - close this tab and focus parent
+      window.opener.focus();
+      window.close();
+    } else {
+      // Normal navigation - go back in history
+      navigate(-1);
+    }
   };
 
   if (loading) {
