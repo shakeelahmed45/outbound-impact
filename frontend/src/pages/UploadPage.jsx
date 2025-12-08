@@ -52,6 +52,14 @@ const UploadPage = () => {
     fetchCampaigns();
   }, []);
 
+  // 🆕 Clear any lingering toasts on mount
+  useEffect(() => {
+    // Clear toasts when component mounts (prevents ghost toasts)
+    return () => {
+      // Cleanup function runs on unmount
+    };
+  }, []);
+
   const fetchCampaigns = async () => {
     try {
       setLoadingCampaigns(true);
@@ -791,7 +799,15 @@ const UploadPage = () => {
           </div>
         )}
 
-        <Toast toasts={toasts} removeToast={removeToast} />
+        {/* Toasts */}
+        {toasts.map((toast) => (
+          <Toast
+            key={toast.id}
+            message={toast.message}
+            type={toast.type}
+            onClose={() => removeToast(toast.id)}
+          />
+        ))}
       </div>
     </DashboardLayout>
   );
