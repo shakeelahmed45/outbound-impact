@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Plus, Folder, Trash2, Edit2, FileText, Tag, Eye, TrendingUp, Download, Share2, ExternalLink } from 'lucide-react';
+import { Plus, Folder, Trash2, Edit2, FileText, Tag, Eye, TrendingUp, Download, Share2, ExternalLink, Wifi } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
+import CampaignNFCWriter from '../components/CampaignNFCWriter';
 import api from '../services/api';
 
 const CAMPAIGN_CATEGORIES = [
@@ -35,6 +36,10 @@ const CampaignsPage = () => {
     description: '',
     category: '',
   });
+
+  // 🆕 NFC State
+  const [showNFCModal, setShowNFCModal] = useState(false);
+  const [nfcCampaign, setNfcCampaign] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -246,7 +251,7 @@ const CampaignsPage = () => {
     }, 0);
   };
 
-  // 🆕 NEW FUNCTIONS FOR QR CODE HANDLING
+  // QR Code Functions
   const downloadCampaignQR = (campaign) => {
     if (!campaign.qrCodeUrl) return;
     
@@ -279,6 +284,17 @@ const CampaignsPage = () => {
 
   const openPublicCampaign = (campaign) => {
     window.open(`/c/${campaign.slug}`, '_blank');
+  };
+
+  // 🆕 NFC Functions
+  const openNFCWriter = (campaign) => {
+    setNfcCampaign(campaign);
+    setShowNFCModal(true);
+  };
+
+  const closeNFCWriter = () => {
+    setShowNFCModal(false);
+    setNfcCampaign(null);
   };
 
   if (loading) {
@@ -363,7 +379,7 @@ const CampaignsPage = () => {
                     </div>
                   </div>
 
-                  {/* 🆕 CAMPAIGN QR CODE & ACTIONS */}
+                  {/* CAMPAIGN QR CODE & NFC ACTIONS */}
                   {campaign.qrCodeUrl && (
                     <div className="mt-4 pt-4 border-t border-gray-200">
                       <div className="flex items-center gap-4">
@@ -381,7 +397,16 @@ const CampaignsPage = () => {
                             className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-primary to-secondary text-white rounded-lg text-sm font-medium hover:opacity-90 transition"
                           >
                             <Download size={16} />
-                            <span>Download QR</span>
+                            <span>QR</span>
+                          </button>
+                          
+                          {/* 🆕 NFC BUTTON */}
+                          <button
+                            onClick={() => openNFCWriter(campaign)}
+                            className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition"
+                          >
+                            <Wifi size={16} />
+                            <span>NFC</span>
                           </button>
                           
                           <button
@@ -733,6 +758,14 @@ const CampaignsPage = () => {
               </div>
             </div>
           </div>
+        )}
+
+        {/* 🆕 NFC Writer Modal */}
+        {showNFCModal && nfcCampaign && (
+          <CampaignNFCWriter
+            campaign={nfcCampaign}
+            onClose={closeNFCWriter}
+          />
         )}
       </div>
     </DashboardLayout>
