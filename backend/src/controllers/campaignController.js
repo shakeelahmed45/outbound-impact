@@ -2,7 +2,6 @@ const { PrismaClient } = require('@prisma/client');
 const QRCode = require('qrcode');
 const axios = require('axios');
 const { nanoid } = require('nanoid');
-const nfcService = require('../services/nfcService');
 
 const prisma = new PrismaClient();
 
@@ -12,9 +11,10 @@ const generateUniqueSlug = async () => {
   let exists = true;
 
   while (exists) {
-    slug = nanoid(8); // Generate 8-character random string
+    slug = nanoid(8);
     const existing = await prisma.campaign.findUnique({
       where: { slug },
+      select: { id: true }
     });
     exists = !!existing;
   }
@@ -28,17 +28,15 @@ const generateCampaignQRCode = async (slug) => {
     const baseUrl = process.env.FRONTEND_URL || 'https://outboundimpact.net';
     const campaignUrl = `${baseUrl}/c/${slug}`;
 
-    // Generate QR code as buffer
     const qrCodeBuffer = await QRCode.toBuffer(campaignUrl, {
       width: 500,
       margin: 2,
       color: {
-        dark: '#800080',  // Purple
+        dark: '#800080',
         light: '#FFFFFF',
       },
     });
 
-    // Upload to Bunny CDN
     const bunnyHostname = process.env.BUNNY_HOSTNAME || 'storage.bunnycdn.com';
     const bunnyStorageZone = process.env.BUNNY_STORAGE_ZONE;
     const bunnyStoragePassword = process.env.BUNNY_STORAGE_PASSWORD;
@@ -107,15 +105,8 @@ const createCampaign = async (req, res) => {
       });
     }
 
-    // Generate unique slug
     const slug = await generateUniqueSlug();
-
-    // Generate QR code
     const qrCodeUrl = await generateCampaignQRCode(slug);
-
-    // Generate NFC URL
-    const baseUrl = process.env.FRONTEND_URL || 'https://outboundimpact.net';
-    const nfcUrl = `${baseUrl}/c/${slug}?source=nfc`;
 
     const campaign = await prisma.campaign.create({
       data: {
@@ -125,8 +116,6 @@ const createCampaign = async (req, res) => {
         description: description || null,
         category: category || null,
         qrCodeUrl,
-        nfcEnabled: true,
-        nfcUrl,
       },
     });
 
@@ -269,12 +258,9 @@ const assignItemToCampaign = async (req, res) => {
   }
 };
 
-// Get public campaign data
 const getPublicCampaign = async (req, res) => {
   try {
     const { slug } = req.params;
-
-    console.log('📋 Fetching campaign with slug:', slug);
 
     const campaign = await prisma.campaign.findUnique({
       where: { slug },
@@ -286,17 +272,12 @@ const getPublicCampaign = async (req, res) => {
     });
 
     if (!campaign) {
-      console.log('❌ Campaign not found:', slug);
       return res.status(404).json({
         status: 'error',
         message: 'Campaign not found',
       });
     }
 
-    console.log('✅ Campaign found:', campaign.name);
-    console.log('📦 Items count:', campaign.items.length);
-
-    // Get user name separately (safer)
     let userName = 'Unknown';
     try {
       const user = await prisma.user.findUnique({
@@ -307,10 +288,9 @@ const getPublicCampaign = async (req, res) => {
         userName = user.name;
       }
     } catch (userError) {
-      console.error('⚠️ Could not fetch user name:', userError.message);
+      console.error('Could not fetch user name:', userError.message);
     }
 
-    // Convert BigInt values to strings for JSON serialization
     const campaignData = {
       ...campaign,
       items: campaign.items.map(item => ({
@@ -322,37 +302,25 @@ const getPublicCampaign = async (req, res) => {
       },
     };
 
-    console.log('✅ Sending campaign data');
-
     res.json({
       status: 'success',
       campaign: campaignData,
     });
   } catch (error) {
-    console.error('❌ Get public campaign error:', error);
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-    });
+    console.error('Get public campaign error:', error);
     res.status(500).json({
       status: 'error',
       message: 'Failed to fetch campaign',
-      error: error.message,
     });
   }
 };
 
-// ============================
-// NFC ENDPOINTS FOR CAMPAIGNS
-// ============================
-
-// Get NFC data for a campaign
+// NFC endpoint - generates NFC URL on the fly (no database storage needed)
 const getCampaignNFC = async (req, res) => {
   try {
     const userId = req.user.userId;
     const { id } = req.params;
 
-    // Verify ownership
     const campaign = await prisma.campaign.findFirst({
       where: { id, userId },
     });
@@ -364,118 +332,34 @@ const getCampaignNFC = async (req, res) => {
       });
     }
 
-    const nfcData = await nfcService.getCampaignNFCData(id);
+    const baseUrl = process.env.FRONTEND_URL || 'https://outboundimpact.net';
+    const nfcUrl = `${baseUrl}/c/${campaign.slug}?source=nfc`;
 
     res.json({
       status: 'success',
-      nfc: nfcData,
+      nfc: {
+        campaignId: campaign.id,
+        name: campaign.name,
+        slug: campaign.slug,
+        nfcUrl: nfcUrl,
+        nfcEnabled: true,
+        ndefRecord: {
+          recordType: 'url',
+          data: nfcUrl,
+        },
+        writeInstructions: {
+          format: 'NDEF',
+          type: 'URL',
+          url: nfcUrl,
+          encoding: 'UTF-8'
+        }
+      },
     });
   } catch (error) {
     console.error('Get campaign NFC error:', error);
     res.status(500).json({
       status: 'error',
-      message: error.message || 'Failed to get NFC data',
-    });
-  }
-};
-
-// Enable NFC for a campaign
-const enableCampaignNFC = async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { id } = req.params;
-
-    // Verify ownership
-    const campaign = await prisma.campaign.findFirst({
-      where: { id, userId },
-    });
-
-    if (!campaign) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Campaign not found',
-      });
-    }
-
-    const updatedCampaign = await nfcService.enableCampaignNFC(id);
-
-    res.json({
-      status: 'success',
-      message: 'NFC enabled for campaign',
-      campaign: updatedCampaign,
-    });
-  } catch (error) {
-    console.error('Enable campaign NFC error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: error.message || 'Failed to enable NFC',
-    });
-  }
-};
-
-// Disable NFC for a campaign
-const disableCampaignNFC = async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { id } = req.params;
-
-    // Verify ownership
-    const campaign = await prisma.campaign.findFirst({
-      where: { id, userId },
-    });
-
-    if (!campaign) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Campaign not found',
-      });
-    }
-
-    const updatedCampaign = await nfcService.disableCampaignNFC(id);
-
-    res.json({
-      status: 'success',
-      message: 'NFC disabled for campaign',
-      campaign: updatedCampaign,
-    });
-  } catch (error) {
-    console.error('Disable campaign NFC error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: error.message || 'Failed to disable NFC',
-    });
-  }
-};
-
-// Get full NFC data for campaign and all its items
-const getCampaignFullNFC = async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { id } = req.params;
-
-    // Verify ownership
-    const campaign = await prisma.campaign.findFirst({
-      where: { id, userId },
-    });
-
-    if (!campaign) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Campaign not found',
-      });
-    }
-
-    const nfcData = await nfcService.getFullCampaignNFCData(id);
-
-    res.json({
-      status: 'success',
-      nfc: nfcData,
-    });
-  } catch (error) {
-    console.error('Get full campaign NFC error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: error.message || 'Failed to get full NFC data',
+      message: 'Failed to get NFC data',
     });
   }
 };
@@ -487,9 +371,5 @@ module.exports = {
   deleteCampaign,
   assignItemToCampaign,
   getPublicCampaign,
-  // NFC exports
   getCampaignNFC,
-  enableCampaignNFC,
-  disableCampaignNFC,
-  getCampaignFullNFC,
 };
