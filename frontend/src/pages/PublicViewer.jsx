@@ -66,49 +66,23 @@ const PublicViewer = () => {
   };
 
   const handleBack = () => {
-    console.log('🔙 Back button clicked');
-    console.log('window.opener:', window.opener);
-    console.log('document.referrer:', referrer.current);
-    console.log('window.history.length:', window.history.length);
+    console.log('🔙 BACK BUTTON DEBUG:');
+    console.log('- window.opener:', window.opener);
+    console.log('- history.length:', window.history.length);
+    console.log('- referrer:', referrer.current);
+    console.log('- current URL:', window.location.href);
     
-    // Strategy 1: If opened in new tab with window.open (has window.opener)
+    // If opened in new tab (from Items page) - close the tab
     if (window.opener && !window.opener.closed) {
-      console.log('✅ Strategy 1: Closing tab via window.opener');
-      try {
-        window.opener.focus();
-        window.close();
-        // If window.close() fails, fallback
-        setTimeout(() => {
-          if (!window.closed) {
-            console.log('⚠️ window.close() failed, using history.back()');
-            window.history.back();
-          }
-        }, 100);
-      } catch (e) {
-        console.log('❌ Strategy 1 failed:', e);
-        window.history.back();
-      }
+      console.log('→ Closing new tab');
+      window.opener.focus();
+      window.close();
+      return;
     }
-    // Strategy 2: If has history (same-window navigation) - PRIORITIZE THIS!
-    else if (window.history.length > 2) {
-      console.log('✅ Strategy 2: Using history.back() - has navigation history');
-      window.history.back();
-    }
-    // Strategy 3: If came from campaign viewer (check referrer path) - FALLBACK
-    else if (referrer.current && referrer.current.includes('/c/')) {
-      console.log('✅ Strategy 3: Returning to campaign viewer via referrer');
-      window.location.href = referrer.current;
-    }
-    // Strategy 4: If came from items page (check referrer path) - FALLBACK
-    else if (referrer.current && referrer.current.includes('/dashboard/items')) {
-      console.log('✅ Strategy 4: Returning to items page via referrer');
-      window.location.href = referrer.current;
-    }
-    // Strategy 5: Fallback to home page
-    else {
-      console.log('✅ Strategy 5: Going to home page');
-      window.location.href = '/';
-    }
+    
+    // Default: Use browser back button (works for same-window navigation)
+    console.log('→ Using history.back()');
+    window.history.back();
   };
 
   if (loading) {
