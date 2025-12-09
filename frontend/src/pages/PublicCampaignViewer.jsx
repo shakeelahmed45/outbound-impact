@@ -96,7 +96,6 @@ const PublicCampaignViewer = () => {
       );
     }
 
-    // For AUDIO, TEXT, OTHER - show icon
     return (
       <div className="w-full h-full bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center">
         {getMediaIcon(item.type)}
@@ -105,29 +104,22 @@ const PublicCampaignViewer = () => {
   };
 
   const handleBack = () => {
-    // Check if we're in a popup/new tab opened from dashboard
     if (window.opener && !window.opener.closed) {
-      // We have a parent window - close this tab and focus parent
       window.opener.focus();
       window.close();
     } else {
-      // No parent window - check if user is logged in
       const token = localStorage.getItem('token');
       if (token) {
-        // Logged in user - go to dashboard campaigns
         window.location.href = '/dashboard/campaigns';
       } else {
-        // Not logged in - go to home
         window.location.href = '/';
       }
     }
   };
 
+  // FIXED: Pass campaign slug in URL query parameter
   const openItem = (item) => {
-    // Pass the campaign URL as state so PublicViewer can return here
-    navigate(`/l/${item.slug}`, { 
-      state: { returnUrl: `/c/${slug}` } 
-    });
+    navigate(`/l/${item.slug}?from=${slug}`);
   };
 
   if (loading) {
@@ -155,7 +147,6 @@ const PublicCampaignViewer = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-violet-50 py-12 px-4">
       <div className="max-w-7xl mx-auto">
-        {/* Back Button */}
         <div className="mb-6">
           <button
             onClick={handleBack}
@@ -166,7 +157,6 @@ const PublicCampaignViewer = () => {
           </button>
         </div>
 
-        {/* Campaign Header */}
         <div className="bg-white rounded-3xl shadow-2xl p-8 mb-8">
           <div className="flex flex-col md:flex-row items-start justify-between gap-6 mb-6">
             <div className="flex-1">
@@ -203,7 +193,6 @@ const PublicCampaignViewer = () => {
             )}
           </div>
 
-          {/* Action Buttons */}
           <div className="flex flex-wrap gap-4">
             {campaign.qrCodeUrl && (
               <button
@@ -224,7 +213,6 @@ const PublicCampaignViewer = () => {
           </div>
         </div>
 
-        {/* Items Grid */}
         {campaign.items.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {campaign.items.map((item) => (
@@ -233,12 +221,10 @@ const PublicCampaignViewer = () => {
                 onClick={() => openItem(item)}
                 className="bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer transform transition hover:scale-105 hover:shadow-2xl"
               >
-                {/* Thumbnail */}
                 <div className="aspect-square w-full overflow-hidden bg-gray-100">
                   {getThumbnail(item)}
                 </div>
 
-                {/* Item Info */}
                 <div className="p-4">
                   <h3 className="text-lg font-bold text-primary mb-2 truncate">
                     {item.title}
@@ -268,7 +254,6 @@ const PublicCampaignViewer = () => {
           </div>
         )}
 
-        {/* Footer */}
         <div className="text-center mt-8">
           <p className="text-secondary mb-4">
             Powered by <span className="font-bold text-primary">Outbound Impact</span>

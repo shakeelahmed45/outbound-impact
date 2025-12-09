@@ -274,15 +274,13 @@ const ItemsPage = () => {
                       Copy Link
                     </button>
 
-                    <a
-                      href={item.publicUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={() => window.open(item.publicUrl, '_blank')}
                       className="flex items-center gap-2 px-3 md:px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all text-sm md:text-base"
                     >
                       <ExternalLink size={16} />
                       View
-                    </a>
+                    </button>
 
                     <button
                       onClick={() => downloadQRCode(item)}

@@ -1,21 +1,21 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 
 const PublicViewer = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showOverlay, setShowOverlay] = useState(true);
   const hasTracked = useRef(false);
   const overlayTimeout = useRef(null);
-  
-  // Get return URL from navigation state (passed by campaign viewer)
-  const returnUrl = location.state?.returnUrl;
+
+  // Get the "from" parameter (campaign slug we came from)
+  const fromCampaign = searchParams.get('from');
 
   useEffect(() => {
     const fetchItem = async () => {
@@ -24,7 +24,6 @@ const PublicViewer = () => {
         if (response.data.status === 'success') {
           setItem(response.data.item);
           
-          // Track view only once
           if (!hasTracked.current) {
             hasTracked.current = true;
             axios.post(import.meta.env.VITE_API_URL + '/analytics/track', { slug }).catch(err => {
@@ -42,7 +41,6 @@ const PublicViewer = () => {
     fetchItem();
   }, [slug]);
 
-  // Auto-hide overlay after 3 seconds
   useEffect(() => {
     if (item && showOverlay) {
       overlayTimeout.current = setTimeout(() => {
@@ -57,7 +55,6 @@ const PublicViewer = () => {
     };
   }, [item, showOverlay]);
 
-  // Show overlay on mouse move
   const handleMouseMove = () => {
     setShowOverlay(true);
     if (overlayTimeout.current) {
@@ -69,35 +66,20 @@ const PublicViewer = () => {
   };
 
   const handleBack = () => {
-    console.log('🔙 BACK BUTTON DEBUG:');
-    console.log('- returnUrl from state:', returnUrl);
-    console.log('- window.opener:', window.opener);
-    console.log('- history.length:', window.history.length);
-    
-    // Strategy 1: If opened in new tab (from Items page) - close the tab
+    // If opened in new tab (from Items page) - close the tab
     if (window.opener && !window.opener.closed) {
-      console.log('→ Closing new tab');
       window.opener.focus();
       window.close();
       return;
     }
-    
-    // Strategy 2: If we have a return URL (from campaign viewer) - go there
-    if (returnUrl) {
-      console.log('→ Navigating to returnUrl:', returnUrl);
-      navigate(returnUrl);
+
+    // If we came from a campaign, go back to that campaign
+    if (fromCampaign) {
+      navigate(`/c/${fromCampaign}`);
       return;
     }
-    
-    // Strategy 3: Try browser back
-    if (window.history.length > 1) {
-      console.log('→ Using history.back()');
-      window.history.back();
-      return;
-    }
-    
-    // Strategy 4: Fallback to home
-    console.log('→ Going to home page');
+
+    // Fallback to home page
     navigate('/');
   };
 
