@@ -85,11 +85,6 @@ model Campaign {
   description String?
   category    String?
   qrCodeUrl   String?
-  
-  // NFC Support
-  nfcEnabled  Boolean  @default(true)
-  nfcUrl      String?
-  
   userId      String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -100,7 +95,6 @@ model Campaign {
   @@index([userId])
   @@index([slug])
   @@index([category])
-  @@index([nfcEnabled])
 }
 
 model TeamMember {
