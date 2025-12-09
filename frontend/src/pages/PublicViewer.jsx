@@ -62,23 +62,19 @@ const PublicViewer = () => {
   };
 
   const handleBack = () => {
-    // Get the "from" parameter
     const fromCampaign = new URLSearchParams(window.location.search).get('from');
     
-    // If opened in new tab (from Items page) - close the tab
     if (window.opener && !window.opener.closed) {
       window.opener.focus();
       window.close();
       return;
     }
 
-    // If we came from a campaign, go back to that campaign
     if (fromCampaign) {
       window.location.href = '/c/' + fromCampaign;
       return;
     }
 
-    // Fallback to home page
     window.location.href = '/';
   };
 
