@@ -11,10 +11,9 @@ const generateUniqueSlug = async () => {
   let exists = true;
 
   while (exists) {
-    slug = nanoid(8);
+    slug = nanoid(8); // Generate 8-character random string
     const existing = await prisma.campaign.findUnique({
       where: { slug },
-      select: { id: true }
     });
     exists = !!existing;
   }
@@ -28,15 +27,17 @@ const generateCampaignQRCode = async (slug) => {
     const baseUrl = process.env.FRONTEND_URL || 'https://outboundimpact.net';
     const campaignUrl = `${baseUrl}/c/${slug}`;
 
+    // Generate QR code as buffer
     const qrCodeBuffer = await QRCode.toBuffer(campaignUrl, {
       width: 500,
       margin: 2,
       color: {
-        dark: '#800080',
+        dark: '#800080',  // Purple
         light: '#FFFFFF',
       },
     });
 
+    // Upload to Bunny CDN
     const bunnyHostname = process.env.BUNNY_HOSTNAME || 'storage.bunnycdn.com';
     const bunnyStorageZone = process.env.BUNNY_STORAGE_ZONE;
     const bunnyStoragePassword = process.env.BUNNY_STORAGE_PASSWORD;
@@ -105,7 +106,10 @@ const createCampaign = async (req, res) => {
       });
     }
 
+    // Generate unique slug
     const slug = await generateUniqueSlug();
+
+    // Generate QR code
     const qrCodeUrl = await generateCampaignQRCode(slug);
 
     const campaign = await prisma.campaign.create({
@@ -258,9 +262,12 @@ const assignItemToCampaign = async (req, res) => {
   }
 };
 
+// 🆕 NEW: Get public campaign data
 const getPublicCampaign = async (req, res) => {
   try {
     const { slug } = req.params;
+
+    console.log('📋 Fetching campaign with slug:', slug);
 
     const campaign = await prisma.campaign.findUnique({
       where: { slug },
@@ -272,12 +279,17 @@ const getPublicCampaign = async (req, res) => {
     });
 
     if (!campaign) {
+      console.log('❌ Campaign not found:', slug);
       return res.status(404).json({
         status: 'error',
         message: 'Campaign not found',
       });
     }
 
+    console.log('✅ Campaign found:', campaign.name);
+    console.log('📦 Items count:', campaign.items.length);
+
+    // Get user name separately (safer)
     let userName = 'Unknown';
     try {
       const user = await prisma.user.findUnique({
@@ -288,9 +300,10 @@ const getPublicCampaign = async (req, res) => {
         userName = user.name;
       }
     } catch (userError) {
-      console.error('Could not fetch user name:', userError.message);
+      console.error('⚠️ Could not fetch user name:', userError.message);
     }
 
+    // Convert BigInt values to strings for JSON serialization
     const campaignData = {
       ...campaign,
       items: campaign.items.map(item => ({
@@ -302,64 +315,22 @@ const getPublicCampaign = async (req, res) => {
       },
     };
 
+    console.log('✅ Sending campaign data');
+
     res.json({
       status: 'success',
       campaign: campaignData,
     });
   } catch (error) {
-    console.error('Get public campaign error:', error);
+    console.error('❌ Get public campaign error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+    });
     res.status(500).json({
       status: 'error',
       message: 'Failed to fetch campaign',
-    });
-  }
-};
-
-// NFC endpoint - generates NFC URL on the fly (no database storage needed)
-const getCampaignNFC = async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { id } = req.params;
-
-    const campaign = await prisma.campaign.findFirst({
-      where: { id, userId },
-    });
-
-    if (!campaign) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Campaign not found',
-      });
-    }
-
-    const baseUrl = process.env.FRONTEND_URL || 'https://outboundimpact.net';
-    const nfcUrl = `${baseUrl}/c/${campaign.slug}?source=nfc`;
-
-    res.json({
-      status: 'success',
-      nfc: {
-        campaignId: campaign.id,
-        name: campaign.name,
-        slug: campaign.slug,
-        nfcUrl: nfcUrl,
-        nfcEnabled: true,
-        ndefRecord: {
-          recordType: 'url',
-          data: nfcUrl,
-        },
-        writeInstructions: {
-          format: 'NDEF',
-          type: 'URL',
-          url: nfcUrl,
-          encoding: 'UTF-8'
-        }
-      },
-    });
-  } catch (error) {
-    console.error('Get campaign NFC error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to get NFC data',
+      error: error.message,
     });
   }
 };
@@ -371,5 +342,4 @@ module.exports = {
   deleteCampaign,
   assignItemToCampaign,
   getPublicCampaign,
-  getCampaignNFC,
 };

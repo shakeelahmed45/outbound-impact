@@ -13,7 +13,4 @@ router.put('/:id', authMiddleware, campaignController.updateCampaign);
 router.delete('/:id', authMiddleware, campaignController.deleteCampaign);
 router.post('/assign', authMiddleware, campaignController.assignItemToCampaign);
 
-// NFC route
-router.get('/:id/nfc', authMiddleware, campaignController.getCampaignNFC);
-
 module.exports = router;
