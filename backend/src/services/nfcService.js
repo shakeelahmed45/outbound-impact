@@ -1,6 +1,6 @@
 /**
  * NFC Service
- * Handles NFC tag data generation and management
+ * Handles NFC tag data generation and management for Items and Campaigns
  */
 
 const { PrismaClient } = require('@prisma/client');
@@ -12,9 +12,24 @@ class NFCService {
    * @param {string} slug - Item slug
    * @returns {string} - NFC-enabled URL
    */
-  generateNFCUrl(slug) {
+  generateItemNFCUrl(slug) {
     const baseUrl = process.env.FRONTEND_URL || 'https://outboundimpact.net';
     return `${baseUrl}/l/${slug}?source=nfc`;
+  }
+
+  /**
+   * Generate NFC URL for a campaign
+   * @param {string} slug - Campaign slug
+   * @returns {string} - NFC-enabled URL
+   */
+  generateCampaignNFCUrl(slug) {
+    const baseUrl = process.env.FRONTEND_URL || 'https://outboundimpact.net';
+    return `${baseUrl}/c/${slug}?source=nfc`;
+  }
+
+  // Legacy method for backwards compatibility
+  generateNFCUrl(slug) {
+    return this.generateItemNFCUrl(slug);
   }
 
   /**
@@ -53,7 +68,7 @@ class NFCService {
       throw new Error('Item not found');
     }
 
-    const nfcUrl = this.generateNFCUrl(item.slug);
+    const nfcUrl = this.generateItemNFCUrl(item.slug);
 
     const updatedItem = await prisma.item.update({
       where: { id: itemId },
@@ -101,7 +116,7 @@ class NFCService {
       throw new Error('NFC not enabled for this item');
     }
 
-    const nfcUrl = item.nfcUrl || this.generateNFCUrl(item.slug);
+    const nfcUrl = item.nfcUrl || this.generateItemNFCUrl(item.slug);
 
     return {
       itemId: item.id,
@@ -157,7 +172,7 @@ class NFCService {
 
     const results = await Promise.all(
       items.map(async (item) => {
-        const nfcUrl = this.generateNFCUrl(item.slug);
+        const nfcUrl = this.generateItemNFCUrl(item.slug);
         
         const updated = await prisma.item.update({
           where: { id: item.id },
@@ -180,10 +195,58 @@ class NFCService {
     return results;
   }
 
+  // ============================
+  // CAMPAIGN NFC METHODS
+  // ============================
+
+  /**
+   * Enable NFC for a campaign
+   * @param {string} campaignId - Campaign ID
+   * @returns {object} - Updated campaign with NFC data
+   */
+  async enableCampaignNFC(campaignId) {
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId }
+    });
+
+    if (!campaign) {
+      throw new Error('Campaign not found');
+    }
+
+    const nfcUrl = this.generateCampaignNFCUrl(campaign.slug);
+
+    const updatedCampaign = await prisma.campaign.update({
+      where: { id: campaignId },
+      data: {
+        nfcEnabled: true,
+        nfcUrl: nfcUrl
+      }
+    });
+
+    return {
+      ...updatedCampaign,
+      ndefRecord: this.generateNDEFRecord(nfcUrl)
+    };
+  }
+
+  /**
+   * Disable NFC for a campaign
+   * @param {string} campaignId - Campaign ID
+   * @returns {object} - Updated campaign
+   */
+  async disableCampaignNFC(campaignId) {
+    return await prisma.campaign.update({
+      where: { id: campaignId },
+      data: {
+        nfcEnabled: false
+      }
+    });
+  }
+
   /**
    * Get NFC data for a campaign
    * @param {string} campaignId - Campaign ID
-   * @returns {object} - Campaign NFC data
+   * @returns {object} - Campaign NFC data including NDEF record
    */
   async getCampaignNFCData(campaignId) {
     const campaign = await prisma.campaign.findUnique({
@@ -197,8 +260,47 @@ class NFCService {
       throw new Error('Campaign not found');
     }
 
-    const nfcData = campaign.items.map(item => {
-      const nfcUrl = item.nfcUrl || this.generateNFCUrl(item.slug);
+    const nfcUrl = campaign.nfcUrl || this.generateCampaignNFCUrl(campaign.slug);
+
+    return {
+      campaignId: campaign.id,
+      name: campaign.name,
+      slug: campaign.slug,
+      nfcUrl: nfcUrl,
+      nfcEnabled: campaign.nfcEnabled !== false, // Default to true
+      ndefRecord: this.generateNDEFRecord(nfcUrl),
+      totalItems: campaign.items.length,
+      // Instructions for manual NFC apps
+      writeInstructions: {
+        format: 'NDEF',
+        type: 'URL',
+        url: nfcUrl,
+        encoding: 'UTF-8'
+      }
+    };
+  }
+
+  /**
+   * Get all NFC data for a campaign including all items
+   * @param {string} campaignId - Campaign ID
+   * @returns {object} - Campaign and all items NFC data
+   */
+  async getFullCampaignNFCData(campaignId) {
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId },
+      include: {
+        items: true
+      }
+    });
+
+    if (!campaign) {
+      throw new Error('Campaign not found');
+    }
+
+    const campaignNfcUrl = campaign.nfcUrl || this.generateCampaignNFCUrl(campaign.slug);
+
+    const itemsNfcData = campaign.items.map(item => {
+      const nfcUrl = item.nfcUrl || this.generateItemNFCUrl(item.slug);
       return {
         itemId: item.id,
         title: item.title,
@@ -210,11 +312,17 @@ class NFCService {
     });
 
     return {
-      campaignId: campaign.id,
-      campaignName: campaign.name,
+      campaign: {
+        campaignId: campaign.id,
+        name: campaign.name,
+        slug: campaign.slug,
+        nfcUrl: campaignNfcUrl,
+        nfcEnabled: campaign.nfcEnabled !== false,
+        ndefRecord: this.generateNDEFRecord(campaignNfcUrl)
+      },
+      items: itemsNfcData,
       totalItems: campaign.items.length,
-      nfcEnabledItems: campaign.items.filter(i => i.nfcEnabled).length,
-      items: nfcData
+      nfcEnabledItems: campaign.items.filter(i => i.nfcEnabled).length
     };
   }
 }
