@@ -1,4 +1,4 @@
-import { LogOut, User } from 'lucide-react';
+import { LogOut, User, HelpCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
 
@@ -54,14 +54,31 @@ const DashboardHeader = () => {
         </div>
       </div>
 
-      {/* Logout Button */}
-      <button
-        onClick={handleLogout}
-        className="flex items-center gap-2 px-4 py-2 gradient-btn text-white rounded-lg font-semibold transition-all"
-      >
-        <LogOut size={18} />
-        <span className="hidden sm:inline">Logout</span>
-      </button>
+      {/* Right Side: Help + Logout */}
+      <div className="flex items-center gap-3">
+        {/* Help Button */}
+        <button
+          onClick={() => navigate('/dashboard/guide')}
+          className="relative group p-2 hover:bg-gray-100 rounded-lg transition-all"
+          title="User Guide"
+        >
+          <HelpCircle size={24} className="text-primary group-hover:text-secondary transition-colors" />
+          
+          {/* Hover Tooltip */}
+          <div className="absolute right-0 top-full mt-2 bg-gray-900 text-white text-xs py-1 px-3 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+            User Guide & Help
+          </div>
+        </button>
+
+        {/* Logout Button */}
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-2 px-4 py-2 gradient-btn text-white rounded-lg font-semibold transition-all"
+        >
+          <LogOut size={18} />
+          <span className="hidden sm:inline">Logout</span>
+        </button>
+      </div>
     </header>
   );
 };

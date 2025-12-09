@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { User, CreditCard, Shield, LogOut, Upload, Trash2, MessageSquare, MessagesSquare } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { User, CreditCard, Shield, LogOut, Upload, Trash2, MessageSquare, MessagesSquare, BookOpen } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import useAuthStore from '../store/authStore';
 import api from '../services/api';
@@ -7,6 +8,7 @@ import { useToast } from '../hooks/useToast';
 import Toast from '../components/common/Toast';
 
 const SettingsPage = () => {
+  const navigate = useNavigate();
   const { user, logout, setUser } = useAuthStore();
   const { toasts, showToast, removeToast } = useToast();
   const [activeTab, setActiveTab] = useState('profile');
@@ -183,6 +185,13 @@ const SettingsPage = () => {
             <span className="hidden sm:inline">Live Chat</span>
           </button>
           <button
+            onClick={() => navigate('/dashboard/guide')}
+            className="pb-4 px-2 font-semibold text-gray-500 hover:text-primary transition-all whitespace-nowrap group"
+          >
+            <BookOpen size={20} className="inline mr-2 group-hover:animate-pulse" />
+            <span className="hidden sm:inline">User Guide</span>
+          </button>
+          <button
             onClick={() => setActiveTab('security')}
             className={`pb-4 px-2 font-semibold transition-all whitespace-nowrap ${
               activeTab === 'security'
@@ -200,72 +209,63 @@ const SettingsPage = () => {
             <h3 className="text-2xl font-bold text-primary mb-6">Profile Information</h3>
             
             <div className="mb-8">
-              <label className="block text-sm font-semibold text-gray-700 mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
                 Profile Picture
               </label>
-              <div className="flex flex-col sm:flex-row items-center gap-6">
-                <div className="relative">
-                  {user?.profilePicture ? (
-                    <img
-                      src={user.profilePicture}
-                      alt="Profile"
-                      className="w-24 h-24 rounded-full object-cover border-4 border-primary"
-                    />
-                  ) : (
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white text-3xl font-bold border-4 border-primary">
-                      {user?.name?.charAt(0).toUpperCase() || 'U'}
-                    </div>
-                  )}
-                  {uploadingPhoto && (
-                    <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-                    </div>
-                  )}
-                </div>
+              <div className="flex items-center gap-6">
+                {user?.profilePicture ? (
+                  <img
+                    src={user.profilePicture}
+                    alt={user.name}
+                    className="w-24 h-24 rounded-full object-cover border-4 border-gray-200"
+                  />
+                ) : (
+                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold text-2xl border-4 border-gray-200">
+                    {user?.name?.substring(0, 2).toUpperCase()}
+                  </div>
+                )}
                 <div>
                   <input
                     type="file"
+                    id="photo-upload"
                     accept="image/*"
                     onChange={handlePhotoUpload}
                     className="hidden"
-                    id="photo-upload"
-                    disabled={uploadingPhoto}
                   />
                   <label
                     htmlFor="photo-upload"
-                    className="gradient-btn text-white px-6 py-3 rounded-lg font-semibold cursor-pointer inline-flex items-center gap-2"
+                    className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 border-2 border-primary text-primary rounded-lg font-semibold hover:bg-purple-50 transition-all"
                   >
-                    <Upload size={20} />
-                    {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
+                    <Upload size={18} />
+                    {uploadingPhoto ? 'Uploading...' : 'Upload New Photo'}
                   </label>
-                  <p className="text-xs text-gray-500 mt-2">Max 5MB. JPG, PNG or GIF</p>
+                  <p className="text-xs text-gray-500 mt-2">JPG, PNG or GIF (MAX. 5MB)</p>
                 </div>
               </div>
             </div>
 
-            <form onSubmit={handleUpdateProfile}>
-              <div className="space-y-6 mb-6">
+            <form onSubmit={handleUpdateProfile} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Full Name
                   </label>
                   <input
                     type="text"
                     value={profileData.name}
                     onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="w-full px-4 py-3 rounded-lg border-2 border-gray-200 focus:border-primary focus:outline-none transition-all"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Email Address
                   </label>
                   <input
                     type="email"
                     value={profileData.email}
                     disabled
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed"
+                    className="w-full px-4 py-3 rounded-lg border-2 border-gray-200 bg-gray-50 text-gray-500"
                   />
                   <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
                 </div>

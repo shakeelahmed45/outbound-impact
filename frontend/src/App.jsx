@@ -29,6 +29,7 @@ import WhiteLabelPage from './pages/enterprise/WhiteLabelPage';
 import IntegrationsPage from './pages/enterprise/IntegrationsPage';
 import AdvancedAnalyticsPage from './pages/enterprise/AdvancedAnalyticsPage';
 import SecurityPage from './pages/enterprise/SecurityPage';
+import UserGuidePage from './pages/UserGuidePage';
 
 function App() {
   const [showSplash, setShowSplash] = useState(() => {
@@ -69,6 +70,7 @@ function App() {
         <Route path="/dashboard/team" element={<ProtectedRoute><TeamPage /></ProtectedRoute>} />
         <Route path="/dashboard/campaigns" element={<ProtectedRoute><CampaignsPage /></ProtectedRoute>} />
         <Route path="/dashboard/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+        <Route path="/dashboard/guide" element={<ProtectedRoute><UserGuidePage /></ProtectedRoute>} />
         
         {/* Live Chat Route */}
         <Route path="/live-chat" element={<ProtectedRoute><LiveChatPage /></ProtectedRoute>} />
