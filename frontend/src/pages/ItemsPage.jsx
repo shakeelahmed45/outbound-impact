@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Download, Trash2, ExternalLink, QrCode as QrCodeIcon, Copy, FolderOpen, Nfc, Info } from 'lucide-react';
+import { Download, Trash2, ExternalLink, QrCode as QrCodeIcon, Copy, FolderOpen, Wifi, Info } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import api from '../services/api';
-import NFCWriter from '../components/NFCWriter';
+import ItemNFCWriter from '../components/ItemNFCWriter';
 import NFCGuide from '../components/NFCGuide';
 
 const ItemsPage = () => {
@@ -11,9 +11,10 @@ const ItemsPage = () => {
   const [loading, setLoading] = useState(true);
   
   // NFC states
-  const [showNFCWriter, setShowNFCWriter] = useState(null);
+  const [showNFCWriter, setShowNFCWriter] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [nfcUrl, setNfcUrl] = useState(null);
   const [showNFCGuide, setShowNFCGuide] = useState(false);
-  const [nfcData, setNfcData] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -41,17 +42,28 @@ const ItemsPage = () => {
   };
 
   // Load NFC data for item
-  const loadNFCData = async (itemId) => {
+  const openNFCWriter = async (item) => {
     try {
-      const response = await api.get(`/items/${itemId}/nfc`);
+      const response = await api.get(`/items/${item.id}/nfc`);
       if (response.data.status === 'success') {
-        setNfcData(response.data.data);
-        setShowNFCWriter(itemId);
+        setSelectedItem(item);
+        setNfcUrl(response.data.data.nfcUrl);
+        setShowNFCWriter(true);
       }
     } catch (error) {
       console.error('Failed to load NFC data:', error);
-      alert('Failed to load NFC data');
+      // Fallback: generate URL locally
+      const fallbackUrl = `${window.location.origin}/l/${item.slug}?source=nfc`;
+      setSelectedItem(item);
+      setNfcUrl(fallbackUrl);
+      setShowNFCWriter(true);
     }
+  };
+
+  const closeNFCWriter = () => {
+    setShowNFCWriter(false);
+    setSelectedItem(null);
+    setNfcUrl(null);
   };
 
   const deleteItem = async (id) => {
@@ -148,21 +160,13 @@ const ItemsPage = () => {
       )}
 
       {/* NFC Writer Modal */}
-      {showNFCWriter && nfcData && (
+      {showNFCWriter && selectedItem && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="max-w-lg w-full relative">
-            <button
-              onClick={() => {
-                setShowNFCWriter(null);
-                setNfcData(null);
-              }}
-              className="absolute -top-2 -right-2 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center text-gray-600 hover:text-gray-800 z-10"
-            >
-              ✕
-            </button>
-            <NFCWriter
-              item={items.find(i => i.id === showNFCWriter)}
-              nfcUrl={nfcData.nfcUrl}
+          <div className="max-w-lg w-full">
+            <ItemNFCWriter
+              item={selectedItem}
+              nfcUrl={nfcUrl}
+              onClose={closeNFCWriter}
               onSuccess={() => {
                 alert('NFC tag written successfully!');
               }}
@@ -264,7 +268,7 @@ const ItemsPage = () => {
                     </select>
                   </div>
 
-                  {/* Action Buttons - NOW WITH NFC! */}
+                  {/* Action Buttons */}
                   <div className="flex flex-wrap gap-2 md:gap-3">
                     <button
                       onClick={() => copyPublicLink(item.publicUrl)}
@@ -290,12 +294,12 @@ const ItemsPage = () => {
                       QR Code
                     </button>
 
-                    {/* NFC BUTTON - NEW! */}
+                    {/* NFC BUTTON */}
                     <button
-                      onClick={() => loadNFCData(item.id)}
+                      onClick={() => openNFCWriter(item)}
                       className="flex items-center gap-2 px-3 md:px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-all text-sm md:text-base"
                     >
-                      <Nfc size={16} />
+                      <Wifi size={16} />
                       Write NFC
                     </button>
 
