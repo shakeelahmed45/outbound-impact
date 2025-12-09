@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Plus, Folder, Trash2, Edit2, FileText, Tag, Eye, TrendingUp, Download, Share2, ExternalLink } from 'lucide-react';
+import { Plus, Folder, Trash2, Edit2, FileText, Tag, Eye, TrendingUp, Download, Share2, ExternalLink, Wifi } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
+import NFCWriter from '../components/NFCWriter';
 import api from '../services/api';
 
 const CAMPAIGN_CATEGORIES = [
@@ -35,6 +36,10 @@ const CampaignsPage = () => {
     description: '',
     category: '',
   });
+  
+  // NFC State
+  const [showNFCModal, setShowNFCModal] = useState(false);
+  const [nfcCampaign, setNfcCampaign] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -246,7 +251,7 @@ const CampaignsPage = () => {
     }, 0);
   };
 
-  // 🆕 NEW FUNCTIONS FOR QR CODE HANDLING
+  // QR Code Functions
   const downloadCampaignQR = (campaign) => {
     if (!campaign.qrCodeUrl) return;
     
@@ -279,6 +284,17 @@ const CampaignsPage = () => {
 
   const openPublicCampaign = (campaign) => {
     window.open(`/c/${campaign.slug}`, '_blank');
+  };
+
+  // NFC Functions
+  const openNFCWriter = (campaign) => {
+    setNfcCampaign(campaign);
+    setShowNFCModal(true);
+  };
+
+  const closeNFCWriter = () => {
+    setShowNFCModal(false);
+    setNfcCampaign(null);
   };
 
   if (loading) {
@@ -363,7 +379,7 @@ const CampaignsPage = () => {
                     </div>
                   </div>
 
-                  {/* 🆕 CAMPAIGN QR CODE & ACTIONS */}
+                  {/* CAMPAIGN QR CODE & ACTIONS */}
                   {campaign.qrCodeUrl && (
                     <div className="mt-4 pt-4 border-t border-gray-200">
                       <div className="flex items-center gap-4">
@@ -381,7 +397,16 @@ const CampaignsPage = () => {
                             className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-primary to-secondary text-white rounded-lg text-sm font-medium hover:opacity-90 transition"
                           >
                             <Download size={16} />
-                            <span>Download QR</span>
+                            <span>QR</span>
+                          </button>
+                          
+                          {/* NFC Button */}
+                          <button
+                            onClick={() => openNFCWriter(campaign)}
+                            className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition"
+                          >
+                            <Wifi size={16} />
+                            <span>NFC</span>
                           </button>
                           
                           <button
@@ -449,7 +474,7 @@ const CampaignsPage = () => {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl p-8 max-w-md w-full">
               <h2 className="text-2xl font-bold text-primary mb-6">Create Campaign</h2>
-              <form onSubmit={handleCreate} className="space-y-4">
+              <form onSubmit={handleCreate} className="space-y-6">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Campaign Name *
@@ -459,7 +484,7 @@ const CampaignsPage = () => {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    placeholder="e.g., Summer Sale 2024"
+                    placeholder="e.g., Summer Menu 2024"
                     required
                   />
                 </div>
@@ -518,11 +543,11 @@ const CampaignsPage = () => {
         )}
 
         {/* Edit Campaign Modal */}
-        {showEditModal && (
+        {showEditModal && selectedCampaign && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl p-8 max-w-md w-full">
               <h2 className="text-2xl font-bold text-primary mb-6">Edit Campaign</h2>
-              <form onSubmit={handleEdit} className="space-y-4">
+              <form onSubmit={handleEdit} className="space-y-6">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Campaign Name *
@@ -733,6 +758,11 @@ const CampaignsPage = () => {
               </div>
             </div>
           </div>
+        )}
+
+        {/* NFC Writer Modal */}
+        {showNFCModal && nfcCampaign && (
+          <NFCWriter campaign={nfcCampaign} onClose={closeNFCWriter} />
         )}
       </div>
     </DashboardLayout>
