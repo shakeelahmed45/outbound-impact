@@ -19,8 +19,8 @@ const getDashboardStats = async (req, res) => {
       where: { userId },
     });
 
-    // Count items with QR codes
-    const totalQRCodes = await prisma.item.count({
+    // Count campaigns with QR codes (instead of items)
+    const totalQRCodes = await prisma.campaign.count({
       where: {
         userId,
         qrCodeUrl: { not: null },
@@ -40,17 +40,25 @@ const getDashboardStats = async (req, res) => {
     // Get all user's items
     const userItems = await prisma.item.findMany({
       where: { userId },
-      select: { id: true }
+      select: { id: true, views: true }
     });
 
     const itemIds = userItems.map(item => item.id);
 
-    // Calculate total views from analytics table
-    const totalViews = itemIds.length > 0 
-      ? await prisma.analytics.count({
-          where: { itemId: { in: itemIds } }
-        })
-      : 0;
+    // Calculate total views from analytics table OR from item views
+    let totalViews = 0;
+    
+    // First try analytics
+    if (itemIds.length > 0) {
+      totalViews = await prisma.analytics.count({
+        where: { itemId: { in: itemIds } }
+      });
+    }
+    
+    // If no analytics, sum up item views
+    if (totalViews === 0) {
+      totalViews = userItems.reduce((sum, item) => sum + (item.views || 0), 0);
+    }
 
     // Calculate storage percentage
     const storageUsed = Number(user.storageUsed);

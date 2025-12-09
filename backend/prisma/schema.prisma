@@ -47,9 +47,15 @@ model Item {
   description  String?
   type         MediaType
   mediaUrl     String
+  qrCodeUrl    String?
   thumbnailUrl String?
   fileSize     BigInt
   views        Int       @default(0)
+  viewsQr      Int       @default(0)
+  viewsNfc     Int       @default(0)
+  viewsDirect  Int       @default(0)
+  nfcEnabled   Boolean   @default(false)
+  nfcUrl       String?
   
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt

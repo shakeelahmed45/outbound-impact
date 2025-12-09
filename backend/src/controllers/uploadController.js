@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const { uploadToBunny, generateFileName, generateSlug } = require('../services/bunnyService');
+const QRCode = require('qrcode');
 
 const prisma = new PrismaClient();
 
@@ -73,7 +74,17 @@ const uploadFile = async (req, res) => {
     // Generate public URL
     const publicUrl = `${process.env.FRONTEND_URL}/l/${slug}`;
 
-    // Create item with thumbnail (no QR code)
+    // Generate QR code (keeping for backward compatibility)
+    const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
+      width: 512,
+      margin: 2,
+      color: {
+        dark: '#800080', // Purple
+        light: '#FFFFFF',
+      },
+    });
+
+    // Create item with QR code and thumbnail
     const item = await prisma.item.create({
       data: {
         userId,
@@ -82,6 +93,7 @@ const uploadFile = async (req, res) => {
         type,
         slug,
         mediaUrl,
+        qrCodeUrl: qrCodeDataUrl,
         thumbnailUrl,
         fileSize: BigInt(fileSize),
       }
@@ -104,6 +116,7 @@ const uploadFile = async (req, res) => {
         type: item.type,
         mediaUrl: item.mediaUrl,
         thumbnailUrl: item.thumbnailUrl,
+        qrCodeUrl: item.qrCodeUrl,
         publicUrl: publicUrl,
       }
     });
@@ -141,6 +154,16 @@ const createTextPost = async (req, res) => {
     // Generate public URL
     const publicUrl = `${process.env.FRONTEND_URL}/l/${slug}`;
 
+    // Generate QR code
+    const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
+      width: 512,
+      margin: 2,
+      color: {
+        dark: '#800080',
+        light: '#FFFFFF',
+      },
+    });
+
     const item = await prisma.item.create({
       data: {
         userId,
@@ -149,7 +172,8 @@ const createTextPost = async (req, res) => {
         type: 'TEXT',
         slug,
         mediaUrl: content,
-        thumbnailUrl: null, // Text posts don't have thumbnails by default
+        qrCodeUrl: qrCodeDataUrl,
+        thumbnailUrl: null,
         fileSize: BigInt(content.length),
       }
     });
@@ -173,6 +197,7 @@ const createTextPost = async (req, res) => {
         slug: item.slug,
         type: item.type,
         thumbnailUrl: item.thumbnailUrl,
+        qrCodeUrl: item.qrCodeUrl,
         publicUrl: publicUrl,
       }
     });

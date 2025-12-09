@@ -19,29 +19,27 @@ const getUserItems = async (req, res) => {
       }),
     };
 
+    // Fetch all fields without explicit select to avoid column issues
     const items = await prisma.item.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        type: true,
-        slug: true,
-        mediaUrl: true,
-        thumbnailUrl: true,
-        fileSize: true,
-        campaignId: true,
-        views: true,
-        createdAt: true,
-      }
     });
 
     res.json({
       status: 'success',
       items: items.map(item => ({
-        ...item,
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        type: item.type,
+        slug: item.slug,
+        mediaUrl: item.mediaUrl,
+        thumbnailUrl: item.thumbnailUrl || null,
+        qrCodeUrl: item.qrCodeUrl || null,
         fileSize: item.fileSize.toString(),
+        campaignId: item.campaignId,
+        views: item.views || 0,
+        createdAt: item.createdAt,
         publicUrl: `${process.env.FRONTEND_URL}/l/${item.slug}`,
       }))
     });
@@ -50,7 +48,7 @@ const getUserItems = async (req, res) => {
     console.error('Get items error:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Failed to fetch items'
+      message: 'Failed to fetch items: ' + error.message
     });
   }
 };
@@ -62,18 +60,6 @@ const getItemById = async (req, res) => {
 
     const item = await prisma.item.findFirst({
       where: { id, userId },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        type: true,
-        slug: true,
-        mediaUrl: true,
-        thumbnailUrl: true,
-        fileSize: true,
-        views: true,
-        createdAt: true,
-      }
     });
 
     if (!item) {
@@ -86,8 +72,17 @@ const getItemById = async (req, res) => {
     res.json({
       status: 'success',
       item: {
-        ...item,
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        type: item.type,
+        slug: item.slug,
+        mediaUrl: item.mediaUrl,
+        thumbnailUrl: item.thumbnailUrl || null,
+        qrCodeUrl: item.qrCodeUrl || null,
         fileSize: item.fileSize.toString(),
+        views: item.views || 0,
+        createdAt: item.createdAt,
         publicUrl: `${process.env.FRONTEND_URL}/l/${item.slug}`,
       }
     });
@@ -264,7 +259,7 @@ const uploadThumbnail = async (req, res) => {
     console.error('Upload thumbnail error:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Failed to upload thumbnail'
+      message: 'Failed to upload thumbnail: ' + error.message
     });
   }
 };
@@ -342,9 +337,13 @@ const deleteItem = async (req, res) => {
     }
 
     // Delete media from Bunny.net if it's a CDN URL
-    if (item.type !== 'TEXT' && item.mediaUrl.includes('b-cdn.net')) {
-      const urlPath = new URL(item.mediaUrl).pathname;
-      await deleteFromBunny(urlPath);
+    if (item.type !== 'TEXT' && item.mediaUrl && item.mediaUrl.includes('b-cdn.net')) {
+      try {
+        const urlPath = new URL(item.mediaUrl).pathname;
+        await deleteFromBunny(urlPath);
+      } catch (err) {
+        console.log('Could not delete from CDN:', err.message);
+      }
     }
 
     // Delete thumbnail from Bunny.net if it's a separate file
