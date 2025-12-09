@@ -64,17 +64,20 @@ const PublicViewer = () => {
   const handleBack = () => {
     const fromCampaign = new URLSearchParams(window.location.search).get('from');
     
+    // FIRST: If we came from a campaign, ALWAYS go back there
+    if (fromCampaign) {
+      window.location.href = '/c/' + fromCampaign;
+      return;
+    }
+
+    // SECOND: If opened in new tab (from Items page with no campaign) - close the tab
     if (window.opener && !window.opener.closed) {
       window.opener.focus();
       window.close();
       return;
     }
 
-    if (fromCampaign) {
-      window.location.href = '/c/' + fromCampaign;
-      return;
-    }
-
+    // Fallback to home page
     window.location.href = '/';
   };
 
