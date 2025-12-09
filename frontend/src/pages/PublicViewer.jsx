@@ -12,6 +12,7 @@ const PublicViewer = () => {
   const [showOverlay, setShowOverlay] = useState(true);
   const hasTracked = useRef(false);
   const overlayTimeout = useRef(null);
+  const referrer = useRef(document.referrer); // Track where we came from
 
   useEffect(() => {
     const fetchItem = async () => {
@@ -65,14 +66,48 @@ const PublicViewer = () => {
   };
 
   const handleBack = () => {
-    // Check if opened in new tab from Items page or Campaign viewer
+    console.log('🔙 Back button clicked');
+    console.log('window.opener:', window.opener);
+    console.log('document.referrer:', referrer.current);
+    console.log('window.history.length:', window.history.length);
+    
+    // Strategy 1: If opened in new tab with window.open (has window.opener)
     if (window.opener && !window.opener.closed) {
-      // Opened from another page - close this tab and focus parent
-      window.opener.focus();
-      window.close();
-    } else {
-      // Normal navigation - go back in history
-      navigate(-1);
+      console.log('✅ Strategy 1: Closing tab via window.opener');
+      try {
+        window.opener.focus();
+        window.close();
+        // If window.close() fails, fallback
+        setTimeout(() => {
+          if (!window.closed) {
+            console.log('⚠️ window.close() failed, using history.back()');
+            window.history.back();
+          }
+        }, 100);
+      } catch (e) {
+        console.log('❌ Strategy 1 failed:', e);
+        window.history.back();
+      }
+    }
+    // Strategy 2: If has history (same-window navigation) - PRIORITIZE THIS!
+    else if (window.history.length > 2) {
+      console.log('✅ Strategy 2: Using history.back() - has navigation history');
+      window.history.back();
+    }
+    // Strategy 3: If came from campaign viewer (check referrer path) - FALLBACK
+    else if (referrer.current && referrer.current.includes('/c/')) {
+      console.log('✅ Strategy 3: Returning to campaign viewer via referrer');
+      window.location.href = referrer.current;
+    }
+    // Strategy 4: If came from items page (check referrer path) - FALLBACK
+    else if (referrer.current && referrer.current.includes('/dashboard/items')) {
+      console.log('✅ Strategy 4: Returning to items page via referrer');
+      window.location.href = referrer.current;
+    }
+    // Strategy 5: Fallback to home page
+    else {
+      console.log('✅ Strategy 5: Going to home page');
+      window.location.href = '/';
     }
   };
 
