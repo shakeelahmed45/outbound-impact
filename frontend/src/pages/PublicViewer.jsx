@@ -1,18 +1,21 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 
 const PublicViewer = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showOverlay, setShowOverlay] = useState(true);
   const hasTracked = useRef(false);
   const overlayTimeout = useRef(null);
-  const referrer = useRef(document.referrer); // Track where we came from
+  
+  // Get return URL from navigation state (passed by campaign viewer)
+  const returnUrl = location.state?.returnUrl;
 
   useEffect(() => {
     const fetchItem = async () => {
@@ -67,12 +70,11 @@ const PublicViewer = () => {
 
   const handleBack = () => {
     console.log('🔙 BACK BUTTON DEBUG:');
+    console.log('- returnUrl from state:', returnUrl);
     console.log('- window.opener:', window.opener);
     console.log('- history.length:', window.history.length);
-    console.log('- referrer:', referrer.current);
-    console.log('- current URL:', window.location.href);
     
-    // If opened in new tab (from Items page) - close the tab
+    // Strategy 1: If opened in new tab (from Items page) - close the tab
     if (window.opener && !window.opener.closed) {
       console.log('→ Closing new tab');
       window.opener.focus();
@@ -80,9 +82,23 @@ const PublicViewer = () => {
       return;
     }
     
-    // Default: Use browser back button (works for same-window navigation)
-    console.log('→ Using history.back()');
-    window.history.back();
+    // Strategy 2: If we have a return URL (from campaign viewer) - go there
+    if (returnUrl) {
+      console.log('→ Navigating to returnUrl:', returnUrl);
+      navigate(returnUrl);
+      return;
+    }
+    
+    // Strategy 3: Try browser back
+    if (window.history.length > 1) {
+      console.log('→ Using history.back()');
+      window.history.back();
+      return;
+    }
+    
+    // Strategy 4: Fallback to home
+    console.log('→ Going to home page');
+    navigate('/');
   };
 
   if (loading) {

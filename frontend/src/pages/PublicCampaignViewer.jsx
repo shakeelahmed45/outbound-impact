@@ -111,18 +111,23 @@ const PublicCampaignViewer = () => {
       window.opener.focus();
       window.close();
     } else {
-      // No parent window or it's closed - navigate back
+      // No parent window - check if user is logged in
       const token = localStorage.getItem('token');
       if (token) {
+        // Logged in user - go to dashboard campaigns
         window.location.href = '/dashboard/campaigns';
       } else {
+        // Not logged in - go to home
         window.location.href = '/';
       }
     }
   };
 
   const openItem = (item) => {
-    navigate(`/l/${item.slug}`);
+    // Pass the campaign URL as state so PublicViewer can return here
+    navigate(`/l/${item.slug}`, { 
+      state: { returnUrl: `/c/${slug}` } 
+    });
   };
 
   if (loading) {
