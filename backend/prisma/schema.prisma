@@ -40,34 +40,27 @@ enum Role {
 }
 
 model Item {
-  id          String    @id @default(uuid())
-  userId      String
-  slug        String    @unique
-  title       String
-  description String?
-  type        MediaType
-  mediaUrl    String
-  qrCodeUrl   String?
-  fileSize    BigInt
+  id           String    @id @default(uuid())
+  userId       String
+  slug         String    @unique
+  title        String
+  description  String?
+  type         MediaType
+  mediaUrl     String
+  thumbnailUrl String?
+  fileSize     BigInt
+  views        Int       @default(0)
   
-  nfcEnabled  Boolean   @default(true)
-  nfcUrl      String?
-  views       Int       @default(0)
-  viewsQr     Int       @default(0)
-  viewsNfc    Int       @default(0)
-  viewsDirect Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
-  user        User      @relation(fields: [userId], references: [id])
-  campaign    Campaign? @relation(fields: [campaignId], references: [id])
-  campaignId  String?
-  analytics   Analytics[]
+  user         User      @relation(fields: [userId], references: [id])
+  campaign     Campaign? @relation(fields: [campaignId], references: [id])
+  campaignId   String?
+  analytics    Analytics[]
   
   @@index([userId])
   @@index([slug])
-  @@index([nfcEnabled])
 }
 
 enum MediaType {

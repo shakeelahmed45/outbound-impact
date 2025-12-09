@@ -58,7 +58,6 @@ const CampaignsPage = () => {
       
       if (itemsRes.data.status === 'success') {
         setItems(itemsRes.data.items);
-        // Fetch analytics for each item
         await fetchAnalyticsForItems(itemsRes.data.items);
       }
     } catch (error) {
@@ -169,26 +168,19 @@ const CampaignsPage = () => {
     setSavingItems(true);
 
     try {
-      // Get current campaign items
       const currentCampaignItems = items.filter(item => item.campaignId === selectedCampaign.id);
       
-      // Items to add (selected but not currently in campaign)
       const itemsToAdd = selectedItems.filter(
         itemId => !currentCampaignItems.find(item => item.id === itemId)
       );
       
-      // Items to remove (currently in campaign but not selected)
       const itemsToRemove = currentCampaignItems.filter(
         item => !selectedItems.includes(item.id)
       );
 
-      console.log('Items to add:', itemsToAdd);
-      console.log('Items to remove:', itemsToRemove);
-
       let addedCount = 0;
       let removedCount = 0;
 
-      // Add items to campaign
       for (const itemId of itemsToAdd) {
         try {
           await api.post('/campaigns/assign', {
@@ -201,7 +193,6 @@ const CampaignsPage = () => {
         }
       }
 
-      // Remove items from campaign
       for (const item of itemsToRemove) {
         try {
           await api.post('/campaigns/assign', {
@@ -214,14 +205,12 @@ const CampaignsPage = () => {
         }
       }
 
-      // Refresh data
       await fetchData();
 
       setShowAddItemsModal(false);
       setSelectedCampaign(null);
       setSelectedItems([]);
 
-      // Show success message
       let message = 'Campaign items updated!';
       if (addedCount > 0 && removedCount > 0) {
         message = `Added ${addedCount} item(s) and removed ${removedCount} item(s)`;
@@ -251,7 +240,6 @@ const CampaignsPage = () => {
     }, 0);
   };
 
-  // QR Code Functions
   const downloadCampaignQR = (campaign) => {
     if (!campaign.qrCodeUrl) return;
     
@@ -314,7 +302,7 @@ const CampaignsPage = () => {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-primary mb-2">Campaigns</h1>
-            <p className="text-secondary">Organize your QR codes by category and purpose</p>
+            <p className="text-secondary">Organize your content with QR codes and NFC tags</p>
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
@@ -330,7 +318,7 @@ const CampaignsPage = () => {
           <div className="text-center py-12 bg-white rounded-2xl shadow-lg">
             <Folder size={64} className="mx-auto text-gray-300 mb-4" />
             <h3 className="text-xl font-semibold text-gray-600 mb-2">No Campaigns Yet</h3>
-            <p className="text-gray-500 mb-6">Create your first campaign to organize your QR codes</p>
+            <p className="text-gray-500 mb-6">Create your first campaign to organize your content</p>
             <button
               onClick={() => setShowCreateModal(true)}
               className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-lg font-semibold inline-flex items-center gap-2"

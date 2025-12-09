@@ -1,7 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
-const QRCode = require('qrcode');
-const { deleteFromBunny } = require('../services/bunnyService');
-const nfcService = require('../services/nfcService');
+const { deleteFromBunny, uploadToBunny, generateFileName } = require('../services/bunnyService');
 
 const prisma = new PrismaClient();
 
@@ -31,16 +29,11 @@ const getUserItems = async (req, res) => {
         type: true,
         slug: true,
         mediaUrl: true,
-        qrCodeUrl: true,
+        thumbnailUrl: true,
         fileSize: true,
         campaignId: true,
-        createdAt: true,
-        nfcEnabled: true,
-        nfcUrl: true,
         views: true,
-        viewsQr: true,
-        viewsNfc: true,
-        viewsDirect: true,
+        createdAt: true,
       }
     });
 
@@ -76,8 +69,9 @@ const getItemById = async (req, res) => {
         type: true,
         slug: true,
         mediaUrl: true,
-        qrCodeUrl: true,
+        thumbnailUrl: true,
         fileSize: true,
+        views: true,
         createdAt: true,
       }
     });
@@ -111,7 +105,6 @@ const getItemById = async (req, res) => {
 const getPublicItem = async (req, res) => {
   try {
     const { slug } = req.params;
-    const { source } = req.query;
 
     const item = await prisma.item.findUnique({
       where: { slug },
@@ -132,30 +125,12 @@ const getPublicItem = async (req, res) => {
       });
     }
 
-    // Track view source (qr, nfc, or direct)
-    let viewSource = 'direct';
-    if (source === 'qr') {
-      viewSource = 'qr';
-    } else if (source === 'nfc') {
-      viewSource = 'nfc';
-    }
-
-    // Update view counts based on source
-    const updateData = {
-      views: { increment: 1 }
-    };
-
-    if (viewSource === 'qr') {
-      updateData.viewsQr = { increment: 1 };
-    } else if (viewSource === 'nfc') {
-      updateData.viewsNfc = { increment: 1 };
-    } else {
-      updateData.viewsDirect = { increment: 1 };
-    }
-
+    // Update view count
     await prisma.item.update({
       where: { id: item.id },
-      data: updateData
+      data: {
+        views: { increment: 1 }
+      }
     });
 
     res.json({
@@ -171,52 +146,6 @@ const getPublicItem = async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to fetch item'
-    });
-  }
-};
-
-const generateQRCode = async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { id } = req.params;
-
-    const item = await prisma.item.findFirst({
-      where: { id, userId }
-    });
-
-    if (!item) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Item not found'
-      });
-    }
-
-    const publicUrl = `${process.env.FRONTEND_URL}/l/${item.slug}?source=qr`;
-    const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
-      width: 512,
-      margin: 2,
-      color: {
-        dark: '#800080',
-        light: '#FFFFFF',
-      },
-    });
-
-    await prisma.item.update({
-      where: { id },
-      data: { qrCodeUrl: qrCodeDataUrl }
-    });
-
-    res.json({
-      status: 'success',
-      qrCode: qrCodeDataUrl,
-      publicUrl,
-    });
-
-  } catch (error) {
-    console.error('QR generation error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to generate QR code'
     });
   }
 };
@@ -264,6 +193,138 @@ const updateItem = async (req, res) => {
   }
 };
 
+// Upload custom thumbnail
+const uploadThumbnail = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+    const { thumbnailData, fileName } = req.body;
+
+    if (!thumbnailData) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Thumbnail data is required'
+      });
+    }
+
+    const item = await prisma.item.findFirst({
+      where: { id, userId }
+    });
+
+    if (!item) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Item not found'
+      });
+    }
+
+    // Delete old thumbnail from CDN if exists and is different from mediaUrl
+    if (item.thumbnailUrl && item.thumbnailUrl !== item.mediaUrl && item.thumbnailUrl.includes('b-cdn.net')) {
+      try {
+        const urlPath = new URL(item.thumbnailUrl).pathname;
+        await deleteFromBunny(urlPath);
+      } catch (err) {
+        console.log('Could not delete old thumbnail:', err.message);
+      }
+    }
+
+    // Upload new thumbnail
+    const uniqueFileName = generateFileName(fileName || 'thumbnail.jpg', `${userId}-thumb`);
+    const base64Data = thumbnailData.split(',')[1] || thumbnailData;
+    const fileBuffer = Buffer.from(base64Data, 'base64');
+
+    const uploadResult = await uploadToBunny(
+      fileBuffer,
+      uniqueFileName,
+      'thumbnails'
+    );
+
+    let thumbnailUrl;
+    if (uploadResult.success) {
+      thumbnailUrl = uploadResult.url;
+    } else {
+      thumbnailUrl = thumbnailData; // Fallback to base64
+    }
+
+    const updatedItem = await prisma.item.update({
+      where: { id },
+      data: { thumbnailUrl }
+    });
+
+    res.json({
+      status: 'success',
+      message: 'Thumbnail updated successfully',
+      item: {
+        ...updatedItem,
+        fileSize: updatedItem.fileSize.toString(),
+      }
+    });
+
+  } catch (error) {
+    console.error('Upload thumbnail error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to upload thumbnail'
+    });
+  }
+};
+
+// Remove custom thumbnail (revert to auto-generated or null)
+const removeThumbnail = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+
+    const item = await prisma.item.findFirst({
+      where: { id, userId }
+    });
+
+    if (!item) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Item not found'
+      });
+    }
+
+    // Delete thumbnail from CDN if exists and is different from mediaUrl
+    if (item.thumbnailUrl && item.thumbnailUrl !== item.mediaUrl && item.thumbnailUrl.includes('b-cdn.net')) {
+      try {
+        const urlPath = new URL(item.thumbnailUrl).pathname;
+        await deleteFromBunny(urlPath);
+      } catch (err) {
+        console.log('Could not delete thumbnail:', err.message);
+      }
+    }
+
+    // Set thumbnail to mediaUrl for images, null for others
+    let newThumbnailUrl = null;
+    if (item.type === 'IMAGE') {
+      newThumbnailUrl = item.mediaUrl;
+    }
+
+    const updatedItem = await prisma.item.update({
+      where: { id },
+      data: { thumbnailUrl: newThumbnailUrl }
+    });
+
+    res.json({
+      status: 'success',
+      message: 'Thumbnail removed successfully',
+      item: {
+        ...updatedItem,
+        fileSize: updatedItem.fileSize.toString(),
+      }
+    });
+
+  } catch (error) {
+    console.error('Remove thumbnail error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to remove thumbnail'
+    });
+  }
+};
+
 const deleteItem = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -280,10 +341,20 @@ const deleteItem = async (req, res) => {
       });
     }
 
-    // Delete from Bunny.net if it's a CDN URL
+    // Delete media from Bunny.net if it's a CDN URL
     if (item.type !== 'TEXT' && item.mediaUrl.includes('b-cdn.net')) {
       const urlPath = new URL(item.mediaUrl).pathname;
       await deleteFromBunny(urlPath);
+    }
+
+    // Delete thumbnail from Bunny.net if it's a separate file
+    if (item.thumbnailUrl && item.thumbnailUrl !== item.mediaUrl && item.thumbnailUrl.includes('b-cdn.net')) {
+      try {
+        const urlPath = new URL(item.thumbnailUrl).pathname;
+        await deleteFromBunny(urlPath);
+      } catch (err) {
+        console.log('Could not delete thumbnail:', err.message);
+      }
     }
 
     await prisma.item.delete({ where: { id } });
@@ -314,216 +385,12 @@ const deleteItem = async (req, res) => {
   }
 };
 
-// ==========================================
-// NFC ENDPOINTS
-// ==========================================
-
-const getNFCData = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.userId;
-
-    const item = await prisma.item.findUnique({
-      where: { id }
-    });
-
-    if (!item) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Item not found'
-      });
-    }
-
-    if (item.userId !== userId) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Not authorized'
-      });
-    }
-
-    const nfcData = await nfcService.getNFCData(id);
-
-    res.json({
-      status: 'success',
-      data: nfcData
-    });
-  } catch (error) {
-    console.error('Get NFC data error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: error.message || 'Failed to get NFC data'
-    });
-  }
-};
-
-const enableNFC = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.userId;
-
-    const item = await prisma.item.findUnique({
-      where: { id }
-    });
-
-    if (!item) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Item not found'
-      });
-    }
-
-    if (item.userId !== userId) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Not authorized'
-      });
-    }
-
-    const updatedItem = await nfcService.enableNFC(id);
-
-    res.json({
-      status: 'success',
-      message: 'NFC enabled successfully',
-      data: updatedItem
-    });
-  } catch (error) {
-    console.error('Enable NFC error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to enable NFC'
-    });
-  }
-};
-
-const disableNFC = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.userId;
-
-    const item = await prisma.item.findUnique({
-      where: { id }
-    });
-
-    if (!item) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Item not found'
-      });
-    }
-
-    if (item.userId !== userId) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Not authorized'
-      });
-    }
-
-    const updatedItem = await nfcService.disableNFC(id);
-
-    res.json({
-      status: 'success',
-      message: 'NFC disabled successfully',
-      data: updatedItem
-    });
-  } catch (error) {
-    console.error('Disable NFC error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to disable NFC'
-    });
-  }
-};
-
-const getNFCStats = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.userId;
-
-    const item = await prisma.item.findUnique({
-      where: { id }
-    });
-
-    if (!item) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Item not found'
-      });
-    }
-
-    if (item.userId !== userId) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Not authorized'
-      });
-    }
-
-    const stats = await nfcService.getNFCStats(id);
-
-    res.json({
-      status: 'success',
-      data: stats
-    });
-  } catch (error) {
-    console.error('Get NFC stats error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to get NFC statistics'
-    });
-  }
-};
-
-const bulkEnableNFC = async (req, res) => {
-  try {
-    const { itemIds } = req.body;
-    const userId = req.user.userId;
-
-    if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Item IDs array is required'
-      });
-    }
-
-    const items = await prisma.item.findMany({
-      where: {
-        id: { in: itemIds },
-        userId: userId
-      }
-    });
-
-    if (items.length !== itemIds.length) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Not authorized for one or more items'
-      });
-    }
-
-    const results = await nfcService.bulkGenerateNFC(itemIds);
-
-    res.json({
-      status: 'success',
-      message: `NFC enabled for ${results.length} items`,
-      data: results
-    });
-  } catch (error) {
-    console.error('Bulk enable NFC error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to bulk enable NFC'
-    });
-  }
-};
-
 module.exports = {
   getUserItems,
   getItemById,
   getPublicItem,
-  generateQRCode,
   updateItem,
+  uploadThumbnail,
+  removeThumbnail,
   deleteItem,
-  getNFCData,
-  enableNFC,
-  disableNFC,
-  getNFCStats,
-  bulkEnableNFC,
 };
