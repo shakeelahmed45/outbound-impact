@@ -1,183 +1,246 @@
-import { useState } from 'react';
-import { Nfc, Check, X, AlertCircle, Info } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Smartphone, Wifi, CheckCircle, AlertCircle, Copy, ExternalLink } from 'lucide-react';
 
-/**
- * NFCWriter Component
- * Allows users to write NFC tags directly from browser
- * Uses Web NFC API (Chrome Android, Safari iOS 13+)
- */
-const NFCWriter = ({ item, nfcUrl, onSuccess, onError }) => {
-  const [writing, setWriting] = useState(false);
-  const [success, setSuccess] = useState(false);
+const NFCWriter = ({ campaign, onClose }) => {
+  const [nfcSupported, setNfcSupported] = useState(false);
+  const [nfcStatus, setNfcStatus] = useState('idle'); // idle, writing, success, error
   const [error, setError] = useState(null);
-  const [supported, setSupported] = useState(true);
+  const [copied, setCopied] = useState(false);
 
-  // Check if NFC is supported
-  const checkNFCSupport = () => {
-    if (!('NDEFReader' in window)) {
-      setSupported(false);
-      return false;
+  // NFC URL for campaign
+  const nfcUrl = `${window.location.origin}/c/${campaign.slug}?source=nfc`;
+
+  useEffect(() => {
+    // Check if Web NFC API is available
+    if ('NDEFReader' in window) {
+      setNfcSupported(true);
     }
-    return true;
-  };
+  }, []);
 
-  // Write NFC tag
-  const writeNFCTag = async () => {
-    if (!checkNFCSupport()) {
+  const writeNFC = async () => {
+    if (!nfcSupported) {
       setError('NFC is not supported on this device/browser');
       return;
     }
 
-    setWriting(true);
-    setError(null);
-    setSuccess(false);
-
     try {
-      const ndef = new NDEFReader();
-      
-      // Request permission and write
+      setNfcStatus('writing');
+      setError(null);
+
+      const ndef = new window.NDEFReader();
       await ndef.write({
-        records: [
-          {
-            recordType: "url",
-            data: nfcUrl
-          }
-        ]
+        records: [{ recordType: 'url', data: nfcUrl }]
       });
 
-      setSuccess(true);
-      setWriting(false);
-      
-      if (onSuccess) {
-        onSuccess();
-      }
-
-      // Reset success message after 3 seconds
-      setTimeout(() => {
-        setSuccess(false);
-      }, 3000);
-
+      setNfcStatus('success');
     } catch (err) {
       console.error('NFC write error:', err);
-      
-      let errorMessage = 'Failed to write NFC tag';
+      setNfcStatus('error');
       
       if (err.name === 'NotAllowedError') {
-        errorMessage = 'NFC permission denied. Please allow NFC access.';
+        setError('NFC permission denied. Please allow NFC access.');
       } else if (err.name === 'NotSupportedError') {
-        errorMessage = 'NFC is not supported on this device.';
+        setError('NFC is not supported on this device.');
       } else if (err.name === 'NotReadableError') {
-        errorMessage = 'NFC tag is not writable or out of range.';
-      }
-      
-      setError(errorMessage);
-      setWriting(false);
-      
-      if (onError) {
-        onError(err);
+        setError('NFC tag is not readable. Try a different tag.');
+      } else {
+        setError(err.message || 'Failed to write NFC tag');
       }
     }
   };
 
+  const copyUrl = () => {
+    navigator.clipboard.writeText(nfcUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-violet-500 rounded-xl flex items-center justify-center">
-          <Nfc className="text-white" size={24} />
-        </div>
-        <div>
-          <h3 className="text-lg font-bold text-gray-900">Write NFC Tag</h3>
-          <p className="text-sm text-gray-600">Tap to write this item to an NFC tag</p>
-        </div>
-      </div>
-
-      {/* NFC URL Display */}
-      <div className="bg-gray-50 rounded-lg p-3 mb-4">
-        <p className="text-xs font-semibold text-gray-600 mb-1">NFC URL:</p>
-        <p className="text-sm text-gray-900 break-all font-mono">{nfcUrl}</p>
-      </div>
-
-      {/* Browser Support Warning */}
-      {!supported && (
-        <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
-          <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={20} />
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b">
           <div>
-            <p className="text-sm font-semibold text-yellow-900">NFC Not Supported</p>
-            <p className="text-xs text-yellow-700 mt-1">
-              Your browser doesn't support Web NFC. Use Chrome on Android or Safari on iOS 13+.
-            </p>
+            <h2 className="text-xl font-bold text-primary">Campaign NFC Tag</h2>
+            <p className="text-sm text-gray-500 mt-1">{campaign.name}</p>
           </div>
-        </div>
-      )}
-
-      {/* Success Message */}
-      {success && (
-        <div className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 rounded-lg mb-4 animate-in fade-in duration-300">
-          <Check className="text-green-600 flex-shrink-0 mt-0.5" size={20} />
-          <div>
-            <p className="text-sm font-semibold text-green-900">NFC Tag Written!</p>
-            <p className="text-xs text-green-700 mt-1">
-              The tag is ready to use. Tap it with any phone to view your content.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Error Message */}
-      {error && (
-        <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg mb-4">
-          <X className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
-          <div>
-            <p className="text-sm font-semibold text-red-900">Write Failed</p>
-            <p className="text-xs text-red-700 mt-1">{error}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Write Button */}
-      <button
-        onClick={writeNFCTag}
-        disabled={!supported || writing}
-        className={`w-full py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
-          !supported || writing
-            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            : 'bg-gradient-to-r from-purple-500 to-violet-500 text-white hover:shadow-lg'
-        }`}
-      >
-        <Nfc size={20} className={writing ? 'animate-pulse' : ''} />
-        {writing ? 'Hold tag near phone...' : 'Write to NFC Tag'}
-      </button>
-
-      {/* Instructions */}
-      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-        <div className="flex items-start gap-2">
-          <Info className="text-blue-600 flex-shrink-0 mt-0.5" size={16} />
-          <div>
-            <p className="text-xs font-semibold text-blue-900 mb-1">How to write:</p>
-            <ol className="text-xs text-blue-800 space-y-1 list-decimal list-inside">
-              <li>Click "Write to NFC Tag" button</li>
-              <li>Hold a blank NFC tag near your phone</li>
-              <li>Wait for success confirmation</li>
-              <li>Test by tapping the tag with any phone</li>
-            </ol>
-          </div>
-        </div>
-      </div>
-
-      {/* Where to buy tags */}
-      <div className="mt-3 text-center">
-        <p className="text-xs text-gray-500">
-          Don't have NFC tags?{' '}
-          <a 
-            href="https://amazon.com/nfc-tags" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-purple-600 hover:text-purple-700 font-semibold"
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-lg transition"
           >
-            Buy NFC tags →
-          </a>
-        </p>
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6">
+          {/* NFC URL Display */}
+          <div className="mb-6 p-4 bg-purple-50 rounded-xl">
+            <p className="text-xs text-gray-600 mb-2">NFC URL:</p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-sm text-primary font-mono break-all">
+                {nfcUrl}
+              </code>
+              <button
+                onClick={copyUrl}
+                className="p-2 hover:bg-purple-100 rounded-lg transition"
+                title="Copy URL"
+              >
+                {copied ? <CheckCircle size={18} className="text-green-500" /> : <Copy size={18} />}
+              </button>
+            </div>
+          </div>
+
+          {/* NFC Support Check */}
+          {nfcSupported ? (
+            <>
+              {/* Write Button */}
+              <button
+                onClick={writeNFC}
+                disabled={nfcStatus === 'writing'}
+                className={`w-full py-4 rounded-xl font-semibold flex items-center justify-center gap-3 transition ${
+                  nfcStatus === 'writing'
+                    ? 'bg-gray-300 cursor-not-allowed'
+                    : nfcStatus === 'success'
+                    ? 'bg-green-500 text-white'
+                    : 'bg-gradient-to-r from-primary to-secondary text-white hover:opacity-90'
+                }`}
+              >
+                {nfcStatus === 'writing' ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                    <span>Hold NFC tag near device...</span>
+                  </>
+                ) : nfcStatus === 'success' ? (
+                  <>
+                    <CheckCircle size={20} />
+                    <span>Tag Written Successfully!</span>
+                  </>
+                ) : (
+                  <>
+                    <Wifi size={20} />
+                    <span>Write to NFC Tag</span>
+                  </>
+                )}
+              </button>
+
+              {/* Status Messages */}
+              {nfcStatus === 'success' && (
+                <div className="mt-4 p-4 bg-green-50 rounded-xl flex items-start gap-3">
+                  <CheckCircle className="text-green-500 flex-shrink-0 mt-0.5" size={20} />
+                  <div>
+                    <p className="font-semibold text-green-800">Success!</p>
+                    <p className="text-sm text-green-700">
+                      NFC tag programmed. Tap it with any phone to open this campaign.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {error && (
+                <div className="mt-4 p-4 bg-red-50 rounded-xl flex items-start gap-3">
+                  <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+                  <div>
+                    <p className="font-semibold text-red-800">Error</p>
+                    <p className="text-sm text-red-700">{error}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Instructions */}
+              <div className="mt-6 p-4 bg-gray-50 rounded-xl">
+                <h3 className="font-semibold text-gray-800 mb-2">How to Write:</h3>
+                <ol className="text-sm text-gray-600 space-y-2">
+                  <li>1. Click "Write to NFC Tag"</li>
+                  <li>2. Hold a blank NFC tag near your device</li>
+                  <li>3. Wait for confirmation</li>
+                  <li>4. Test by tapping the tag with any phone</li>
+                </ol>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* NFC Not Supported */}
+              <div className="p-4 bg-yellow-50 rounded-xl flex items-start gap-3 mb-6">
+                <AlertCircle className="text-yellow-500 flex-shrink-0 mt-0.5" size={20} />
+                <div>
+                  <p className="font-semibold text-yellow-800">Web NFC Not Available</p>
+                  <p className="text-sm text-yellow-700 mt-1">
+                    Your browser doesn't support Web NFC. Use Chrome on Android, or use an NFC writing app.
+                  </p>
+                </div>
+              </div>
+
+              {/* Manual Instructions */}
+              <div className="p-4 bg-gray-50 rounded-xl">
+                <h3 className="font-semibold text-gray-800 mb-3">Manual NFC Writing:</h3>
+                <ol className="text-sm text-gray-600 space-y-3">
+                  <li className="flex items-start gap-2">
+                    <span className="bg-primary text-white w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs">1</span>
+                    <span>Download an NFC writing app (NFC Tools, NXP TagWriter)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="bg-primary text-white w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs">2</span>
+                    <span>Select "Write" → "URL/Link"</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="bg-primary text-white w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs">3</span>
+                    <span>Paste this URL: <button onClick={copyUrl} className="text-primary underline">{copied ? 'Copied!' : 'Copy URL'}</button></span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="bg-primary text-white w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs">4</span>
+                    <span>Tap your NFC tag to write</span>
+                  </li>
+                </ol>
+              </div>
+
+              {/* App Links */}
+              <div className="mt-4 flex gap-3">
+                <a
+                  href="https://play.google.com/store/apps/details?id=com.wakdev.wdnfc"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 py-3 border-2 border-primary text-primary rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-purple-50 transition"
+                >
+                  <ExternalLink size={18} />
+                  NFC Tools
+                </a>
+                <a
+                  href="https://play.google.com/store/apps/details?id=com.nxp.nfc.tagwriter"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 py-3 border-2 border-gray-300 text-gray-700 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-gray-50 transition"
+                >
+                  <ExternalLink size={18} />
+                  TagWriter
+                </a>
+              </div>
+            </>
+          )}
+
+          {/* Recommended Tags */}
+          <div className="mt-6 pt-6 border-t">
+            <h3 className="font-semibold text-gray-800 mb-2">Recommended NFC Tags:</h3>
+            <ul className="text-sm text-gray-600 space-y-1">
+              <li>• NTAG213 (144 bytes) - Small URLs</li>
+              <li>• NTAG215 (504 bytes) - Medium URLs</li>
+              <li>• NTAG216 (888 bytes) - Long URLs</li>
+            </ul>
+            <p className="text-xs text-gray-500 mt-2">
+              Available on Amazon, AliExpress, or specialty NFC suppliers.
+            </p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 border-t bg-gray-50">
+          <button
+            onClick={onClose}
+            className="w-full py-3 border-2 border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-100 transition"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   );
