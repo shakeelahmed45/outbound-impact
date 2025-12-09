@@ -1,12 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 
 const PublicViewer = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -14,8 +13,11 @@ const PublicViewer = () => {
   const hasTracked = useRef(false);
   const overlayTimeout = useRef(null);
 
-  // Get the "from" parameter (campaign slug we came from)
-  const fromCampaign = searchParams.get('from');
+  // Get the "from" parameter using plain JavaScript (no React Router hook needed)
+  const getFromParam = () => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('from');
+  };
 
   useEffect(() => {
     const fetchItem = async () => {
@@ -66,8 +68,15 @@ const PublicViewer = () => {
   };
 
   const handleBack = () => {
+    const fromCampaign = getFromParam();
+    
+    console.log('=== BACK BUTTON CLICKED ===');
+    console.log('fromCampaign:', fromCampaign);
+    console.log('window.opener:', window.opener);
+    
     // If opened in new tab (from Items page) - close the tab
     if (window.opener && !window.opener.closed) {
+      console.log('Closing tab...');
       window.opener.focus();
       window.close();
       return;
@@ -75,12 +84,14 @@ const PublicViewer = () => {
 
     // If we came from a campaign, go back to that campaign
     if (fromCampaign) {
-      navigate(`/c/${fromCampaign}`);
+      console.log('Navigating to campaign:', fromCampaign);
+      window.location.href = '/c/' + fromCampaign;
       return;
     }
 
     // Fallback to home page
-    navigate('/');
+    console.log('Going to home page...');
+    window.location.href = '/';
   };
 
   if (loading) {
