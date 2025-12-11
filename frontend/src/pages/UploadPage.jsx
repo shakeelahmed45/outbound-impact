@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Upload, Image, Video, Music, FileText, X, Loader2, Plus, Folder } from 'lucide-react';
+import { Upload, Image, Video, Music, FileText, X, Loader2, Plus, Folder, Link } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import api from '../services/api';
@@ -493,13 +493,60 @@ const UploadPage = () => {
                   <Tooltip content="Write your text content here - supports plain text and formatting" />
                 </label>
                 <textarea
+                  id="content-textarea"
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   rows={10}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="Write your content here..."
+                  placeholder="Write your content here... Tip: Just type URLs starting with https:// to make them clickable!"
                   required
                 />
+              </div>
+
+              {/* ✅ LINK INSERTION HELPER */}
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center">
+                      <Link size={20} className="text-white" />
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-bold text-primary mb-2">💡 Adding Clickable Links</h4>
+                    <p className="text-xs text-gray-600 mb-3">
+                      Simply type URLs in your content (they must start with http:// or https://). They'll automatically become clickable blue links when viewed!
+                    </p>
+                    <div className="bg-white border border-purple-200 rounded-lg p-3 mb-3">
+                      <p className="text-xs font-semibold text-gray-700 mb-1">Example:</p>
+                      <code className="text-xs text-gray-700 block bg-gray-50 p-2 rounded">
+                        Check out our site at https://example.com
+                      </code>
+                      <p className="text-xs text-gray-500 mt-2">
+                        👆 This URL will be a clickable blue link for viewers
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const textarea = document.getElementById('content-textarea');
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const textBefore = content.substring(0, start);
+                        const textAfter = content.substring(end);
+                        const newText = textBefore + 'https://' + textAfter;
+                        setContent(newText);
+                        setTimeout(() => {
+                          textarea.focus();
+                          textarea.setSelectionRange(start + 8, start + 8);
+                        }, 0);
+                      }}
+                      className="text-xs px-3 py-2 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-medium hover:shadow-lg transition-all inline-flex items-center gap-2"
+                    >
+                      <Link size={14} />
+                      Insert https:// at cursor
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {uploading && uploadProgress > 0 && (
