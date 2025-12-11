@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Download, Share2, Calendar, Folder, Play, FileText, Music, Image as ImageIcon, ArrowLeft, Home } from 'lucide-react';
+import { Calendar, Folder, Play, FileText, Music, Image as ImageIcon } from 'lucide-react';
 import axios from 'axios';
 
 const PublicCampaignViewer = () => {
@@ -28,34 +28,6 @@ const PublicCampaignViewer = () => {
 
     fetchCampaign();
   }, [slug]);
-
-  const downloadQRCode = () => {
-    if (!campaign || !campaign.qrCodeUrl) return;
-
-    const link = document.createElement('a');
-    link.href = campaign.qrCodeUrl;
-    link.download = `${campaign.name}-qr-code.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const shareCampaign = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: campaign.name,
-          text: campaign.description || `Check out ${campaign.name}`,
-          url: window.location.href,
-        });
-      } catch (err) {
-        console.log('Share cancelled');
-      }
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-      alert('Link copied to clipboard!');
-    }
-  };
 
   const getMediaIcon = (type) => {
     switch (type) {
@@ -103,21 +75,6 @@ const PublicCampaignViewer = () => {
     );
   };
 
-  const handleBack = () => {
-    if (window.opener && !window.opener.closed) {
-      window.opener.focus();
-      window.close();
-    } else {
-      const token = localStorage.getItem('token');
-      if (token) {
-        window.location.href = '/dashboard/campaigns';
-      } else {
-        window.location.href = '/';
-      }
-    }
-  };
-
-  // FIXED: Pass campaign slug in URL query parameter
   const openItem = (item) => {
     navigate(`/l/${item.slug}?from=${slug}`);
   };
@@ -147,69 +104,30 @@ const PublicCampaignViewer = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-violet-50 py-12 px-4">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <button
-            onClick={handleBack}
-            className="flex items-center gap-2 px-4 py-2 bg-white text-primary rounded-lg font-semibold shadow-md hover:shadow-lg transition-all hover:bg-purple-50"
-          >
-            <ArrowLeft size={20} />
-            <span>Back to Dashboard</span>
-          </button>
-        </div>
-
         <div className="bg-white rounded-3xl shadow-2xl p-8 mb-8">
-          <div className="flex flex-col md:flex-row items-start justify-between gap-6 mb-6">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-4">
-                <Folder className="text-primary" size={32} />
-                <h1 className="text-4xl font-bold text-primary">{campaign.name}</h1>
-              </div>
-              
-              {campaign.description && (
-                <p className="text-secondary text-lg mb-4">{campaign.description}</p>
-              )}
-              
-              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                <div className="flex items-center gap-2">
-                  <Calendar size={16} />
-                  <span>{new Date(campaign.createdAt).toLocaleDateString()}</span>
-                </div>
-                {campaign.category && (
-                  <span className="px-3 py-1 bg-purple-100 text-primary rounded-full font-medium">
-                    {campaign.category}
-                  </span>
-                )}
-                <span>{campaign.items.length} {campaign.items.length === 1 ? 'item' : 'items'}</span>
-                <span>Created by {campaign.user.name}</span>
-              </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-4">
+              <Folder className="text-primary" size={32} />
+              <h1 className="text-4xl font-bold text-primary">{campaign.name}</h1>
             </div>
-
-            {campaign.qrCodeUrl && (
-              <img
-                src={campaign.qrCodeUrl}
-                alt="Campaign QR Code"
-                className="w-32 h-32 rounded-xl shadow-md"
-              />
+            
+            {campaign.description && (
+              <p className="text-secondary text-lg mb-4">{campaign.description}</p>
             )}
-          </div>
-
-          <div className="flex flex-wrap gap-4">
-            {campaign.qrCodeUrl && (
-              <button
-                onClick={downloadQRCode}
-                className="flex-1 min-w-[200px] bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition"
-              >
-                <Download size={20} />
-                <span>Download QR Code</span>
-              </button>
-            )}
-            <button
-              onClick={shareCampaign}
-              className="flex-1 min-w-[200px] border-2 border-primary text-primary px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-purple-50 transition"
-            >
-              <Share2 size={20} />
-              <span>Share Campaign</span>
-            </button>
+            
+            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+              <div className="flex items-center gap-2">
+                <Calendar size={16} />
+                <span>{new Date(campaign.createdAt).toLocaleDateString()}</span>
+              </div>
+              {campaign.category && (
+                <span className="px-3 py-1 bg-purple-100 text-primary rounded-full font-medium">
+                  {campaign.category}
+                </span>
+              )}
+              <span>{campaign.items.length} {campaign.items.length === 1 ? 'item' : 'items'}</span>
+              <span>Created by {campaign.user.name}</span>
+            </div>
           </div>
         </div>
 
@@ -253,12 +171,6 @@ const PublicCampaignViewer = () => {
             <p className="text-secondary">This campaign doesn't have any content yet.</p>
           </div>
         )}
-
-        <div className="text-center mt-8">
-          <p className="text-secondary mb-4">
-            Powered by <span className="font-bold text-primary">Outbound Impact</span>
-          </p>
-        </div>
       </div>
     </div>
   );
