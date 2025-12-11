@@ -3,6 +3,32 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, Folder, Play, FileText, Music, Image as ImageIcon } from 'lucide-react';
 import axios from 'axios';
 
+// ✅ Utility function to make URLs clickable (for text preview)
+const linkifyText = (text) => {
+  if (!text) return '';
+  
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  
+  return parts.map((part, index) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white hover:text-blue-200 underline font-medium break-all"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+};
+
 const PublicCampaignViewer = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
@@ -63,6 +89,23 @@ const PublicCampaignViewer = () => {
           />
           <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
             {getMediaIcon(item.type)}
+          </div>
+        </div>
+      );
+    }
+
+    // ✅ FIX: Show text preview for TEXT type instead of purple box
+    if (item.type === 'TEXT') {
+      return (
+        <div className="w-full h-full bg-gradient-to-br from-purple-500 to-violet-500 p-4 flex flex-col overflow-hidden">
+          <div className="flex items-center gap-2 mb-2">
+            <FileText className="text-white" size={20} />
+            <span className="text-white text-xs font-semibold">TEXT</span>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <div className="text-white text-sm leading-relaxed line-clamp-6">
+              {linkifyText(item.content || 'No content available')}
+            </div>
           </div>
         </div>
       );
