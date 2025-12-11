@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, Eye, QrCode, BarChart3, Users, Folder, Key, Palette, Zap, Shield, Crown } from 'lucide-react';
+import { Upload, Eye, QrCode, BarChart3, Users, Folder, Key, Palette, Zap, Shield, Crown, FileText, HardDrive } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
+import Tooltip from '../components/common/Tooltip';
 import useAuthStore from '../store/authStore';
 import api from '../services/api';
 
@@ -89,16 +90,24 @@ const Dashboard = () => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {/* Total Items */}
           <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                <Upload size={24} className="text-white" />
+                <FileText size={24} className="text-white" />
               </div>
             </div>
             <p className="text-3xl font-bold text-primary mb-1">{stats?.totalUploads || 0}</p>
-            <p className="text-sm text-gray-600">Total Uploads</p>
+            <p className="text-sm text-gray-600 flex items-center gap-1">
+              Total Items
+              <Tooltip 
+                content="All media files you've uploaded (images, videos, audio, text)" 
+                iconSize={14}
+              />
+            </p>
           </div>
 
+          {/* Total Views */}
           <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
@@ -106,19 +115,16 @@ const Dashboard = () => {
               </div>
             </div>
             <p className="text-3xl font-bold text-primary mb-1">{stats?.totalViews || 0}</p>
-            <p className="text-sm text-gray-600">Total Views</p>
+            <p className="text-sm text-gray-600 flex items-center gap-1">
+              Total Views
+              <Tooltip 
+                content="Combined views across all your content and campaigns" 
+                iconSize={14}
+              />
+            </p>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center">
-                <QrCode size={24} className="text-white" />
-              </div>
-            </div>
-            <p className="text-3xl font-bold text-primary mb-1">{stats?.totalQRCodes || 0}</p>
-            <p className="text-sm text-gray-600">QR Codes</p>
-          </div>
-
+          {/* Campaigns */}
           <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
@@ -126,7 +132,30 @@ const Dashboard = () => {
               </div>
             </div>
             <p className="text-3xl font-bold text-primary mb-1">{stats?.totalCampaigns || 0}</p>
-            <p className="text-sm text-gray-600">Campaigns</p>
+            <p className="text-sm text-gray-600 flex items-center gap-1">
+              Campaigns
+              <Tooltip 
+                content="Collections of grouped content with QR codes" 
+                iconSize={14}
+              />
+            </p>
+          </div>
+
+          {/* Storage Used */}
+          <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
+                <HardDrive size={24} className="text-white" />
+              </div>
+            </div>
+            <p className="text-3xl font-bold text-primary mb-1">{storageUsedGB}</p>
+            <p className="text-sm text-gray-600 flex items-center gap-1">
+              Storage Used
+              <Tooltip 
+                content="Amount of storage space your uploaded files are using" 
+                iconSize={14}
+              />
+            </p>
           </div>
         </div>
 
@@ -180,7 +209,10 @@ const Dashboard = () => {
 
         {/* Quick Actions */}
         <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-          <h3 className="text-xl font-bold text-primary mb-4">Quick Actions</h3>
+          <h3 className="text-xl font-bold text-primary mb-4 flex items-center gap-2">
+            Quick Actions
+            <Tooltip content="Common tasks for quick access" />
+          </h3>
           <div className={`grid grid-cols-2 ${isEnterprise ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4`}>
             <button
               onClick={() => navigate('/dashboard/upload')}
