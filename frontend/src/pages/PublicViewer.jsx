@@ -3,6 +3,32 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 
+// ✅ Utility function to make URLs clickable
+const linkifyText = (text) => {
+  if (!text) return '';
+  
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  
+  return parts.map((part, index) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 hover:text-blue-800 underline font-medium break-all"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+};
+
 const PublicViewer = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
@@ -163,13 +189,14 @@ const PublicViewer = () => {
           </div>
         )}
 
+        {/* ✅ FIXED: Use item.mediaUrl (TEXT content is stored in mediaUrl field, not content field) */}
         {item.type === 'TEXT' && (
           <div className="w-full max-w-4xl max-h-screen overflow-y-auto px-8 py-12">
             <div className="bg-white bg-opacity-95 p-12 rounded-3xl">
               <h2 className="text-3xl font-bold text-gray-900 mb-6">{item.title}</h2>
-              <p className="text-gray-800 text-lg whitespace-pre-wrap leading-relaxed">
-                {item.mediaUrl}
-              </p>
+              <div className="text-gray-800 text-lg whitespace-pre-wrap leading-relaxed">
+                {linkifyText(item.mediaUrl || 'No content available')}
+              </div>
             </div>
           </div>
         )}

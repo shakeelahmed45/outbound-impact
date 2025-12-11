@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, Folder, Play, FileText, Music, Image as ImageIcon } from 'lucide-react';
 import axios from 'axios';
 
-// ✅ Utility function to make URLs clickable (for text preview)
+// ✅ Utility function to make URLs clickable
 const linkifyText = (text) => {
   if (!text) return '';
   
@@ -94,7 +94,7 @@ const PublicCampaignViewer = () => {
       );
     }
 
-    // ✅ FIX: Show text preview for TEXT type instead of purple box
+    // ✅ FIXED: Use item.mediaUrl (not item.content) for TEXT type
     if (item.type === 'TEXT') {
       return (
         <div className="w-full h-full bg-gradient-to-br from-purple-500 to-violet-500 p-4 flex flex-col overflow-hidden">
@@ -104,7 +104,7 @@ const PublicCampaignViewer = () => {
           </div>
           <div className="flex-1 overflow-hidden">
             <div className="text-white text-sm leading-relaxed line-clamp-6">
-              {linkifyText(item.content || 'No content available')}
+              {linkifyText(item.mediaUrl || 'No content available')}
             </div>
           </div>
         </div>
