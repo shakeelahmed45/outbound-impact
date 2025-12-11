@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, CreditCard, Shield, LogOut, Upload, Trash2, MessageSquare, MessagesSquare, BookOpen } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
+import Tooltip from '../components/common/Tooltip';
 import useAuthStore from '../store/authStore';
 import api from '../services/api';
 import { useToast } from '../hooks/useToast';
@@ -209,37 +210,46 @@ const SettingsPage = () => {
             <h3 className="text-2xl font-bold text-primary mb-6">Profile Information</h3>
             
             <div className="mb-8">
-              <label className="block text-sm font-medium text-gray-700 mb-3">
+              <label className="block text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
                 Profile Picture
+                <Tooltip content="Upload a photo to personalize your account" />
               </label>
               <div className="flex items-center gap-6">
-                {user?.profilePicture ? (
-                  <img
-                    src={user.profilePicture}
-                    alt={user.name}
-                    className="w-24 h-24 rounded-full object-cover border-4 border-gray-200"
-                  />
-                ) : (
-                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold text-2xl border-4 border-gray-200">
-                    {user?.name?.substring(0, 2).toUpperCase()}
-                  </div>
-                )}
+                <div className="relative">
+                  {user?.photoUrl ? (
+                    <img
+                      src={user.photoUrl}
+                      alt="Profile"
+                      className="w-24 h-24 rounded-full object-cover border-4 border-primary"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                      <span className="text-3xl text-white font-bold">
+                        {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+                      </span>
+                    </div>
+                  )}
+                  {uploadingPhoto && (
+                    <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                    </div>
+                  )}
+                </div>
                 <div>
-                  <input
-                    type="file"
-                    id="photo-upload"
-                    accept="image/*"
-                    onChange={handlePhotoUpload}
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor="photo-upload"
-                    className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 border-2 border-primary text-primary rounded-lg font-semibold hover:bg-purple-50 transition-all"
-                  >
+                  <label className="cursor-pointer bg-gradient-to-r from-primary to-secondary text-white px-6 py-2 rounded-lg font-semibold hover:shadow-lg transition-all inline-flex items-center gap-2">
                     <Upload size={18} />
-                    {uploadingPhoto ? 'Uploading...' : 'Upload New Photo'}
+                    <span>Upload Photo</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                      disabled={uploadingPhoto}
+                    />
                   </label>
-                  <p className="text-xs text-gray-500 mt-2">JPG, PNG or GIF (MAX. 5MB)</p>
+                  <p className="text-xs text-gray-500 mt-2">
+                    JPG, PNG, or GIF (max 5MB)
+                  </p>
                 </div>
               </div>
             </div>
@@ -247,25 +257,28 @@ const SettingsPage = () => {
             <form onSubmit={handleUpdateProfile} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                     Full Name
+                    <Tooltip content="Your name as it will appear to other users" />
                   </label>
                   <input
                     type="text"
                     value={profileData.name}
                     onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-                    className="w-full px-4 py-3 rounded-lg border-2 border-gray-200 focus:border-primary focus:outline-none transition-all"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                     Email Address
+                    <Tooltip content="Your login email cannot be changed for security reasons" />
                   </label>
                   <input
                     type="email"
                     value={profileData.email}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed"
                     disabled
-                    className="w-full px-4 py-3 rounded-lg border-2 border-gray-200 bg-gray-50 text-gray-500"
                   />
                   <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
                 </div>
@@ -289,7 +302,10 @@ const SettingsPage = () => {
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <p className="text-sm text-gray-600 mb-2">Current Plan</p>
+                  <p className="text-sm text-gray-600 mb-2 flex items-center gap-1">
+                    Current Plan
+                    <Tooltip content="Your active subscription tier" iconSize={14} />
+                  </p>
                   <p className="text-xl md:text-2xl font-bold text-primary">{getPlanName(user?.role)}</p>
                 </div>
                 <div>
@@ -301,7 +317,10 @@ const SettingsPage = () => {
               </div>
 
               <div className="border-t border-gray-200 pt-6">
-                <p className="text-sm text-gray-600 mb-2">Storage Usage</p>
+                <p className="text-sm text-gray-600 mb-2 flex items-center gap-1">
+                  Storage Usage
+                  <Tooltip content="How much of your plan's storage you're currently using" iconSize={14} />
+                </p>
                 <div className="flex items-center gap-4">
                   <div className="flex-1">
                     <div className="flex justify-between mb-2">
@@ -335,7 +354,11 @@ const SettingsPage = () => {
                   </li>
                   <li className="flex items-center gap-2 text-gray-600">
                     <span className="text-green-500">✓</span>
-                    {formatStorage(Number(user?.storageLimit || 2147483648))} Storage
+                    <span>{formatStorage(Number(user?.storageLimit || 2147483648))} Storage</span>
+                    <Tooltip 
+                      content="Total storage space available in your plan" 
+                      iconSize={12}
+                    />
                   </li>
                   <li className="flex items-center gap-2 text-gray-600">
                     <span className="text-green-500">✓</span>
@@ -408,7 +431,10 @@ const SettingsPage = () => {
             
             <div className="space-y-6">
               <div>
-                <h4 className="font-semibold text-gray-800 mb-4">Change Password</h4>
+                <h4 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  Change Password
+                  <Tooltip content="Update your password to keep your account secure" />
+                </h4>
                 <p className="text-gray-600 mb-4">Update your password to keep your account secure</p>
                 <button 
                   onClick={() => showToast('Password change feature coming soon!', 'warning')}
@@ -419,7 +445,10 @@ const SettingsPage = () => {
               </div>
 
               <div className="border-t border-gray-200 pt-6">
-                <h4 className="font-semibold text-gray-800 mb-4">Sign Out</h4>
+                <h4 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  Sign Out
+                  <Tooltip content="Sign out of your account on this device only" />
+                </h4>
                 <p className="text-gray-600 mb-4">Sign out of your account on this device</p>
                 <button
                   onClick={handleLogout}
@@ -431,7 +460,10 @@ const SettingsPage = () => {
               </div>
 
               <div className="border-t border-gray-200 pt-6">
-                <h4 className="font-semibold text-red-600 mb-4">Danger Zone</h4>
+                <h4 className="font-semibold text-red-600 mb-4 flex items-center gap-2">
+                  Danger Zone
+                  <Tooltip content="Permanent account deletion - this action cannot be undone!" />
+                </h4>
                 <p className="text-gray-600 mb-4">
                   Permanently delete your account and all associated data. This action cannot be undone.
                 </p>

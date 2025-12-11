@@ -3,6 +3,7 @@ import { Plus, Folder, Trash2, Edit2, FileText, Tag, Eye, TrendingUp, Download, 
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import NFCWriter from '../components/NFCWriter';
 import ShareModal from '../components/share/ShareModal';
+import Tooltip from '../components/common/Tooltip';
 import api from '../services/api';
 
 const CAMPAIGN_CATEGORIES = [
@@ -357,6 +358,10 @@ const CampaignsPage = () => {
                       <div className="flex items-center gap-2 text-blue-600 mb-1">
                         <FileText size={16} />
                         <span className="text-xs font-medium">Items</span>
+                        <Tooltip 
+                          content="Number of media files in this campaign" 
+                          iconSize={14}
+                        />
                       </div>
                       <p className="text-xl font-bold text-blue-700">{itemsCount}</p>
                     </div>
@@ -364,6 +369,10 @@ const CampaignsPage = () => {
                       <div className="flex items-center gap-2 text-green-600 mb-1">
                         <TrendingUp size={16} />
                         <span className="text-xs font-medium">Views</span>
+                        <Tooltip 
+                          content="Total views across all items in this campaign" 
+                          iconSize={14}
+                        />
                       </div>
                       <p className="text-xl font-bold text-green-700">{totalViews}</p>
                     </div>
@@ -461,8 +470,9 @@ const CampaignsPage = () => {
               <h2 className="text-2xl font-bold text-primary mb-6">Create Campaign</h2>
               <form onSubmit={handleCreate} className="space-y-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Campaign Name *
+                    <Tooltip content="Give your campaign a clear, descriptive name that helps you identify it easily" />
                   </label>
                   <input
                     type="text"
@@ -475,8 +485,9 @@ const CampaignsPage = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Category
+                    <Tooltip content="Choose a category to organize your campaigns and make them easier to find" />
                   </label>
                   <select
                     value={formData.category}
@@ -493,8 +504,9 @@ const CampaignsPage = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Description
+                    <Tooltip content="Add optional details about this campaign to help team members understand its purpose" />
                   </label>
                   <textarea
                     value={formData.description}
@@ -534,8 +546,9 @@ const CampaignsPage = () => {
               <h2 className="text-2xl font-bold text-primary mb-6">Edit Campaign</h2>
               <form onSubmit={handleEdit} className="space-y-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Campaign Name *
+                    <Tooltip content="Give your campaign a clear, descriptive name that helps you identify it easily" />
                   </label>
                   <input
                     type="text"
@@ -547,8 +560,9 @@ const CampaignsPage = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Category
+                    <Tooltip content="Choose a category to organize your campaigns and make them easier to find" />
                   </label>
                   <select
                     value={formData.category}
@@ -565,8 +579,9 @@ const CampaignsPage = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Description
+                    <Tooltip content="Add optional details about this campaign to help team members understand its purpose" />
                   </label>
                   <textarea
                     value={formData.description}

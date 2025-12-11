@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import api from '../services/api';
 import { useToast } from '../hooks/useToast';
+import Tooltip from '../components/common/Tooltip';
 import Toast from '../components/common/Toast';
 
 const CAMPAIGN_CATEGORIES = [
@@ -317,8 +318,9 @@ const UploadPage = () => {
   // 🆕 Campaign Selection Component
   const CampaignSelector = () => (
     <div className="mb-6">
-      <label className="block text-sm font-semibold text-gray-700 mb-2">
+      <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
         Select Campaign *
+        <Tooltip content="Choose which campaign this content belongs to" />
       </label>
       {loadingCampaigns ? (
         <div className="flex items-center justify-center py-4">
@@ -457,8 +459,9 @@ const UploadPage = () => {
               <CampaignSelector />
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                   Title *
+                  <Tooltip content="Give your text post a clear, descriptive title" />
                 </label>
                 <input
                   type="text"
@@ -471,8 +474,9 @@ const UploadPage = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                   Description (Optional)
+                  <Tooltip content="Add optional details about this text post" />
                 </label>
                 <input
                   type="text"
@@ -484,8 +488,9 @@ const UploadPage = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                   Content *
+                  <Tooltip content="Write your text content here - supports plain text and formatting" />
                 </label>
                 <textarea
                   value={content}
@@ -636,8 +641,9 @@ const UploadPage = () => {
               )}
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                   Title *
+                  <Tooltip content="Give your media file a clear, descriptive title" />
                 </label>
                 <input
                   type="text"
@@ -650,8 +656,9 @@ const UploadPage = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                   Description (Optional)
+                  <Tooltip content="Add optional details about this media file" />
                 </label>
                 <input
                   type="text"
@@ -724,8 +731,9 @@ const UploadPage = () => {
               <h2 className="text-2xl font-bold text-primary mb-6">Create New Campaign</h2>
               <form onSubmit={handleCreateCampaign} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Campaign Name *
+                    <Tooltip content="Give your campaign a clear, descriptive name" />
                   </label>
                   <input
                     type="text"
@@ -738,8 +746,9 @@ const UploadPage = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Category
+                    <Tooltip content="Choose a category to organize your campaigns" />
                   </label>
                   <select
                     value={newCampaignData.category}
@@ -756,8 +765,9 @@ const UploadPage = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Description
+                    <Tooltip content="Add optional details about this campaign's purpose" />
                   </label>
                   <textarea
                     value={newCampaignData.description}
