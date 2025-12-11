@@ -20,7 +20,7 @@ const getTeamMembers = async (req, res) => {
 
     const teamMembers = await prisma.teamMember.findMany({
       where: { userId },
-      orderBy: { invitedAt: 'desc' },
+      orderBy: { createdAt: 'desc' },
     });
 
     res.json({
