@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Upload, Eye, QrCode, BarChart3, Users, Folder, Key, Palette, Zap, Shield, Crown } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
+import Tooltip from '../components/common/Tooltip';
 import useAuthStore from '../store/authStore';
 import api from '../services/api';
 
@@ -96,7 +97,13 @@ const Dashboard = () => {
               </div>
             </div>
             <p className="text-3xl font-bold text-primary mb-1">{stats?.totalUploads || 0}</p>
-            <p className="text-sm text-gray-600">Total Uploads</p>
+            <p className="text-sm text-gray-600 flex items-center gap-1">
+              Total Uploads
+              <Tooltip 
+                content="All media files you've uploaded to the platform" 
+                iconSize={14}
+              />
+            </p>
           </div>
 
           <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
@@ -106,7 +113,13 @@ const Dashboard = () => {
               </div>
             </div>
             <p className="text-3xl font-bold text-primary mb-1">{stats?.totalViews || 0}</p>
-            <p className="text-sm text-gray-600">Total Views</p>
+            <p className="text-sm text-gray-600 flex items-center gap-1">
+              Total Views
+              <Tooltip 
+                content="Combined views across all your content" 
+                iconSize={14}
+              />
+            </p>
           </div>
 
           <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
@@ -116,7 +129,13 @@ const Dashboard = () => {
               </div>
             </div>
             <p className="text-3xl font-bold text-primary mb-1">{stats?.totalQRCodes || 0}</p>
-            <p className="text-sm text-gray-600">QR Codes</p>
+            <p className="text-sm text-gray-600 flex items-center gap-1">
+              QR Codes
+              <Tooltip 
+                content="Total QR codes generated for your content" 
+                iconSize={14}
+              />
+            </p>
           </div>
 
           <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
@@ -126,7 +145,13 @@ const Dashboard = () => {
               </div>
             </div>
             <p className="text-3xl font-bold text-primary mb-1">{stats?.totalCampaigns || 0}</p>
-            <p className="text-sm text-gray-600">Campaigns</p>
+            <p className="text-sm text-gray-600 flex items-center gap-1">
+              Campaigns
+              <Tooltip 
+                content="Collections of grouped content with QR codes" 
+                iconSize={14}
+              />
+            </p>
           </div>
         </div>
 
@@ -147,7 +172,10 @@ const Dashboard = () => {
 
         {/* Storage Usage */}
         <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 mb-8">
-          <h3 className="text-xl font-bold text-primary mb-4">Storage Usage</h3>
+          <h3 className="text-xl font-bold text-primary mb-4 flex items-center gap-2">
+            Storage Usage
+            <Tooltip content="Your current storage space usage" />
+          </h3>
           <div className="flex items-center gap-4">
             <div className="flex-1">
               <div className="flex justify-between mb-2">
@@ -180,7 +208,10 @@ const Dashboard = () => {
 
         {/* Quick Actions */}
         <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-          <h3 className="text-xl font-bold text-primary mb-4">Quick Actions</h3>
+          <h3 className="text-xl font-bold text-primary mb-4 flex items-center gap-2">
+            Quick Actions
+            <Tooltip content="Common tasks for quick access" />
+          </h3>
           <div className={`grid grid-cols-2 ${isEnterprise ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4`}>
             <button
               onClick={() => navigate('/dashboard/upload')}
