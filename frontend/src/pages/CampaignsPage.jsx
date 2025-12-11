@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Folder, Trash2, Edit2, FileText, Tag, Eye, TrendingUp, Download, Share2, ExternalLink, Wifi } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import NFCWriter from '../components/NFCWriter';
+import ShareModal from '../components/share/ShareModal';
 import api from '../services/api';
 
 const CAMPAIGN_CATEGORIES = [
@@ -40,6 +41,10 @@ const CampaignsPage = () => {
   // NFC State
   const [showNFCModal, setShowNFCModal] = useState(false);
   const [nfcCampaign, setNfcCampaign] = useState(null);
+
+  // Share State
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareSelectedCampaign, setShareSelectedCampaign] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -251,23 +256,14 @@ const CampaignsPage = () => {
     document.body.removeChild(link);
   };
 
-  const shareCampaign = async (campaign) => {
-    const campaignUrl = `${window.location.origin}/c/${campaign.slug}`;
-    
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: campaign.name,
-          text: campaign.description || `Check out ${campaign.name}`,
-          url: campaignUrl,
-        });
-      } catch (err) {
-        console.log('Share cancelled');
-      }
-    } else {
-      navigator.clipboard.writeText(campaignUrl);
-      alert('Link copied to clipboard!');
-    }
+  const openShareModal = (campaign) => {
+    setShareSelectedCampaign(campaign);
+    setShowShareModal(true);
+  };
+
+  const closeShareModal = () => {
+    setShowShareModal(false);
+    setShareSelectedCampaign(null);
   };
 
   const openPublicCampaign = (campaign) => {
@@ -299,120 +295,121 @@ const CampaignsPage = () => {
     <DashboardLayout>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold text-primary mb-2">Campaigns</h1>
-            <p className="text-secondary">Organize your content with QR codes and NFC tags</p>
+            <p className="text-secondary">Organize your content into campaigns with QR codes</p>
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-lg font-semibold flex items-center gap-2 hover:shadow-lg transition-all"
+            className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all flex items-center gap-2"
           >
             <Plus size={20} />
-            <span>Create Campaign</span>
+            Create Campaign
           </button>
         </div>
 
         {/* Campaigns Grid */}
         {campaigns.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-2xl shadow-lg">
+          <div className="text-center py-12">
             <Folder size={64} className="mx-auto text-gray-300 mb-4" />
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">No Campaigns Yet</h3>
-            <p className="text-gray-500 mb-6">Create your first campaign to organize your content</p>
+            <p className="text-gray-500 mb-4">No campaigns yet. Create your first campaign!</p>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-lg font-semibold inline-flex items-center gap-2"
+              className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all inline-flex items-center gap-2"
             >
               <Plus size={20} />
-              <span>Create Campaign</span>
+              Create Campaign
             </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {campaigns.map((campaign) => {
-              const campaignItems = getCampaignItems(campaign.id);
+              const itemsCount = getCampaignItems(campaign.id).length;
               const totalViews = getCampaignTotalViews(campaign.id);
+
               return (
                 <div
                   key={campaign.id}
-                  className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all border border-gray-100"
+                  className="bg-white rounded-xl shadow-lg p-6 border-2 border-gray-100 hover:border-primary transition-all"
                 >
+                  {/* Campaign Header */}
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Folder size={24} className="text-primary" />
-                        <h3 className="text-xl font-bold text-gray-800">{campaign.name}</h3>
-                      </div>
+                      <h3 className="text-xl font-bold text-primary mb-2">{campaign.name}</h3>
                       {campaign.category && (
-                        <div className="flex items-center gap-1 mb-2">
-                          <Tag size={14} className="text-secondary" />
-                          <span className="text-sm font-medium text-secondary">{campaign.category}</span>
-                        </div>
+                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-primary/10 to-secondary/10 text-primary rounded-full text-sm font-medium">
+                          <Tag size={14} />
+                          {campaign.category}
+                        </span>
                       )}
-                      {campaign.description && (
-                        <p className="text-sm text-gray-600 mb-3">{campaign.description}</p>
-                      )}
-                      
-                      {/* Stats */}
-                      <div className="flex items-center gap-4 text-sm">
-                        <div className="flex items-center gap-2 text-gray-500">
-                          <FileText size={16} />
-                          <span>{campaignItems.length} items</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-blue-600">
-                          <TrendingUp size={16} />
-                          <span className="font-semibold">{totalViews} views</span>
-                        </div>
-                      </div>
                     </div>
                   </div>
 
-                  {/* CAMPAIGN QR CODE & ACTIONS */}
+                  {/* Description */}
+                  {campaign.description && (
+                    <p className="text-gray-600 text-sm mb-4 line-clamp-2">{campaign.description}</p>
+                  )}
+
+                  {/* Stats */}
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="bg-blue-50 p-3 rounded-lg">
+                      <div className="flex items-center gap-2 text-blue-600 mb-1">
+                        <FileText size={16} />
+                        <span className="text-xs font-medium">Items</span>
+                      </div>
+                      <p className="text-xl font-bold text-blue-700">{itemsCount}</p>
+                    </div>
+                    <div className="bg-green-50 p-3 rounded-lg">
+                      <div className="flex items-center gap-2 text-green-600 mb-1">
+                        <TrendingUp size={16} />
+                        <span className="text-xs font-medium">Views</span>
+                      </div>
+                      <p className="text-xl font-bold text-green-700">{totalViews}</p>
+                    </div>
+                  </div>
+
+                  {/* QR Code Section */}
                   {campaign.qrCodeUrl && (
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                      <div className="flex items-center gap-4">
-                        <img 
-                          src={campaign.qrCodeUrl} 
-                          alt="Campaign QR Code" 
-                          className="w-20 h-20 rounded-lg shadow-md cursor-pointer hover:scale-105 transition"
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-gray-700">QR Code & NFC</span>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <button
                           onClick={() => downloadCampaignQR(campaign)}
-                          title="Click to download"
-                        />
+                          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-primary to-secondary text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all"
+                        >
+                          <Download size={16} />
+                          <span>QR Code</span>
+                        </button>
                         
-                        <div className="flex-1 flex flex-wrap gap-2">
-                          <button
-                            onClick={() => downloadCampaignQR(campaign)}
-                            className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-primary to-secondary text-white rounded-lg text-sm font-medium hover:opacity-90 transition"
-                          >
-                            <Download size={16} />
-                            <span>QR</span>
-                          </button>
-                          
-                          {/* NFC Button */}
-                          <button
-                            onClick={() => openNFCWriter(campaign)}
-                            className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition"
-                          >
-                            <Wifi size={16} />
-                            <span>NFC</span>
-                          </button>
-                          
-                          <button
-                            onClick={() => shareCampaign(campaign)}
-                            className="flex items-center gap-2 px-3 py-2 border-2 border-primary text-primary rounded-lg text-sm font-medium hover:bg-purple-50 transition"
-                          >
-                            <Share2 size={16} />
-                            <span>Share</span>
-                          </button>
-                          
-                          <button
-                            onClick={() => openPublicCampaign(campaign)}
-                            className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
-                          >
-                            <ExternalLink size={16} />
-                            <span>Preview</span>
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => openNFCWriter(campaign)}
+                          className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-secondary to-primary text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all"
+                        >
+                          <Wifi size={16} />
+                          <span>NFC</span>
+                        </button>
+                      </div>
+                      
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={() => openShareModal(campaign)}
+                          className="flex items-center gap-2 px-3 py-2 border-2 border-primary text-primary rounded-lg text-sm font-medium hover:bg-purple-50 transition"
+                        >
+                          <Share2 size={16} />
+                          <span>Share</span>
+                        </button>
+                        
+                        <button
+                          onClick={() => openPublicCampaign(campaign)}
+                          className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
+                        >
+                          <ExternalLink size={16} />
+                          <span>Preview</span>
+                        </button>
                       </div>
                       
                       <div className="mt-3 p-2 bg-gray-50 rounded-lg">
@@ -752,6 +749,13 @@ const CampaignsPage = () => {
         {showNFCModal && nfcCampaign && (
           <NFCWriter campaign={nfcCampaign} onClose={closeNFCWriter} />
         )}
+
+        {/* Share Modal */}
+        <ShareModal
+          isOpen={showShareModal}
+          onClose={closeShareModal}
+          campaign={shareSelectedCampaign}
+        />
       </div>
     </DashboardLayout>
   );
