@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, Mail, Shield, Trash2, AlertCircle, Loader2 } from 'lucide-react';
+import { UserPlus, Mail, Trash2, AlertCircle, Loader2, RefreshCw, Clock, CheckCircle, XCircle } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import useAuthStore from '../store/authStore';
 import api from '../services/api';
@@ -10,25 +10,23 @@ const TeamPage = () => {
   const [loading, setLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [resendingId, setResendingId] = useState(null);
   const [formData, setFormData] = useState({
     email: '',
     role: 'VIEWER',
   });
   const [error, setError] = useState('');
 
-  // Fetch user data and team members on mount
   useEffect(() => {
     fetchInitialData();
   }, []);
 
   const fetchInitialData = async () => {
     try {
-      // Fetch user data first to check role
       const userRes = await api.get('/auth/me');
       if (userRes.data.status === 'success') {
         setUser(userRes.data.user);
         
-        // Only fetch team members if user is organization
         const userRole = userRes.data.user.role;
         if (userRole === 'ORG_SMALL' || userRole === 'ORG_MEDIUM' || userRole === 'ORG_ENTERPRISE') {
           await fetchTeamMembers();
@@ -50,7 +48,6 @@ const TeamPage = () => {
       }
     } catch (error) {
       console.error('Failed to fetch team members:', error);
-      // Don't set error here as it might be due to access restriction
     }
   };
 
@@ -65,13 +62,28 @@ const TeamPage = () => {
         setTeamMembers([response.data.teamMember, ...teamMembers]);
         setShowInviteModal(false);
         setFormData({ email: '', role: 'VIEWER' });
-        alert('✅ Team member invited successfully!');
+        alert('✅ Team member invited successfully! Invitation email sent.');
       }
     } catch (error) {
       console.error('Failed to invite team member:', error);
       setError(error.response?.data?.message || 'Failed to invite team member');
     } finally {
       setInviting(false);
+    }
+  };
+
+  const handleResend = async (id) => {
+    setResendingId(id);
+    try {
+      const response = await api.post(`/team/${id}/resend`);
+      if (response.data.status === 'success') {
+        alert('✅ Invitation resent successfully!');
+      }
+    } catch (error) {
+      console.error('Failed to resend invitation:', error);
+      alert('❌ Failed to resend invitation');
+    } finally {
+      setResendingId(null);
     }
   };
 
@@ -88,7 +100,36 @@ const TeamPage = () => {
     }
   };
 
-  // Check if user has organization role
+  const getStatusBadge = (status) => {
+    const badges = {
+      PENDING: {
+        icon: Clock,
+        color: 'bg-yellow-100 text-yellow-800',
+        text: 'Pending'
+      },
+      ACCEPTED: {
+        icon: CheckCircle,
+        color: 'bg-green-100 text-green-800',
+        text: 'Accepted'
+      },
+      DECLINED: {
+        icon: XCircle,
+        color: 'bg-red-100 text-red-800',
+        text: 'Declined'
+      }
+    };
+
+    const badge = badges[status] || badges.PENDING;
+    const Icon = badge.icon;
+
+    return (
+      <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${badge.color}`}>
+        <Icon size={14} />
+        {badge.text}
+      </span>
+    );
+  };
+
   const isOrganization = user?.role === 'ORG_SMALL' || user?.role === 'ORG_MEDIUM' || user?.role === 'ORG_ENTERPRISE';
 
   if (loading) {
@@ -102,7 +143,6 @@ const TeamPage = () => {
     );
   }
 
-  // Show upgrade message for non-organization users
   if (!isOrganization) {
     return (
       <DashboardLayout>
@@ -179,6 +219,7 @@ const TeamPage = () => {
                   <tr>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Member</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Role</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Invited</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Actions</th>
                   </tr>
@@ -202,21 +243,41 @@ const TeamPage = () => {
                           {member.role}
                         </span>
                       </td>
+                      <td className="px-6 py-4">
+                        {getStatusBadge(member.status)}
+                      </td>
                       <td className="px-6 py-4 text-gray-600 text-sm">
-                        {new Date(member.createdAt || member.createdAt).toLocaleDateString('en-US', {
+                        {new Date(member.createdAt).toLocaleDateString('en-US', {
                           year: 'numeric',
                           month: 'short',
                           day: 'numeric'
                         })}
                       </td>
                       <td className="px-6 py-4">
-                        <button
-                          onClick={() => handleRemove(member.id)}
-                          className="text-red-600 hover:text-red-700 font-medium flex items-center gap-2 transition-colors"
-                        >
-                          <Trash2 size={16} />
-                          Remove
-                        </button>
+                        <div className="flex items-center gap-2">
+                          {member.status === 'PENDING' && (
+                            <button
+                              onClick={() => handleResend(member.id)}
+                              disabled={resendingId === member.id}
+                              className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition-colors text-sm disabled:opacity-50"
+                              title="Resend invitation"
+                            >
+                              {resendingId === member.id ? (
+                                <Loader2 className="animate-spin" size={16} />
+                              ) : (
+                                <RefreshCw size={16} />
+                              )}
+                              Resend
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleRemove(member.id)}
+                            className="text-red-600 hover:text-red-700 font-medium flex items-center gap-1 transition-colors text-sm"
+                          >
+                            <Trash2 size={16} />
+                            Remove
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -237,7 +298,7 @@ const TeamPage = () => {
                 <h3 className="text-2xl font-bold text-primary">Invite Team Member</h3>
               </div>
               <p className="text-sm text-gray-600 mb-6 ml-15">
-                Add a team member to collaborate on your content
+                Send a professional invitation email with a secure link
               </p>
               
               <form onSubmit={handleInvite}>
@@ -282,7 +343,7 @@ const TeamPage = () => {
 
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                     <p className="text-xs text-blue-800">
-                      <strong>Note:</strong> The invited member will be added to your team. They'll be able to access your content based on their role.
+                      <strong>📧 Email will include:</strong> Professional invitation with your logo, role details, and a secure acceptance link that expires in 7 days.
                     </p>
                   </div>
                 </div>
@@ -308,12 +369,12 @@ const TeamPage = () => {
                     {inviting ? (
                       <>
                         <Loader2 className="animate-spin" size={16} />
-                        Inviting...
+                        Sending...
                       </>
                     ) : (
                       <>
                         <Mail size={16} />
-                        Send Invite
+                        Send Invitation
                       </>
                     )}
                   </button>

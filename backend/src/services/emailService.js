@@ -221,11 +221,220 @@ const sendAdminNotification = async (userData) => {
   }
 };
 
+// ✨ NEW: Send team invitation email
+const sendTeamInvitationEmail = async (invitationData) => {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.log('⚠️ Resend not configured - skipping invitation email');
+      return { success: false, error: 'Resend not configured' };
+    }
+
+    const { recipientEmail, inviterName, inviterEmail, role, invitationLink } = invitationData;
+
+    const roleDescriptions = {
+      VIEWER: '👁️ <strong>Viewer Access:</strong> You can view all content, campaigns, and analytics.',
+      EDITOR: '✏️ <strong>Editor Access:</strong> You can view and edit content, create campaigns, and manage media.',
+      ADMIN: '👑 <strong>Admin Access:</strong> You have full access to all features including team management, settings, and billing.'
+    };
+
+    const { data, error } = await resend.emails.send({
+      from: 'Outbound Impact <noreply@outboundimpact.org>',
+      to: [recipientEmail],
+      replyTo: inviterEmail,
+      subject: `🎉 You've been invited to join ${inviterName}'s team on Outbound Impact`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 40px 20px;">
+            <tr>
+              <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); overflow: hidden;">
+                  
+                  <!-- Header with Purple Gradient -->
+                  <tr>
+                    <td style="background: linear-gradient(135deg, #800080 0%, #EE82EE 100%); padding: 40px 40px 30px; text-align: center;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">You're Invited! 🎉</h1>
+                      <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Join the Outbound Impact team</p>
+                    </td>
+                  </tr>
+                  
+                  <!-- Content -->
+                  <tr>
+                    <td style="padding: 40px;">
+                      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
+                        Hi there! 👋
+                      </p>
+                      
+                      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
+                        <strong>${inviterName}</strong> (${inviterEmail}) has invited you to join their team on <strong>Outbound Impact</strong>.
+                      </p>
+                      
+                      <!-- Role Badge -->
+                      <table cellpadding="0" cellspacing="0" style="margin: 30px 0;">
+                        <tr>
+                          <td style="background: linear-gradient(135deg, #800080 0%, #EE82EE 100%); color: #ffffff; padding: 12px 24px; border-radius: 8px; font-weight: bold; font-size: 14px;">
+                            🎯 Your Role: ${role}
+                          </td>
+                        </tr>
+                      </table>
+                      
+                      <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 0 0 30px; background-color: #f9f9f9; padding: 15px; border-radius: 8px; border-left: 4px solid #800080;">
+                        ${roleDescriptions[role] || 'Team member access'}
+                      </p>
+                      
+                      <!-- CTA Button -->
+                      <table width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td align="center" style="padding: 20px 0;">
+                            <a href="${invitationLink}" style="background: linear-gradient(135deg, #800080 0%, #EE82EE 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 12px rgba(128, 0, 128, 0.3);">
+                              Accept Invitation →
+                            </a>
+                          </td>
+                        </tr>
+                      </table>
+                      
+                      <p style="color: #999999; font-size: 13px; line-height: 1.6; margin: 30px 0 0; padding-top: 20px; border-top: 1px solid #eeeeee;">
+                        Or copy and paste this link into your browser:<br>
+                        <a href="${invitationLink}" style="color: #800080; word-break: break-all;">${invitationLink}</a>
+                      </p>
+                      
+                      <p style="color: #999999; font-size: 13px; line-height: 1.6; margin: 20px 0 0;">
+                        This invitation link will expire in <strong>7 days</strong>.
+                      </p>
+                    </td>
+                  </tr>
+                  
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background-color: #f9f9f9; padding: 30px 40px; text-align: center; border-top: 1px solid #eeeeee;">
+                      <p style="color: #999999; font-size: 13px; margin: 0 0 10px;">
+                        <strong style="color: #800080;">Outbound Impact</strong> - Share Content. Track Analytics. Grow Your Reach.
+                      </p>
+                      <p style="color: #cccccc; font-size: 12px; margin: 0;">
+                        © ${new Date().getFullYear()} Outbound Impact. All rights reserved.
+                      </p>
+                      <p style="color: #cccccc; font-size: 11px; margin: 10px 0 0;">
+                        If you didn't expect this invitation, you can safely ignore this email.
+                      </p>
+                    </td>
+                  </tr>
+                  
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Failed to send invitation email:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('✅ Team invitation email sent to:', recipientEmail, '(ID:', data.id, ')');
+    return { success: true, messageId: data.id };
+  } catch (error) {
+    console.error('❌ Failed to send invitation email:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+// ✨ NEW: Send reminder email for pending invitations
+const sendInvitationReminderEmail = async (reminderData) => {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.log('⚠️ Resend not configured - skipping reminder email');
+      return { success: false, error: 'Resend not configured' };
+    }
+
+    const { recipientEmail, inviterName, role, invitationLink, daysLeft } = reminderData;
+
+    const { data, error } = await resend.emails.send({
+      from: 'Outbound Impact <noreply@outboundimpact.org>',
+      to: [recipientEmail],
+      subject: '⏰ Reminder: Your team invitation is expiring soon',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 40px 20px;">
+            <tr>
+              <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                  <tr>
+                    <td style="background: linear-gradient(135deg, #800080 0%, #EE82EE 100%); padding: 40px; text-align: center; border-radius: 16px 16px 0 0;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">⏰ Invitation Expiring Soon</h1>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 40px;">
+                      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
+                        Hi there! 👋
+                      </p>
+                      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
+                        Just a friendly reminder that <strong>${inviterName}</strong> has invited you to join their team on Outbound Impact.
+                      </p>
+                      <p style="color: #ff6b6b; font-size: 16px; line-height: 1.6; margin: 0 0 30px; font-weight: bold;">
+                        ⚠️ This invitation will expire in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}.
+                      </p>
+                      <table width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td align="center" style="padding: 20px 0;">
+                            <a href="${invitationLink}" style="background: linear-gradient(135deg, #800080 0%, #EE82EE 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">
+                              Accept Invitation Now →
+                            </a>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="background-color: #f9f9f9; padding: 20px; text-align: center; border-top: 1px solid #eeeeee;">
+                      <p style="color: #999999; font-size: 12px; margin: 0;">
+                        © ${new Date().getFullYear()} Outbound Impact. All rights reserved.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Failed to send reminder email:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('✅ Reminder email sent to:', recipientEmail);
+    return { success: true, messageId: data.id };
+  } catch (error) {
+    console.error('❌ Failed to send reminder email:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
 // Test connection when service loads
 testConnection();
 
 module.exports = {
   sendWelcomeEmail,
   sendAdminNotification,
+  sendTeamInvitationEmail,      // ✨ NEW
+  sendInvitationReminderEmail,   // ✨ NEW
   testConnection
 };

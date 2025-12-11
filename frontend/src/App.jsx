@@ -30,6 +30,7 @@ import IntegrationsPage from './pages/enterprise/IntegrationsPage';
 import AdvancedAnalyticsPage from './pages/enterprise/AdvancedAnalyticsPage';
 import SecurityPage from './pages/enterprise/SecurityPage';
 import UserGuidePage from './pages/UserGuidePage';
+import AcceptInvitation from './pages/AcceptInvitation'; // ✨ NEW: Team invitation acceptance page
 
 function App() {
   const [showSplash, setShowSplash] = useState(() => {
@@ -61,6 +62,9 @@ function App() {
         {/* Public Routes */}
         <Route path="/l/:slug" element={<PublicViewer />} />
         <Route path="/c/:slug" element={<PublicCampaignViewer />} />
+        
+        {/* ✨ NEW: Team Invitation Route (Public - No Authentication Required) */}
+        <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
         
         {/* User Dashboard Routes */}
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
