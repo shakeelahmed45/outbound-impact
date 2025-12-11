@@ -203,7 +203,7 @@ const TeamPage = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-gray-600 text-sm">
-                        {new Date(member.invitedAt || member.createdAt).toLocaleDateString('en-US', {
+                        {new Date(member.createdAt || member.createdAt).toLocaleDateString('en-US', {
                           year: 'numeric',
                           month: 'short',
                           day: 'numeric'

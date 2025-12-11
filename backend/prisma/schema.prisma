@@ -101,7 +101,7 @@ model TeamMember {
   email     String
   role      String
   userId    String
-  invitedAt DateTime @default(now())
+    createdAt DateTime @default(now())  // ← BACK TO createdAt!
   
     user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
