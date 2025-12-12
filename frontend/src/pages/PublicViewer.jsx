@@ -163,31 +163,31 @@ const PublicViewer = () => {
           </div>
         )}
 
-        {/* ✅ TEXT - With Custom Button Above Content, NO AUTO-LINKING */}
+        {/* ✅ TEXT - Button at BOTTOM/END of content */}
         {item.type === 'TEXT' && (
           <div className="w-full max-w-4xl max-h-screen overflow-y-auto px-8 py-12">
             <div className="bg-white bg-opacity-95 p-12 rounded-3xl">
               <h2 className="text-3xl font-bold text-gray-900 mb-6">{item.title}</h2>
               
-              {/* ✅ Custom Button (Above Content) */}
+              {/* ✅ Text Content - Plain text, NO auto-linking */}
+              <div className="text-gray-800 text-lg whitespace-pre-wrap leading-relaxed mb-8">
+                {item.mediaUrl || 'No content available'}
+              </div>
+              
+              {/* ✅ Custom Button at the BOTTOM/END */}
               {item.buttonText && item.buttonUrl && (
-                <div className="mb-6">
+                <div className="mt-8 pt-6 border-t border-gray-200">
                   <a
                     href={item.buttonUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all"
+                    className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-primary to-secondary text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-2xl transition-all transform hover:scale-105"
                   >
-                    <ExternalLink size={20} />
+                    <ExternalLink size={24} />
                     {item.buttonText}
                   </a>
                 </div>
               )}
-              
-              {/* ✅ Text Content - Plain text, NO auto-linking */}
-              <div className="text-gray-800 text-lg whitespace-pre-wrap leading-relaxed">
-                {item.mediaUrl || 'No content available'}
-              </div>
             </div>
           </div>
         )}

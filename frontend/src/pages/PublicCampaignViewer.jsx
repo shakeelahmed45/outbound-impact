@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Calendar, Folder, Play, FileText, Music, Image as ImageIcon, ExternalLink } from 'lucide-react';
+import { Calendar, Folder, Play, FileText, Music, Image as ImageIcon } from 'lucide-react';
 import axios from 'axios';
 
 const PublicCampaignViewer = () => {
@@ -68,7 +68,7 @@ const PublicCampaignViewer = () => {
       );
     }
 
-    // ✅ TEXT TYPE - Black background with custom button
+    // ✅ TEXT TYPE - Black background, NO BUTTON on preview card
     if (item.type === 'TEXT') {
       return (
         <div className="relative w-full h-full bg-gradient-to-br from-gray-900 via-black to-gray-800 p-4 flex flex-col overflow-hidden">
@@ -84,24 +84,8 @@ const PublicCampaignViewer = () => {
               <FileText className="text-white" size={20} />
               <span className="text-white text-xs font-semibold">TEXT</span>
             </div>
-
-            {/* ✅ Custom Button (if provided) */}
-            {item.buttonText && item.buttonUrl && (
-              <div className="mb-3">
-                <a
-                  href={item.buttonUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="inline-flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-primary to-secondary text-white rounded-lg text-xs font-semibold hover:shadow-lg transition-all"
-                >
-                  <ExternalLink size={14} />
-                  {item.buttonText}
-                </a>
-              </div>
-            )}
             
-            {/* Text Content - NO AUTO-LINKING */}
+            {/* Text Content Preview - NO AUTO-LINKING */}
             <div className="flex-1 overflow-hidden">
               <div className="text-white text-sm leading-relaxed line-clamp-6 whitespace-pre-wrap">
                 {item.mediaUrl || 'No content available'}
