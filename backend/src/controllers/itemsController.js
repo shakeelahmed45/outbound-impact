@@ -3,6 +3,7 @@ const { deleteFromBunny, uploadToBunny, generateFileName } = require('../service
 
 const prisma = new PrismaClient();
 
+// ✅ UPDATED: Include buttonText and buttonUrl
 const getUserItems = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -19,7 +20,6 @@ const getUserItems = async (req, res) => {
       }),
     };
 
-    // Fetch all fields without explicit select to avoid column issues
     const items = await prisma.item.findMany({
       where,
       orderBy: { createdAt: 'desc' },
@@ -41,6 +41,8 @@ const getUserItems = async (req, res) => {
         views: item.views || 0,
         createdAt: item.createdAt,
         publicUrl: `${process.env.FRONTEND_URL}/l/${item.slug}`,
+        buttonText: item.buttonText || null,  // ✅ NEW
+        buttonUrl: item.buttonUrl || null,    // ✅ NEW
       }))
     });
 
@@ -53,6 +55,7 @@ const getUserItems = async (req, res) => {
   }
 };
 
+// ✅ UPDATED: Include buttonText and buttonUrl
 const getItemById = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -84,6 +87,8 @@ const getItemById = async (req, res) => {
         views: item.views || 0,
         createdAt: item.createdAt,
         publicUrl: `${process.env.FRONTEND_URL}/l/${item.slug}`,
+        buttonText: item.buttonText || null,  // ✅ NEW
+        buttonUrl: item.buttonUrl || null,    // ✅ NEW
       }
     });
 
@@ -145,11 +150,12 @@ const getPublicItem = async (req, res) => {
   }
 };
 
+// ✅ UPDATED: Support content, buttonText, and buttonUrl
 const updateItem = async (req, res) => {
   try {
     const userId = req.user.userId;
     const { id } = req.params;
-    const { title, description } = req.body;
+    const { title, description, content, buttonText, buttonUrl } = req.body;
 
     const item = await prisma.item.findFirst({
       where: { id, userId }
@@ -162,12 +168,61 @@ const updateItem = async (req, res) => {
       });
     }
 
+    // ✅ Validate button fields for TEXT items
+    if (item.type === 'TEXT') {
+      if (buttonText && !buttonUrl) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Button URL is required when button text is provided',
+        });
+      }
+      if (buttonUrl && !buttonText) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Button text is required when button URL is provided',
+        });
+      }
+      
+      // ✅ Validate URL format
+      if (buttonUrl) {
+        try {
+          new URL(buttonUrl);
+          if (!buttonUrl.startsWith('http://') && !buttonUrl.startsWith('https://')) {
+            return res.status(400).json({
+              status: 'error',
+              message: 'Button URL must start with http:// or https://',
+            });
+          }
+        } catch (error) {
+          return res.status(400).json({
+            status: 'error',
+            message: 'Invalid button URL format',
+          });
+        }
+      }
+    }
+
+    // Build update data object
+    const updateData = {};
+    
+    if (title) updateData.title = title;
+    if (description !== undefined) updateData.description = description;
+    
+    // ✅ Update content for TEXT items
+    if (item.type === 'TEXT' && content !== undefined) {
+      updateData.mediaUrl = content;
+      updateData.fileSize = BigInt(content.length);
+    }
+    
+    // ✅ Update button fields for TEXT items
+    if (item.type === 'TEXT') {
+      if (buttonText !== undefined) updateData.buttonText = buttonText || null;
+      if (buttonUrl !== undefined) updateData.buttonUrl = buttonUrl || null;
+    }
+
     const updatedItem = await prisma.item.update({
       where: { id },
-      data: {
-        ...(title && { title }),
-        ...(description !== undefined && { description }),
-      }
+      data: updateData
     });
 
     res.json({
