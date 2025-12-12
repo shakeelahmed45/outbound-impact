@@ -44,9 +44,9 @@ model Item {
   userId       String
   slug         String    @unique
   title        String
-  description  String?
+  description  String?   @db.Text
   type         MediaType
-  mediaUrl     String
+  mediaUrl     String    @db.Text
   qrCodeUrl    String?
   thumbnailUrl String?
   fileSize     BigInt

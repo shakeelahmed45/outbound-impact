@@ -1,7 +1,33 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Calendar, Folder, Play, FileText, Music, Image as ImageIcon } from 'lucide-react';
+import { Calendar, Folder, Play, FileText, Music, Image as ImageIcon, Eye } from 'lucide-react';
 import axios from 'axios';
+
+// ✅ Utility function to make URLs clickable
+const linkifyText = (text) => {
+  if (!text) return '';
+  
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  
+  return parts.map((part, index) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white hover:text-blue-200 underline font-medium break-all"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+};
 
 const PublicCampaignViewer = () => {
   const { slug } = useParams();
@@ -68,33 +94,42 @@ const PublicCampaignViewer = () => {
       );
     }
 
-    // ✅ TEXT TYPE - Black background, NO BUTTON on preview card
+    // ✅ UPDATED: TEXT card with clear "Click to read more" indicator
     if (item.type === 'TEXT') {
+      const textContent = item.mediaUrl || 'No content available';
+      const hasLongContent = textContent.length > 200;
+      
       return (
-        <div className="relative w-full h-full bg-gradient-to-br from-gray-900 via-black to-gray-800 p-4 flex flex-col overflow-hidden">
-          {/* Subtle background pattern */}
-          <div className="absolute inset-0 opacity-5">
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-500 via-violet-600 to-purple-700"></div>
-          </div>
+        <div className="w-full h-full bg-gradient-to-br from-gray-900 via-black to-gray-800 p-4 flex flex-col overflow-hidden relative">
+          {/* Purple tint overlay */}
+          <div className="absolute inset-0 bg-primary opacity-5 pointer-events-none"></div>
           
           {/* Content */}
           <div className="relative z-10 flex flex-col h-full">
-            {/* Header */}
             <div className="flex items-center gap-2 mb-3">
               <FileText className="text-white" size={20} />
-              <span className="text-white text-xs font-semibold">TEXT</span>
+              <span className="text-white text-xs font-semibold tracking-wide">TEXT</span>
             </div>
             
-            {/* Text Content Preview - NO AUTO-LINKING */}
             <div className="flex-1 overflow-hidden">
-              <div className="text-white text-sm leading-relaxed line-clamp-6 whitespace-pre-wrap">
-                {item.mediaUrl || 'No content available'}
+              <div className="text-white text-sm leading-relaxed line-clamp-6">
+                {textContent}
               </div>
             </div>
+            
+            {/* ✅ NEW: Clear "Click to read more" indicator */}
+            {hasLongContent && (
+              <div className="mt-auto pt-3 border-t border-white/20">
+                <div className="flex items-center gap-2 text-white/90 text-xs font-medium">
+                  <Eye className="w-4 h-4" />
+                  <span>Click to read full text</span>
+                </div>
+              </div>
+            )}
           </div>
           
-          {/* Bottom gradient overlay */}
-          <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black to-transparent z-20"></div>
+          {/* Bottom gradient fade */}
+          <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black to-transparent pointer-events-none"></div>
         </div>
       );
     }
@@ -135,7 +170,6 @@ const PublicCampaignViewer = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-violet-50 py-12 px-4">
       <div className="max-w-7xl mx-auto">
-        {/* Campaign Header */}
         <div className="bg-white rounded-3xl shadow-2xl p-8 mb-8">
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-4">
@@ -163,7 +197,6 @@ const PublicCampaignViewer = () => {
           </div>
         </div>
 
-        {/* Campaign Items Grid */}
         {campaign.items.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {campaign.items.map((item) => (
@@ -172,12 +205,10 @@ const PublicCampaignViewer = () => {
                 onClick={() => openItem(item)}
                 className="bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer transform transition hover:scale-105 hover:shadow-2xl"
               >
-                {/* Item Preview */}
                 <div className="aspect-square w-full overflow-hidden bg-gray-100">
                   {getThumbnail(item)}
                 </div>
 
-                {/* Item Info */}
                 <div className="p-4">
                   <h3 className="text-lg font-bold text-primary mb-2 truncate">
                     {item.title}
