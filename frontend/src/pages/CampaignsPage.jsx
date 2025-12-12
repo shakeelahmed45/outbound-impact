@@ -3,7 +3,7 @@ import { Plus, Folder, Trash2, Edit2, FileText, Tag, Eye, TrendingUp, Download, 
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import NFCWriter from '../components/NFCWriter';
 import ShareModal from '../components/share/ShareModal';
-import EditItemModal from '../components/EditItemModal'; // ✅ ONLY NEW IMPORT
+import EditItemModal from '../components/EditItemModal';
 import Tooltip from '../components/common/Tooltip';
 import api from '../services/api';
 
@@ -48,7 +48,7 @@ const CampaignsPage = () => {
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareSelectedCampaign, setShareSelectedCampaign] = useState(null);
 
-  // ✅ ONLY NEW STATE - Edit Item
+  // Edit Item State
   const [showEditItemModal, setShowEditItemModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
 
@@ -143,7 +143,6 @@ const CampaignsPage = () => {
     }
   };
 
-  // ✅ ONLY NEW HANDLERS - Edit Item
   const handleEditItem = (item) => {
     setEditingItem(item);
     setShowEditItemModal(true);
@@ -223,12 +222,16 @@ const CampaignsPage = () => {
         item => !selectedItems.includes(item.id)
       );
 
+      let addedCount = 0;
+      let removedCount = 0;
+
       for (const itemId of itemsToAdd) {
         try {
           await api.post('/campaigns/assign', {
             itemId,
             campaignId: selectedCampaign.id,
           });
+          addedCount++;
         } catch (error) {
           console.error('Failed to add item:', itemId, error);
         }
@@ -240,18 +243,28 @@ const CampaignsPage = () => {
             itemId: item.id,
             campaignId: null,
           });
+          removedCount++;
         } catch (error) {
           console.error('Failed to remove item:', item.id, error);
         }
       }
 
       await fetchData();
-      
+
       setShowAddItemsModal(false);
       setSelectedCampaign(null);
       setSelectedItems([]);
+
+      let message = 'Campaign items updated!';
+      if (addedCount > 0 && removedCount > 0) {
+        message = `Added ${addedCount} item(s) and removed ${removedCount} item(s)`;
+      } else if (addedCount > 0) {
+        message = `Added ${addedCount} item(s) to campaign`;
+      } else if (removedCount > 0) {
+        message = `Removed ${removedCount} item(s) from campaign`;
+      }
       
-      alert('Items updated successfully!');
+      alert(message);
     } catch (error) {
       console.error('Failed to update items:', error);
       alert('Failed to update items: ' + error.message);
@@ -488,22 +501,23 @@ const CampaignsPage = () => {
           </div>
         )}
 
-        {/* CREATE Campaign Modal */}
+        {/* Create Campaign Modal */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl p-8 max-w-md w-full">
-              <h2 className="text-2xl font-bold text-primary mb-6">Create New Campaign</h2>
-              <form onSubmit={handleCreate} className="space-y-4">
+              <h2 className="text-2xl font-bold text-primary mb-6">Create Campaign</h2>
+              <form onSubmit={handleCreate} className="space-y-6">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Campaign Name *
-                    <Tooltip content="Give your campaign a clear, descriptive name" />
+                    <Tooltip content="Give your campaign a clear, descriptive name that helps you identify it easily" />
                   </label>
                   <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="e.g., Summer Menu 2024"
                     required
                   />
                 </div>
@@ -511,7 +525,7 @@ const CampaignsPage = () => {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Category
-                    <Tooltip content="Choose a category to organize your campaigns" />
+                    <Tooltip content="Choose a category to organize your campaigns and make them easier to find" />
                   </label>
                   <select
                     value={formData.category}
@@ -536,6 +550,7 @@ const CampaignsPage = () => {
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent h-24 resize-none"
+                    placeholder="Optional description..."
                   />
                 </div>
 
@@ -562,7 +577,7 @@ const CampaignsPage = () => {
           </div>
         )}
 
-        {/* EDIT Campaign Modal */}
+        {/* Edit Campaign Modal */}
         {showEditModal && selectedCampaign && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl p-8 max-w-md w-full">
@@ -571,7 +586,7 @@ const CampaignsPage = () => {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Campaign Name *
-                    <Tooltip content="Give your campaign a clear, descriptive name" />
+                    <Tooltip content="Give your campaign a clear, descriptive name that helps you identify it easily" />
                   </label>
                   <input
                     type="text"
@@ -585,7 +600,7 @@ const CampaignsPage = () => {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Category
-                    <Tooltip content="Choose a category to organize your campaigns" />
+                    <Tooltip content="Choose a category to organize your campaigns and make them easier to find" />
                   </label>
                   <select
                     value={formData.category}
@@ -637,7 +652,7 @@ const CampaignsPage = () => {
           </div>
         )}
 
-        {/* VIEW Campaign Items Modal - ✅ ONLY CHANGE: Added action buttons to items */}
+        {/* VIEW Campaign Items Modal */}
         {showViewItemsModal && selectedCampaign && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl p-8 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
@@ -690,7 +705,7 @@ const CampaignsPage = () => {
                         </span>
                       </div>
 
-                      {/* ✅ ONLY NEW ADDITION: Action buttons */}
+                      {/* Action Buttons */}
                       <div className="flex gap-2 pt-2 border-t border-gray-100">
                         <button
                           onClick={() => window.open(`/l/${item.slug}`, '_blank')}
@@ -820,7 +835,7 @@ const CampaignsPage = () => {
           campaign={shareSelectedCampaign}
         />
 
-        {/* ✅ ONLY NEW COMPONENT: Edit Item Modal */}
+        {/* Edit Item Modal */}
         <EditItemModal
           item={editingItem}
           isOpen={showEditItemModal}
