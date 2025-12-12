@@ -181,7 +181,7 @@ const PublicViewer = () => {
                     href={item.buttonUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-primary to-secondary text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-2xl transition-all transform hover:scale-105"
+                    className="inline-flex items-center gap-2 px-3 py-4 bg-gradient-to-r from-primary to-secondary text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-2xl transition-all transform hover:scale-105"
                   >
                     <ExternalLink size={24} />
                     {item.buttonText}
