@@ -133,13 +133,47 @@ const uploadFile = async (req, res) => {
 const createTextPost = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { title, description, content } = req.body;
+    // ✅ ADD: Get buttonText and buttonUrl from request
+    const { title, description, content, buttonText, buttonUrl } = req.body;
 
     if (!title || !content) {
       return res.status(400).json({
         status: 'error',
         message: 'Title and content are required'
       });
+    }
+
+    // ✅ ADD: Validate button fields if provided
+    if (buttonText && !buttonUrl) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Button URL is required when button text is provided'
+      });
+    }
+    
+    if (buttonUrl && !buttonText) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Button text is required when button URL is provided'
+      });
+    }
+
+    // ✅ ADD: Validate URL format if provided
+    if (buttonUrl) {
+      try {
+        new URL(buttonUrl);
+        if (!buttonUrl.startsWith('http://') && !buttonUrl.startsWith('https://')) {
+          return res.status(400).json({
+            status: 'error',
+            message: 'Button URL must start with http:// or https://'
+          });
+        }
+      } catch (error) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Invalid button URL format'
+        });
+      }
     }
 
     // Generate unique slug
@@ -164,6 +198,7 @@ const createTextPost = async (req, res) => {
       },
     });
 
+    // ✅ ADD: Include buttonText and buttonUrl in database
     const item = await prisma.item.create({
       data: {
         userId,
@@ -175,6 +210,8 @@ const createTextPost = async (req, res) => {
         qrCodeUrl: qrCodeDataUrl,
         thumbnailUrl: null,
         fileSize: BigInt(content.length),
+        buttonText: buttonText || null,  // ✅ NEW
+        buttonUrl: buttonUrl || null,    // ✅ NEW
       }
     });
 
@@ -199,6 +236,8 @@ const createTextPost = async (req, res) => {
         thumbnailUrl: item.thumbnailUrl,
         qrCodeUrl: item.qrCodeUrl,
         publicUrl: publicUrl,
+        buttonText: item.buttonText,     // ✅ NEW
+        buttonUrl: item.buttonUrl,       // ✅ NEW
       }
     });
 

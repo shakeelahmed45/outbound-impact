@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Upload, Image, Video, Music, FileText, X, Loader2, Plus, Folder, Link } from 'lucide-react';
+import { Upload, Image, Video, Music, FileText, X, Loader2, Plus, Folder, Link, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import api from '../services/api';
@@ -36,7 +36,11 @@ const UploadPage = () => {
   const [description, setDescription] = useState('');
   const [content, setContent] = useState('');
 
-  // 🆕 Campaign selection state
+  // ✅ NEW: Button fields for TEXT content
+  const [buttonText, setButtonText] = useState('');
+  const [buttonUrl, setButtonUrl] = useState('');
+
+  // Campaign selection state
   const [campaigns, setCampaigns] = useState([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const [loadingCampaigns, setLoadingCampaigns] = useState(true);
@@ -48,16 +52,13 @@ const UploadPage = () => {
   });
   const [creatingCampaign, setCreatingCampaign] = useState(false);
 
-  // 🆕 Fetch campaigns on mount
+  // Fetch campaigns on mount
   useEffect(() => {
     fetchCampaigns();
   }, []);
 
-  // 🆕 Clear any lingering toasts on mount
   useEffect(() => {
-    // Clear toasts when component mounts (prevents ghost toasts)
     return () => {
-      // Cleanup function runs on unmount
     };
   }, []);
 
@@ -67,7 +68,6 @@ const UploadPage = () => {
       const response = await api.get('/campaigns');
       if (response.data.status === 'success') {
         setCampaigns(response.data.campaigns);
-        // Auto-select first campaign if available
         if (response.data.campaigns.length > 0 && !selectedCampaignId) {
           setSelectedCampaignId(response.data.campaigns[0].id);
         }
@@ -79,7 +79,6 @@ const UploadPage = () => {
     }
   };
 
-  // 🆕 Create new campaign
   const handleCreateCampaign = async (e) => {
     e.preventDefault();
     
@@ -183,7 +182,6 @@ const UploadPage = () => {
       return;
     }
 
-    // 🆕 Check campaign selection
     if (!selectedCampaignId) {
       showToast('Please select a campaign', 'error');
       return;
@@ -193,17 +191,14 @@ const UploadPage = () => {
     setUploadProgress(0);
 
     try {
-      // Start progress simulation
-      await simulateProgress(0, 20, 500); // Reading file: 0-20%
+      await simulateProgress(0, 20, 500);
 
       const reader = new FileReader();
       reader.onload = async (e) => {
         const fileData = e.target.result;
 
-        // File read complete
-        await simulateProgress(20, 40, 300); // Preparing: 20-40%
+        await simulateProgress(20, 40, 300);
 
-        // Start upload
         const uploadPromise = api.post('/upload/file', {
           title,
           description,
@@ -213,17 +208,15 @@ const UploadPage = () => {
           fileSize: selectedFile.size,
         });
 
-        // Simulate upload progress
-        const progressPromise = simulateProgress(40, 95, 2000); // Uploading: 40-95%
+        const progressPromise = simulateProgress(40, 95, 2000);
 
         const [response] = await Promise.all([uploadPromise, progressPromise]);
 
-        setUploadProgress(100); // Complete
+        setUploadProgress(100);
 
         if (response.data.status === 'success') {
           const itemId = response.data.item.id;
 
-          // 🆕 Assign item to campaign
           await api.post('/campaigns/assign', {
             itemId,
             campaignId: selectedCampaignId,
@@ -238,7 +231,6 @@ const UploadPage = () => {
             setPreview(null);
             setUploadType(null);
             setUploadProgress(0);
-            // 🆕 Redirect to campaigns page
             navigate('/dashboard/campaigns');
           }, 1000);
         }
@@ -261,7 +253,16 @@ const UploadPage = () => {
       return;
     }
 
-    // 🆕 Check campaign selection
+    // ✅ NEW: Validate button fields
+    if (buttonText && !buttonUrl) {
+      showToast('Please enter button URL', 'error');
+      return;
+    }
+    if (buttonUrl && !buttonText) {
+      showToast('Please enter button text', 'error');
+      return;
+    }
+
     if (!selectedCampaignId) {
       showToast('Please select a campaign', 'error');
       return;
@@ -273,10 +274,13 @@ const UploadPage = () => {
     try {
       await simulateProgress(0, 30, 300);
 
+      // ✅ NEW: Include button fields
       const uploadPromise = api.post('/upload/text', {
         title,
         description,
         content,
+        buttonText: buttonText || null,
+        buttonUrl: buttonUrl || null,
       });
 
       const progressPromise = simulateProgress(30, 95, 1000);
@@ -288,7 +292,6 @@ const UploadPage = () => {
       if (response.data.status === 'success') {
         const itemId = response.data.item.id;
 
-        // 🆕 Assign item to campaign
         await api.post('/campaigns/assign', {
           itemId,
           campaignId: selectedCampaignId,
@@ -300,9 +303,10 @@ const UploadPage = () => {
           setTitle('');
           setDescription('');
           setContent('');
+          setButtonText('');     // ✅ NEW: Clear button fields
+          setButtonUrl('');      // ✅ NEW: Clear button fields
           setUploadType(null);
           setUploadProgress(0);
-          // 🆕 Redirect to campaigns page
           navigate('/dashboard/campaigns');
         }, 1000);
       }
@@ -315,7 +319,6 @@ const UploadPage = () => {
     }
   };
 
-  // 🆕 Campaign Selection Component
   const CampaignSelector = () => (
     <div className="mb-6">
       <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
@@ -436,6 +439,7 @@ const UploadPage = () => {
           </>
         )}
 
+        {/* ✅ TEXT UPLOAD FORM WITH BUTTON FEATURE */}
         {uploadType === 'TEXT' && (
           <form onSubmit={handleTextPost} className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
             <div className="flex items-center justify-between mb-6">
@@ -447,6 +451,8 @@ const UploadPage = () => {
                   setTitle('');
                   setDescription('');
                   setContent('');
+                  setButtonText('');
+                  setButtonUrl('');
                 }}
                 className="text-gray-500 hover:text-gray-700"
               >
@@ -455,7 +461,6 @@ const UploadPage = () => {
             </div>
 
             <div className="space-y-6">
-              {/* 🆕 Campaign Selector */}
               <CampaignSelector />
 
               <div>
@@ -490,62 +495,104 @@ const UploadPage = () => {
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                   Content *
-                  <Tooltip content="Write your text content here - supports plain text and formatting" />
+                  <Tooltip content="Write your text content here - plain text only" />
                 </label>
                 <textarea
                   id="content-textarea"
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   rows={10}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="Write your content here... Tip: Just type URLs starting with https:// to make them clickable!"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+                  placeholder="Write your content here..."
                   required
                 />
               </div>
 
-              {/* ✅ LINK INSERTION HELPER */}
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0">
-                    <div className="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center">
-                      <Link size={20} className="text-white" />
+              {/* ✅ NEW: CUSTOM BUTTON SECTION */}
+              <div className="border-t border-gray-200 pt-6">
+                <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-xl p-6">
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="flex-shrink-0">
+                      <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-lg">
+                        <ExternalLink size={24} className="text-white" />
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="text-sm font-bold text-primary mb-2">💡 Adding Clickable Links</h4>
-                    <p className="text-xs text-gray-600 mb-3">
-                      Simply type URLs in your content (they must start with http:// or https://). They'll automatically become clickable blue links when viewed!
-                    </p>
-                    <div className="bg-white border border-purple-200 rounded-lg p-3 mb-3">
-                      <p className="text-xs font-semibold text-gray-700 mb-1">Example:</p>
-                      <code className="text-xs text-gray-700 block bg-gray-50 p-2 rounded">
-                        Check out our site at https://example.com
-                      </code>
-                      <p className="text-xs text-gray-500 mt-2">
-                        👆 This URL will be a clickable blue link for viewers
+                    <div className="flex-1">
+                      <h4 className="text-lg font-bold text-primary mb-2">
+                        🔗 Add Custom Button (Optional)
+                      </h4>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Add a professional call-to-action button that appears above your text content. 
+                        Perfect for "Visit Website", "Learn More", "Contact Us", etc.
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const textarea = document.getElementById('content-textarea');
-                        const start = textarea.selectionStart;
-                        const end = textarea.selectionEnd;
-                        const textBefore = content.substring(0, start);
-                        const textAfter = content.substring(end);
-                        const newText = textBefore + 'https://' + textAfter;
-                        setContent(newText);
-                        setTimeout(() => {
-                          textarea.focus();
-                          textarea.setSelectionRange(start + 8, start + 8);
-                        }, 0);
-                      }}
-                      className="text-xs px-3 py-2 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-medium hover:shadow-lg transition-all inline-flex items-center gap-2"
-                    >
-                      <Link size={14} />
-                      Insert https:// at cursor
-                    </button>
                   </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Button Text
+                      </label>
+                      <input
+                        type="text"
+                        value={buttonText}
+                        onChange={(e) => setButtonText(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                        placeholder="e.g., Visit Website"
+                        maxLength={50}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        What the button says (max 50 characters)
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Button URL
+                      </label>
+                      <input
+                        type="url"
+                        value={buttonUrl}
+                        onChange={(e) => setButtonUrl(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                        placeholder="https://example.com"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Where the button links to (must start with https://)
+                      </p>
+                    </div>
+                  </div>
+
+                  {buttonText && buttonUrl && (
+                    <div className="mt-4 p-4 bg-white border border-purple-200 rounded-lg">
+                      <p className="text-xs font-semibold text-gray-600 mb-2">Preview:</p>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all"
+                      >
+                        <ExternalLink size={18} />
+                        {buttonText}
+                      </button>
+                      <p className="text-xs text-gray-500 mt-2">
+                        Links to: {buttonUrl}
+                      </p>
+                    </div>
+                  )}
+
+                  {buttonText && !buttonUrl && (
+                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        ⚠️ Please enter a button URL
+                      </p>
+                    </div>
+                  )}
+                  {buttonUrl && !buttonText && (
+                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        ⚠️ Please enter button text
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -565,7 +612,7 @@ const UploadPage = () => {
                 </div>
               )}
 
-              <div className="flex gap-4">
+              <div className="flex gap-4 pt-4">
                 <button
                   type="button"
                   onClick={() => {
@@ -573,6 +620,8 @@ const UploadPage = () => {
                     setTitle('');
                     setDescription('');
                     setContent('');
+                    setButtonText('');
+                    setButtonUrl('');
                   }}
                   className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-all"
                   disabled={uploading}
@@ -590,7 +639,7 @@ const UploadPage = () => {
                       Creating...
                     </span>
                   ) : (
-                    'Create Post'
+                    'Create Text Post'
                   )}
                 </button>
               </div>
@@ -615,7 +664,6 @@ const UploadPage = () => {
               </button>
             </div>
 
-            {/* Campaign Selector */}
             <CampaignSelector />
 
             <div
@@ -673,7 +721,6 @@ const UploadPage = () => {
             </div>
 
             <div className="space-y-6">
-              {/* 🆕 Campaign Selector */}
               <CampaignSelector />
 
               {preview && (uploadType === 'IMAGE' || uploadType === 'VIDEO') && (
@@ -771,7 +818,6 @@ const UploadPage = () => {
           </form>
         )}
 
-        {/* 🆕 Create Campaign Modal */}
         {showCreateCampaignModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl p-8 max-w-md w-full">
@@ -856,7 +902,6 @@ const UploadPage = () => {
           </div>
         )}
 
-        {/* Toasts */}
         {toasts.map((toast) => (
           <Toast
             key={toast.id}

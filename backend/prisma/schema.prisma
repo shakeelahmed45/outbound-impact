@@ -56,6 +56,9 @@ model Item {
   viewsDirect  Int       @default(0)
   nfcEnabled   Boolean   @default(false)
   nfcUrl       String?
+
+  buttonText   String?
+  buttonUrl    String?
   
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt

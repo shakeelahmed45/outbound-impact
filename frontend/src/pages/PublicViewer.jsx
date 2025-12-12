@@ -1,33 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ExternalLink } from 'lucide-react';
 import axios from 'axios';
-
-// ✅ Utility function to make URLs clickable
-const linkifyText = (text) => {
-  if (!text) return '';
-  
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  const parts = text.split(urlRegex);
-  
-  return parts.map((part, index) => {
-    if (part.match(urlRegex)) {
-      return (
-        <a
-          key={index}
-          href={part}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 hover:text-blue-800 underline font-medium break-all"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {part}
-        </a>
-      );
-    }
-    return part;
-  });
-};
 
 const PublicViewer = () => {
   const { slug } = useParams();
@@ -90,20 +64,17 @@ const PublicViewer = () => {
   const handleBack = () => {
     const fromCampaign = new URLSearchParams(window.location.search).get('from');
     
-    // FIRST: If we came from a campaign, ALWAYS go back there
     if (fromCampaign) {
       window.location.href = '/c/' + fromCampaign;
       return;
     }
 
-    // SECOND: If opened in new tab (from Items page with no campaign) - close the tab
     if (window.opener && !window.opener.closed) {
       window.opener.focus();
       window.close();
       return;
     }
 
-    // Fallback to home page
     window.location.href = '/';
   };
 
@@ -154,6 +125,7 @@ const PublicViewer = () => {
 
       {/* Media Content */}
       <div className="relative w-full h-screen flex items-center justify-center">
+        {/* IMAGE */}
         {item.type === 'IMAGE' && (
           <img 
             src={item.mediaUrl} 
@@ -162,6 +134,7 @@ const PublicViewer = () => {
           />
         )}
 
+        {/* VIDEO */}
         {item.type === 'VIDEO' && (
           <video 
             controls 
@@ -173,6 +146,7 @@ const PublicViewer = () => {
           </video>
         )}
 
+        {/* AUDIO */}
         {item.type === 'AUDIO' && (
           <div className="w-full max-w-2xl px-8">
             <div className="bg-gradient-to-br from-purple-900 to-violet-900 p-12 rounded-3xl">
@@ -189,18 +163,36 @@ const PublicViewer = () => {
           </div>
         )}
 
-        {/* ✅ FIXED: Use item.mediaUrl (TEXT content is stored in mediaUrl field, not content field) */}
+        {/* ✅ TEXT - With Custom Button Above Content, NO AUTO-LINKING */}
         {item.type === 'TEXT' && (
           <div className="w-full max-w-4xl max-h-screen overflow-y-auto px-8 py-12">
             <div className="bg-white bg-opacity-95 p-12 rounded-3xl">
               <h2 className="text-3xl font-bold text-gray-900 mb-6">{item.title}</h2>
+              
+              {/* ✅ Custom Button (Above Content) */}
+              {item.buttonText && item.buttonUrl && (
+                <div className="mb-6">
+                  <a
+                    href={item.buttonUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all"
+                  >
+                    <ExternalLink size={20} />
+                    {item.buttonText}
+                  </a>
+                </div>
+              )}
+              
+              {/* ✅ Text Content - Plain text, NO auto-linking */}
               <div className="text-gray-800 text-lg whitespace-pre-wrap leading-relaxed">
-                {linkifyText(item.mediaUrl || 'No content available')}
+                {item.mediaUrl || 'No content available'}
               </div>
             </div>
           </div>
         )}
 
+        {/* OTHER FILE TYPES */}
         {item.type !== 'IMAGE' && item.type !== 'VIDEO' && item.type !== 'AUDIO' && item.type !== 'TEXT' && (
           <div className="bg-white bg-opacity-95 p-12 rounded-3xl text-center max-w-md">
             <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-violet-500 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -221,7 +213,7 @@ const PublicViewer = () => {
         )}
       </div>
 
-      {/* Text Overlay (Bottom) */}
+      {/* Text Overlay (Bottom) - Title & Description */}
       {(item.title || item.description) && (
         <div 
           className={`fixed bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-black via-black to-transparent p-8 pb-12 transition-all duration-500 ${
