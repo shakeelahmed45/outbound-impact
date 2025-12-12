@@ -94,19 +94,30 @@ const PublicCampaignViewer = () => {
       );
     }
 
-    // ✅ FIXED: Use item.mediaUrl (not item.content) for TEXT type
+    // ✅ FIXED: Black overlay style for TEXT (matching client's request)
     if (item.type === 'TEXT') {
       return (
-        <div className="w-full h-full bg-gradient-to-br from-purple-500 to-violet-500 p-4 flex flex-col overflow-hidden">
-          <div className="flex items-center gap-2 mb-2">
-            <FileText className="text-white" size={20} />
-            <span className="text-white text-xs font-semibold">TEXT</span>
+        <div className="relative w-full h-full bg-gradient-to-br from-gray-900 via-black to-gray-800 p-4 flex flex-col overflow-hidden">
+          {/* Subtle background pattern */}
+          <div className="absolute inset-0 opacity-5">
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-500 via-violet-600 to-purple-700"></div>
           </div>
-          <div className="flex-1 overflow-hidden">
-            <div className="text-white text-sm leading-relaxed line-clamp-6">
-              {linkifyText(item.mediaUrl || 'No content available')}
+          
+          {/* Content */}
+          <div className="relative z-10 flex flex-col h-full">
+            <div className="flex items-center gap-2 mb-2">
+              <FileText className="text-white" size={20} />
+              <span className="text-white text-xs font-semibold">TEXT</span>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <div className="text-white text-sm leading-relaxed line-clamp-6">
+                {linkifyText(item.mediaUrl || 'No content available')}
+              </div>
             </div>
           </div>
+          
+          {/* Bottom gradient overlay (like "black and white image") */}
+          <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black to-transparent z-20"></div>
         </div>
       );
     }
