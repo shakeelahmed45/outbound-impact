@@ -284,15 +284,32 @@ const CampaignsPage = () => {
     }, 0);
   };
 
-  const downloadCampaignQR = (campaign) => {
+  const downloadCampaignQR = async (campaign) => {
     if (!campaign.qrCodeUrl) return;
     
-    const link = document.createElement('a');
-    link.href = campaign.qrCodeUrl;
-    link.download = `${campaign.name}-qr-code.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      // Fetch the image as a blob to bypass CORS restrictions
+      const response = await fetch(campaign.qrCodeUrl);
+      const blob = await response.blob();
+      
+      // Create a blob URL
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      // Create download link
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `${campaign.name}-qr-code.png`;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Failed to download QR code:', error);
+      // Fallback: open in new tab if download fails
+      window.open(campaign.qrCodeUrl, '_blank');
+    }
   };
 
   const openShareModal = (campaign) => {
