@@ -17,9 +17,28 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// CORS configuration
+// CORS configuration - Allow web app AND mobile app
+const allowedOrigins = [
+  process.env.FRONTEND_URL,      // Web app (https://outboundimpact.net)
+  'https://localhost',            // Capacitor Android
+  'capacitor://localhost',        // Capacitor alternative format
+  'http://localhost:5173',        // Local development
+  'http://localhost:5000'         // Local backend testing
+].filter(Boolean); // Remove any undefined values
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      // For development: log blocked origins to help debug
+      console.log('Blocked by CORS:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 
@@ -85,6 +104,7 @@ if (process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL}`);
+    console.log(`📱 Allowed Origins: ${allowedOrigins.join(', ')}`);
     console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   });
 }
