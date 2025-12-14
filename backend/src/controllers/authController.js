@@ -1,7 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const { generateAccessToken, generateRefreshToken } = require('../utils/jwt');
-const { createCheckoutSession, getCheckoutSession } = require('../services/stripeService');
+const { createCheckoutSession, getCheckoutSession, upgradePlan } = require('../services/stripeService');
 
 const prisma = new PrismaClient();
 
@@ -136,6 +136,19 @@ const completeSignup = async (req, res) => {
       });
     }
 
+    // Get subscription details if it's a subscription plan
+    let subscriptionData = {};
+    if (session.subscription) {
+      const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+      const subscription = await stripe.subscriptions.retrieve(session.subscription);
+      
+      subscriptionData = {
+        currentPeriodStart: new Date(subscription.current_period_start * 1000),
+        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+        priceId: subscription.items.data[0].price.id,
+      };
+    }
+
     const user = await prisma.user.create({
       data: {
         email: signupData.email,
@@ -146,12 +159,13 @@ const completeSignup = async (req, res) => {
         stripeCustomerId: session.customer,
         subscriptionId: session.subscription || null,
         subscriptionStatus: 'active',
+        ...subscriptionData, // Add period start/end and priceId
       }
     });
 
     delete global.pendingSignups[sessionId];
 
-    // 🆕 SEND EMAILS IN BACKGROUND - DON'T WAIT FOR THEM!
+    // ðŸ†• SEND EMAILS IN BACKGROUND - DON'T WAIT FOR THEM!
     // This prevents signup from getting stuck
     setImmediate(async () => {
       try {
@@ -160,9 +174,9 @@ const completeSignup = async (req, res) => {
         // Try to send welcome email
         try {
           await emailService.sendWelcomeEmail(user.email, user.name, user.role);
-          console.log('✅ Welcome email sent to:', user.email);
+          console.log('âœ… Welcome email sent to:', user.email);
         } catch (emailError) {
-          console.error('❌ Failed to send welcome email:', emailError.message);
+          console.error('âŒ Failed to send welcome email:', emailError.message);
         }
 
         // Try to send admin notification
@@ -173,12 +187,12 @@ const completeSignup = async (req, res) => {
             userRole: user.role,
             subscriptionId: session.subscription
           });
-          console.log('✅ Admin notification sent');
+          console.log('âœ… Admin notification sent');
         } catch (emailError) {
-          console.error('❌ Failed to send admin notification:', emailError.message);
+          console.error('âŒ Failed to send admin notification:', emailError.message);
         }
       } catch (error) {
-        console.error('❌ Email service error:', error.message);
+        console.error('âŒ Email service error:', error.message);
       }
     });
 
@@ -311,9 +325,136 @@ const getCurrentUser = async (req, res) => {
   }
 };
 
+/**
+ * Upgrade user's subscription plan with prorated billing
+ */
+const handleUpgradePlan = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { newPlan } = req.body; // ORG_SMALL, ORG_MEDIUM, ORG_ENTERPRISE
+
+    console.log('=== UPGRADE PLAN REQUEST ===');
+    console.log('User ID:', userId);
+    console.log('New Plan:', newPlan);
+
+    // Validate input
+    if (!newPlan) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'New plan is required'
+      });
+    }
+
+    // Get current user
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    // Check if user is trying to "upgrade" to same plan
+    if (user.role === newPlan) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'You are already on this plan'
+      });
+    }
+
+    // Determine new price ID and storage limit
+    let newPriceId, newStorageLimit;
+    
+    switch (newPlan) {
+      case 'ORG_SMALL':
+        newPriceId = process.env.STRIPE_SMALL_ORG_PRICE;
+        newStorageLimit = 10 * 1024 * 1024 * 1024; // 10GB
+        break;
+      case 'ORG_MEDIUM':
+        newPriceId = process.env.STRIPE_MEDIUM_ORG_PRICE;
+        newStorageLimit = 30 * 1024 * 1024 * 1024; // 30GB
+        break;
+      case 'ORG_ENTERPRISE':
+        newPriceId = process.env.STRIPE_ENTERPRISE_PRICE;
+        newStorageLimit = 100 * 1024 * 1024 * 1024; // 100GB
+        break;
+      default:
+        return res.status(400).json({
+          status: 'error',
+          message: 'Invalid plan selected'
+        });
+    }
+
+    console.log('New Price ID:', newPriceId);
+    console.log('New Storage Limit:', newStorageLimit);
+
+    // Perform upgrade in Stripe with prorated billing
+    const upgradeResult = await upgradePlan(user, newPriceId, newPlan);
+
+    console.log('Upgrade result:', upgradeResult);
+
+    // Update user in database
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        role: newPlan,
+        storageLimit: newStorageLimit,
+        subscriptionId: upgradeResult.subscriptionId,
+        subscriptionStatus: upgradeResult.status,
+        priceId: upgradeResult.priceId,
+        currentPeriodStart: upgradeResult.currentPeriodStart,
+        currentPeriodEnd: upgradeResult.currentPeriodEnd,
+      }
+    });
+
+    console.log('âœ… User upgraded successfully');
+
+    // Send upgrade confirmation email in background
+    setImmediate(async () => {
+      try {
+        const emailService = require('../services/emailService');
+        // You can create an upgrade email template later
+        console.log('ðŸ“§ Upgrade email would be sent to:', user.email);
+      } catch (error) {
+        console.error('Email error:', error);
+      }
+    });
+
+    res.json({
+      status: 'success',
+      message: 'Plan upgraded successfully!',
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        role: updatedUser.role,
+        storageLimit: updatedUser.storageLimit.toString(),
+        storageUsed: updatedUser.storageUsed.toString(),
+      },
+      upgrade: {
+        oldPlan: user.role,
+        newPlan: newPlan,
+        proratedAmount: upgradeResult.proratedAmount,
+        nextBillingDate: upgradeResult.currentPeriodEnd,
+      }
+    });
+
+  } catch (error) {
+    console.error('Upgrade plan error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to upgrade plan'
+    });
+  }
+};
+
 module.exports = {
   createCheckout,
   completeSignup,
   signIn,
   getCurrentUser,
+  handleUpgradePlan,
 };

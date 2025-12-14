@@ -10,5 +10,6 @@ router.post('/signin', authController.signIn);
 
 // Protected routes
 router.get('/me', authMiddleware, authController.getCurrentUser);
+router.post('/upgrade-plan', authMiddleware, authController.handleUpgradePlan);
 
 module.exports = router;

@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "User" 
+ADD COLUMN IF NOT EXISTS "priceId" TEXT,
+ADD COLUMN IF NOT EXISTS "currentPeriodStart" TIMESTAMP(3),
+ADD COLUMN IF NOT EXISTS "currentPeriodEnd" TIMESTAMP(3);

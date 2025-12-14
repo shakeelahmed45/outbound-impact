@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, CreditCard, Shield, LogOut, Upload, Trash2, MessageSquare, MessagesSquare, BookOpen } from 'lucide-react';
+import { User, CreditCard, Shield, LogOut, Upload, Trash2, MessageSquare, MessagesSquare, BookOpen, TrendingUp } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import Tooltip from '../components/common/Tooltip';
 import useAuthStore from '../store/authStore';
 import api from '../services/api';
 import { useToast } from '../hooks/useToast';
 import Toast from '../components/common/Toast';
+import UpgradePlanModal from '../components/UpgradePlanModal';
 
 const SettingsPage = () => {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ const SettingsPage = () => {
   const { toasts, showToast, removeToast } = useToast();
   const [activeTab, setActiveTab] = useState('profile');
   const [loading, setLoading] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -299,6 +301,29 @@ const SettingsPage = () => {
           <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 border border-gray-100">
             <h3 className="text-2xl font-bold text-primary mb-6">Subscription Details</h3>
             
+            {/* Upgrade Plan Section - NEW */}
+            {user?.role !== 'ORG_ENTERPRISE' && (
+              <div className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl p-6 border border-purple-200 mb-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                      <TrendingUp className="text-purple-600" size={24} />
+                      Want More Features?
+                    </h3>
+                    <p className="text-gray-600">
+                      Upgrade your plan to unlock more storage, users, and features with prorated billing!
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowUpgradeModal(true)}
+                    className="px-6 py-3 bg-gradient-to-r from-purple-600 to-violet-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all whitespace-nowrap"
+                  >
+                    Upgrade Plan
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -374,12 +399,6 @@ const SettingsPage = () => {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <button
-                  onClick={() => showToast('Upgrade functionality will be added soon!', 'warning')}
-                  className="gradient-btn text-white px-6 py-3 rounded-lg font-semibold"
-                >
-                  Upgrade Plan
-                </button>
                 <button
                   onClick={() => showToast('Contact support to cancel your subscription.', 'warning')}
                   className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50"
@@ -491,6 +510,20 @@ const SettingsPage = () => {
           ))}
         </div>
       </div>
+
+      {/* Upgrade Modal - NEW */}
+      <UpgradePlanModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        currentPlan={user?.role}
+        onUpgradeSuccess={(updatedUser) => {
+          setUser(updatedUser);
+          showToast('Plan upgraded successfully!', 'success');
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        }}
+      />
     </DashboardLayout>
   );
 };

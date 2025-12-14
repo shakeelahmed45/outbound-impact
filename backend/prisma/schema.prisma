@@ -8,25 +8,28 @@ datasource db {
 }
 
 model User {
-  id                String   @id @default(uuid())
-  email             String   @unique
-  password          String
-  name              String
-  role              Role     @default(INDIVIDUAL)
-  stripeCustomerId  String?  @unique
-  subscriptionId    String?
-  subscriptionStatus String?
-  storageUsed       BigInt   @default(0)
-  storageLimit      BigInt   @default(2147483648)
-  profilePicture    String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                   String   @id @default(uuid())
+  email                String   @unique
+  password             String
+  name                 String
+  role                 Role     @default(INDIVIDUAL)
+  stripeCustomerId     String?  @unique
+  subscriptionId       String?
+  subscriptionStatus   String?
+  priceId              String?
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  storageUsed          BigInt   @default(0)
+  storageLimit         BigInt   @default(2147483648)
+  profilePicture       String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
   
-  items             Item[]
-  campaigns         Campaign[]
-  teamMembers       TeamMember[]
-  feedback          Feedback[]
-  chatConversations ChatConversation[]
+  items                Item[]
+  campaigns            Campaign[]
+  teamMembers          TeamMember[]
+  feedback             Feedback[]
+  chatConversations    ChatConversation[]
   
   @@index([email])
 }
@@ -104,15 +107,15 @@ model TeamMember {
   email     String
   role      String
   userId    String
-  status    String   @default("PENDING")  // NEW: PENDING, ACCEPTED, DECLINED
-  token     String?  @unique              // NEW: Invitation token
+  status    String   @default("PENDING")
+  token     String?  @unique
   createdAt DateTime @default(now())
   
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   @@unique([userId, email])
   @@index([userId])
-  @@index([token])  // NEW: Index for faster token lookups
+  @@index([token])
 }
 
 model Analytics {
