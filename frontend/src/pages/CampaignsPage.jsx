@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Folder, Trash2, Edit2, FileText, Tag, Eye, TrendingUp, Download, Share2, ExternalLink, Wifi } from 'lucide-react';
+import { Plus, Folder, Trash2, Edit2, FileText, Tag, Eye, TrendingUp, Download, Share2, ExternalLink, Wifi, Upload as UploadIcon, X, Image as ImageIcon } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import NFCWriter from '../components/NFCWriter';
 import ShareModal from '../components/share/ShareModal';
@@ -38,7 +38,13 @@ const CampaignsPage = () => {
     name: '',
     description: '',
     category: '',
+    logoUrl: '',
   });
+  
+  // ✅ NEW: Logo upload state
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState('');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   
   // NFC State
   const [showNFCModal, setShowNFCModal] = useState(false);
@@ -97,14 +103,109 @@ const CampaignsPage = () => {
     }
   };
 
+  // ✅ NEW: Handle logo file selection
+  const handleLogoSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
+      }
+      
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Logo file size must be less than 5MB');
+        return;
+      }
+      
+      setLogoFile(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // ✅ NEW: Upload logo to server
+  // ✅ FIXED: Upload logo to server (base64 format for your backend)
+  const uploadLogo = async () => {
+    if (!logoFile) return null;
+
+    setUploadingLogo(true);
+    try {
+      // Convert file to base64 (your backend expects this format)
+      const base64Data = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(logoFile);
+      });
+
+      // Prepare data in the format your backend expects
+      const uploadData = {
+        title: `Campaign Logo - ${Date.now()}`,
+        description: 'Campaign logo image',
+        type: 'IMAGE',
+        fileData: base64Data,
+        fileName: logoFile.name,
+        fileSize: logoFile.size,
+      };
+
+      const response = await api.post('/upload/file', uploadData, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.data.status === 'success') {
+        // Your backend returns the mediaUrl in item.thumbnailUrl
+        return response.data.item?.thumbnailUrl || response.data.mediaUrl;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to upload logo:', error);
+      alert('Failed to upload logo: ' + (error.response?.data?.message || error.message));
+      return null;
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+
+  // ✅ NEW: Clear logo
+  const clearLogo = () => {
+    setLogoFile(null);
+    setLogoPreview('');
+    setFormData({ ...formData, logoUrl: '' });
+  };
+
   const handleCreate = async (e) => {
     e.preventDefault();
+    
     try {
-      const response = await api.post('/campaigns', formData);
+      let logoUrl = formData.logoUrl;
+      
+      // Upload logo if selected
+      if (logoFile) {
+        logoUrl = await uploadLogo();
+        if (!logoUrl) {
+          alert('Failed to upload logo. Please try again.');
+          return;
+        }
+      }
+      
+      const response = await api.post('/campaigns', {
+        ...formData,
+        logoUrl,
+      });
+      
       if (response.data.status === 'success') {
         setCampaigns([response.data.campaign, ...campaigns]);
         setShowCreateModal(false);
-        setFormData({ name: '', description: '', category: '' });
+        setFormData({ name: '', description: '', category: '', logoUrl: '' });
+        clearLogo();
         alert('Campaign created successfully!');
       }
     } catch (error) {
@@ -115,13 +216,30 @@ const CampaignsPage = () => {
 
   const handleEdit = async (e) => {
     e.preventDefault();
+    
     try {
-      const response = await api.put('/campaigns/' + selectedCampaign.id, formData);
+      let logoUrl = formData.logoUrl;
+      
+      // Upload new logo if selected
+      if (logoFile) {
+        logoUrl = await uploadLogo();
+        if (!logoUrl) {
+          alert('Failed to upload logo. Please try again.');
+          return;
+        }
+      }
+      
+      const response = await api.put('/campaigns/' + selectedCampaign.id, {
+        ...formData,
+        logoUrl,
+      });
+      
       if (response.data.status === 'success') {
         setCampaigns(campaigns.map(c => c.id === selectedCampaign.id ? response.data.campaign : c));
         setShowEditModal(false);
         setSelectedCampaign(null);
-        setFormData({ name: '', description: '', category: '' });
+        setFormData({ name: '', description: '', category: '', logoUrl: '' });
+        clearLogo();
         alert('Campaign updated successfully!');
       }
     } catch (error) {
@@ -182,7 +300,14 @@ const CampaignsPage = () => {
       name: campaign.name,
       description: campaign.description || '',
       category: campaign.category || '',
+      logoUrl: campaign.logoUrl || '',
     });
+    
+    // Set logo preview if exists
+    if (campaign.logoUrl) {
+      setLogoPreview(campaign.logoUrl);
+    }
+    
     setShowEditModal(true);
   };
 
@@ -288,26 +413,18 @@ const CampaignsPage = () => {
     if (!campaign.qrCodeUrl) return;
     
     try {
-      // Fetch the image as a blob to bypass CORS restrictions
       const response = await fetch(campaign.qrCodeUrl);
       const blob = await response.blob();
-      
-      // Create a blob URL
       const blobUrl = window.URL.createObjectURL(blob);
-      
-      // Create download link
       const link = document.createElement('a');
       link.href = blobUrl;
       link.download = `${campaign.name}-qr-code.png`;
       document.body.appendChild(link);
       link.click();
-      
-      // Cleanup
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.error('Failed to download QR code:', error);
-      // Fallback: open in new tab if download fails
       window.open(campaign.qrCodeUrl, '_blank');
     }
   };
@@ -322,11 +439,12 @@ const CampaignsPage = () => {
     setShareSelectedCampaign(null);
   };
 
+  // ✅ UPDATED: Navigate to campaign with preview mode (not new tab)
   const openPublicCampaign = (campaign) => {
-    window.open(`/c/${campaign.slug}`, '_blank');
+    // Navigate in same window with preview=true parameter
+    window.location.href = `/c/${campaign.slug}?preview=true`;
   };
 
-  // NFC Functions
   const openNFCWriter = (campaign) => {
     setNfcCampaign(campaign);
     setShowNFCModal(true);
@@ -350,7 +468,6 @@ const CampaignsPage = () => {
   return (
     <DashboardLayout>
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold text-primary mb-2">Campaigns</h1>
@@ -365,7 +482,6 @@ const CampaignsPage = () => {
           </button>
         </div>
 
-        {/* Campaigns Grid */}
         {campaigns.length === 0 ? (
           <div className="text-center py-12">
             <Folder size={64} className="mx-auto text-gray-300 mb-4" />
@@ -392,6 +508,16 @@ const CampaignsPage = () => {
                   {/* Campaign Header */}
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
+                      {/* ✅ NEW: Show logo if exists */}
+                      {campaign.logoUrl && (
+                        <div className="mb-3">
+                          <img 
+                            src={campaign.logoUrl} 
+                            alt={`${campaign.name} logo`}
+                            className="h-12 w-auto object-contain"
+                          />
+                        </div>
+                      )}
                       <h3 className="text-xl font-bold text-primary mb-2">{campaign.name}</h3>
                       {campaign.category && (
                         <span className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-primary/10 to-secondary/10 text-primary rounded-full text-sm font-medium">
@@ -402,12 +528,10 @@ const CampaignsPage = () => {
                     </div>
                   </div>
 
-                  {/* Description */}
                   {campaign.description && (
                     <p className="text-gray-600 text-sm mb-4 line-clamp-2">{campaign.description}</p>
                   )}
 
-                  {/* Stats */}
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     <div className="bg-blue-50 p-3 rounded-lg">
                       <div className="flex items-center gap-2 text-blue-600 mb-1">
@@ -433,7 +557,6 @@ const CampaignsPage = () => {
                     </div>
                   </div>
 
-                  {/* QR Code Section */}
                   {campaign.qrCodeUrl && (
                     <div className="mb-4">
                       <div className="flex items-center justify-between mb-2">
@@ -521,9 +644,46 @@ const CampaignsPage = () => {
         {/* Create Campaign Modal */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl p-8 max-w-md w-full">
+            <div className="bg-white rounded-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
               <h2 className="text-2xl font-bold text-primary mb-6">Create Campaign</h2>
               <form onSubmit={handleCreate} className="space-y-6">
+                {/* ✅ NEW: Logo Upload Section */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    Campaign Logo (Optional)
+                    <Tooltip content="Upload a logo to display on your campaign page" />
+                  </label>
+                  
+                  {logoPreview ? (
+                    <div className="relative border-2 border-dashed border-gray-300 rounded-lg p-4">
+                      <img 
+                        src={logoPreview} 
+                        alt="Logo preview" 
+                        className="h-24 w-auto mx-auto object-contain"
+                      />
+                      <button
+                        type="button"
+                        onClick={clearLogo}
+                        className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer hover:border-primary transition">
+                      <ImageIcon className="text-gray-400 mb-2" size={32} />
+                      <span className="text-sm text-gray-600 mb-1">Click to upload logo</span>
+                      <span className="text-xs text-gray-400">PNG, JPG up to 5MB</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoSelect}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
+
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Campaign Name *
@@ -576,17 +736,20 @@ const CampaignsPage = () => {
                     type="button"
                     onClick={() => {
                       setShowCreateModal(false);
-                      setFormData({ name: '', description: '', category: '' });
+                      setFormData({ name: '', description: '', category: '', logoUrl: '' });
+                      clearLogo();
                     }}
                     className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-all"
+                    disabled={uploadingLogo}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all"
+                    disabled={uploadingLogo}
+                    className="flex-1 bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50"
                   >
-                    Create
+                    {uploadingLogo ? 'Uploading...' : 'Create'}
                   </button>
                 </div>
               </form>
@@ -597,9 +760,46 @@ const CampaignsPage = () => {
         {/* Edit Campaign Modal */}
         {showEditModal && selectedCampaign && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl p-8 max-w-md w-full">
+            <div className="bg-white rounded-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
               <h2 className="text-2xl font-bold text-primary mb-6">Edit Campaign</h2>
               <form onSubmit={handleEdit} className="space-y-6">
+                {/* ✅ NEW: Logo Upload Section */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    Campaign Logo (Optional)
+                    <Tooltip content="Upload a logo to display on your campaign page" />
+                  </label>
+                  
+                  {logoPreview ? (
+                    <div className="relative border-2 border-dashed border-gray-300 rounded-lg p-4">
+                      <img 
+                        src={logoPreview} 
+                        alt="Logo preview" 
+                        className="h-24 w-auto mx-auto object-contain"
+                      />
+                      <button
+                        type="button"
+                        onClick={clearLogo}
+                        className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer hover:border-primary transition">
+                      <ImageIcon className="text-gray-400 mb-2" size={32} />
+                      <span className="text-sm text-gray-600 mb-1">Click to upload logo</span>
+                      <span className="text-xs text-gray-400">PNG, JPG up to 5MB</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoSelect}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
+
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Campaign Name *
@@ -651,17 +851,20 @@ const CampaignsPage = () => {
                     onClick={() => {
                       setShowEditModal(false);
                       setSelectedCampaign(null);
-                      setFormData({ name: '', description: '', category: '' });
+                      setFormData({ name: '', description: '', category: '', logoUrl: '' });
+                      clearLogo();
                     }}
                     className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-all"
+                    disabled={uploadingLogo}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all"
+                    disabled={uploadingLogo}
+                    className="flex-1 bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50"
                   >
-                    Save
+                    {uploadingLogo ? 'Uploading...' : 'Save'}
                   </button>
                 </div>
               </form>
@@ -722,7 +925,6 @@ const CampaignsPage = () => {
                         </span>
                       </div>
 
-                      {/* Action Buttons */}
                       <div className="flex gap-2 pt-2 border-t border-gray-100">
                         <button
                           onClick={() => window.open(`/l/${item.slug}`, '_blank')}
@@ -840,19 +1042,22 @@ const CampaignsPage = () => {
           </div>
         )}
 
-        {/* NFC Writer Modal */}
-        {showNFCModal && nfcCampaign && (
-          <NFCWriter campaign={nfcCampaign} onClose={closeNFCWriter} />
+
+        {/* NFC Writer Modal - Only render when campaign exists */}
+        {nfcCampaign && (
+          <NFCWriter 
+            campaign={nfcCampaign} 
+            onClose={closeNFCWriter}
+            isOpen={showNFCModal}
+          />
         )}
 
-        {/* Share Modal */}
         <ShareModal
           isOpen={showShareModal}
           onClose={closeShareModal}
           campaign={shareSelectedCampaign}
         />
 
-        {/* Edit Item Modal */}
         <EditItemModal
           item={editingItem}
           isOpen={showEditItemModal}

@@ -12,6 +12,13 @@ const Dashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // ✅ FIXED: Check if user is a team member VIEWER
+  const isTeamMemberViewer = user?.isTeamMember && user?.teamRole === 'VIEWER';
+  
+  // ✅ FIXED: Get effective role for organization features
+  const effectiveUser = user?.isTeamMember ? user.organization : user;
+  const effectiveRole = effectiveUser?.role;
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -44,8 +51,9 @@ const Dashboard = () => {
   };
 
   const calculateStoragePercentage = () => {
-    const storageUsed = Number(user?.storageUsed || 0);
-    const storageLimit = Number(user?.storageLimit || 2147483648);
+    // ✅ FIXED: Use effective user's storage
+    const storageUsed = Number(effectiveUser?.storageUsed || 0);
+    const storageLimit = Number(effectiveUser?.storageLimit || 2147483648);
     
     if (storageLimit === 0) return 0;
     
@@ -63,11 +71,13 @@ const Dashboard = () => {
     );
   }
 
-  const isOrganization = user?.role === 'ORG_SMALL' || user?.role === 'ORG_MEDIUM' || user?.role === 'ORG_ENTERPRISE';
-  const isEnterprise = user?.role === 'ORG_ENTERPRISE';
+  // ✅ FIXED: Use effective role for organization checks
+  const isOrganization = effectiveRole === 'ORG_SMALL' || effectiveRole === 'ORG_MEDIUM' || effectiveRole === 'ORG_ENTERPRISE';
+  const isEnterprise = effectiveRole === 'ORG_ENTERPRISE';
   const storagePercentage = calculateStoragePercentage();
-  const storageUsedGB = formatStorage(Number(user?.storageUsed || 0));
-  const storageLimitGB = formatStorage(Number(user?.storageLimit || 2147483648));
+  // ✅ FIXED: Use effective user's storage
+  const storageUsedGB = formatStorage(Number(effectiveUser?.storageUsed || 0));
+  const storageLimitGB = formatStorage(Number(effectiveUser?.storageLimit || 2147483648));
 
   return (
     <DashboardLayout>
@@ -77,7 +87,14 @@ const Dashboard = () => {
           <div>
             <h1 className="text-3xl font-bold text-primary mb-2 flex items-center gap-3">
               Welcome back, {user?.name}!
-              {isEnterprise && (
+              {/* ✅ FIXED: Show VIEWER badge for team members */}
+              {isTeamMemberViewer && (
+                <span className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-400 to-blue-600 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                  <Eye size={16} />
+                  VIEWER
+                </span>
+              )}
+              {isEnterprise && !isTeamMemberViewer && (
                 <span className="inline-flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white px-4 py-1 rounded-full text-sm font-semibold">
                   <Crown size={16} />
                   Enterprise
@@ -99,13 +116,10 @@ const Dashboard = () => {
             <p className="text-3xl font-bold text-primary mb-1">{stats?.totalUploads || 0}</p>
             <p className="text-sm text-gray-600 flex items-center gap-1">
               Total Uploads
-              <Tooltip 
-                content="All media files you've uploaded to the platform" 
-                iconSize={14}
-              />
+              <Tooltip content="Total number of items you've uploaded" iconSize={14} />
             </p>
           </div>
-
+          
           <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
@@ -115,57 +129,58 @@ const Dashboard = () => {
             <p className="text-3xl font-bold text-primary mb-1">{stats?.totalViews || 0}</p>
             <p className="text-sm text-gray-600 flex items-center gap-1">
               Total Views
-              <Tooltip 
-                content="Combined views across all your content" 
-                iconSize={14}
-              />
+              <Tooltip content="Total number of times your content has been viewed" iconSize={14} />
             </p>
           </div>
-
+          
           <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
                 <QrCode size={24} className="text-white" />
               </div>
             </div>
             <p className="text-3xl font-bold text-primary mb-1">{stats?.totalQRCodes || 0}</p>
             <p className="text-sm text-gray-600 flex items-center gap-1">
-              QR Codes
-              <Tooltip 
-                content="Total QR codes generated for your content" 
-                iconSize={14}
-              />
+              QR Codes Generated
+              <Tooltip content="Number of QR codes generated for campaigns" iconSize={14} />
             </p>
           </div>
-
+          
           <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
                 <Folder size={24} className="text-white" />
               </div>
             </div>
             <p className="text-3xl font-bold text-primary mb-1">{stats?.totalCampaigns || 0}</p>
             <p className="text-sm text-gray-600 flex items-center gap-1">
-              Campaigns
-              <Tooltip 
-                content="Collections of grouped content with QR codes" 
-                iconSize={14}
-              />
+              Active Campaigns
+              <Tooltip content="Number of campaigns you've created" iconSize={14} />
             </p>
           </div>
         </div>
 
-        {/* Team Members */}
-        {isOrganization && (
-          <div className="bg-gradient-to-br from-primary to-secondary rounded-2xl shadow-lg p-6 mb-8 text-white">
+        {/* Team Members Card - Only show for organizations */}
+        {isOrganization && !isTeamMemberViewer && (
+          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl shadow-lg p-6 mb-8 text-white">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-2xl font-bold mb-2">Team Members</h3>
-                <p className="text-lg opacity-90">{stats?.totalTeamMembers || 0} active members</p>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-12 h-12 bg-white bg-opacity-20 rounded-xl flex items-center justify-center">
+                    <Users size={24} />
+                  </div>
+                  <div>
+                    <p className="text-3xl font-bold">{stats?.totalTeamMembers || 0}</p>
+                    <p className="text-sm opacity-90">Team Members</p>
+                  </div>
+                </div>
               </div>
-              <div className="w-16 h-16 bg-white bg-opacity-20 rounded-xl flex items-center justify-center">
-                <Users size={32} />
-              </div>
+              <button
+                onClick={() => navigate('/dashboard/team')}
+                className="px-6 py-3 bg-white text-indigo-600 rounded-lg font-semibold hover:bg-opacity-90 transition-all"
+              >
+                Manage Team
+              </button>
             </div>
           </div>
         )}
@@ -174,7 +189,7 @@ const Dashboard = () => {
         <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 mb-8">
           <h3 className="text-xl font-bold text-primary mb-4 flex items-center gap-2">
             Storage Usage
-            <Tooltip content="Your current storage space usage" />
+            <Tooltip content="Your current storage usage and available space" />
           </h3>
           <div className="flex items-center gap-4">
             <div className="flex-1">
@@ -193,11 +208,11 @@ const Dashboard = () => {
                 />
               </div>
               <p className="text-xs text-gray-500 mt-2">
-                {Number(user?.storageUsed || 0).toLocaleString()} bytes used of {Number(user?.storageLimit || 2147483648).toLocaleString()} bytes
+                {Number(effectiveUser?.storageUsed || 0).toLocaleString()} bytes used of {Number(effectiveUser?.storageLimit || 2147483648).toLocaleString()} bytes
               </p>
             </div>
           </div>
-          {storagePercentage > 80 && !isEnterprise && (
+          {storagePercentage > 80 && !isEnterprise && !isTeamMemberViewer && (
             <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-yellow-800 font-medium">
                 ⚠️ You're running low on storage! Consider upgrading your plan.
@@ -212,14 +227,17 @@ const Dashboard = () => {
             Quick Actions
             <Tooltip content="Common tasks for quick access" />
           </h3>
-          <div className={`grid grid-cols-2 ${isEnterprise ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4`}>
-            <button
-              onClick={() => navigate('/dashboard/upload')}
-              className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center"
-            >
-              <Upload className="mx-auto mb-2 text-primary" size={24} />
-              <span className="text-sm font-semibold text-gray-700">Upload New</span>
-            </button>
+          <div className={`grid grid-cols-2 ${isEnterprise && !isTeamMemberViewer ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4`}>
+            {/* ✅ FIXED: Hide Upload for VIEWERS (they can't upload) */}
+            {!isTeamMemberViewer && (
+              <button
+                onClick={() => navigate('/dashboard/upload')}
+                className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center"
+              >
+                <Upload className="mx-auto mb-2 text-primary" size={24} />
+                <span className="text-sm font-semibold text-gray-700">Upload New</span>
+              </button>
+            )}
             <button
               onClick={() => navigate('/dashboard/items')}
               className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center"
@@ -244,8 +262,8 @@ const Dashboard = () => {
               <span className="text-sm font-semibold text-gray-700">Campaigns</span>
             </button>
 
-            {/* Enterprise-Only Quick Actions */}
-            {isEnterprise && (
+            {/* ✅ FIXED: Enterprise-Only Quick Actions - HIDDEN for VIEWERS */}
+            {isEnterprise && !isTeamMemberViewer && (
               <>
                 <button
                   onClick={() => navigate('/dashboard/api-access')}

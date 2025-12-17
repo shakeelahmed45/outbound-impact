@@ -115,7 +115,7 @@ const trackView = async (req, res) => {
 
 const getAnalytics = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.effectiveUserId; // ✅ FIXED
 
     const items = await prisma.item.findMany({
       where: { userId },
@@ -225,7 +225,7 @@ const getAnalytics = async (req, res) => {
 
 const getItemAnalytics = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.effectiveUserId; // ✅ FIXED
     const { id } = req.params;
 
     const item = await prisma.item.findFirst({

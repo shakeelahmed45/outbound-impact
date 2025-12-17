@@ -6,14 +6,48 @@ const prisma = new PrismaClient();
 
 const uploadFile = async (req, res) => {
   try {
-    const userId = req.user.userId;
-    const { title, description, type, fileData, fileName, fileSize } = req.body;
+    const userId = req.effectiveUserId;
+    // ✅ NEW: Added buttonText, buttonUrl, and attachments support
+    const { title, description, type, fileData, fileName, fileSize, buttonText, buttonUrl, attachments } = req.body;
 
     if (!title || !type || !fileData || !fileName) {
       return res.status(400).json({
         status: 'error',
         message: 'Missing required fields'
       });
+    }
+
+    // ✅ NEW: Validate button fields if provided
+    if (buttonText && !buttonUrl) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Button URL is required when button text is provided'
+      });
+    }
+    
+    if (buttonUrl && !buttonText) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Button text is required when button URL is provided'
+      });
+    }
+
+    // ✅ NEW: Validate URL format if provided
+    if (buttonUrl) {
+      try {
+        new URL(buttonUrl);
+        if (!buttonUrl.startsWith('http://') && !buttonUrl.startsWith('https://')) {
+          return res.status(400).json({
+            status: 'error',
+            message: 'Button URL must start with http:// or https://'
+          });
+        }
+      } catch (error) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Invalid button URL format'
+        });
+      }
     }
 
     const user = await prisma.user.findUnique({
@@ -84,7 +118,7 @@ const uploadFile = async (req, res) => {
       },
     });
 
-    // Create item with QR code and thumbnail
+    // ✅ NEW: Create item with button and attachments support
     const item = await prisma.item.create({
       data: {
         userId,
@@ -96,28 +130,31 @@ const uploadFile = async (req, res) => {
         qrCodeUrl: qrCodeDataUrl,
         thumbnailUrl,
         fileSize: BigInt(fileSize),
+        buttonText: buttonText || null,
+        buttonUrl: buttonUrl || null,
+        attachments: attachments || null,
       }
     });
 
     await prisma.user.update({
       where: { id: userId },
-      data: { storageUsed: BigInt(newStorageUsed) }
+      data: { storageUsed: BigInt(Number(user.storageUsed) + Number(fileSize)) }
     });
 
     res.json({
       status: 'success',
-      message: uploadResult.success ? 
-        'File uploaded to CDN successfully' : 
-        'File uploaded (stored locally - please configure Bunny.net)',
+      message: 'File uploaded successfully',
       item: {
         id: item.id,
         title: item.title,
         slug: item.slug,
         type: item.type,
-        mediaUrl: item.mediaUrl,
         thumbnailUrl: item.thumbnailUrl,
         qrCodeUrl: item.qrCodeUrl,
         publicUrl: publicUrl,
+        buttonText: item.buttonText,
+        buttonUrl: item.buttonUrl,
+        attachments: item.attachments,
       }
     });
 
@@ -132,9 +169,9 @@ const uploadFile = async (req, res) => {
 
 const createTextPost = async (req, res) => {
   try {
-    const userId = req.user.userId;
-    // ✅ ADD: Get buttonText and buttonUrl from request
-    const { title, description, content, buttonText, buttonUrl } = req.body;
+    const userId = req.effectiveUserId;
+    // Get buttonText, buttonUrl, and attachments from request
+    const { title, description, content, buttonText, buttonUrl, attachments } = req.body;
 
     if (!title || !content) {
       return res.status(400).json({
@@ -143,7 +180,7 @@ const createTextPost = async (req, res) => {
       });
     }
 
-    // ✅ ADD: Validate button fields if provided
+    // Validate button fields if provided
     if (buttonText && !buttonUrl) {
       return res.status(400).json({
         status: 'error',
@@ -158,7 +195,7 @@ const createTextPost = async (req, res) => {
       });
     }
 
-    // ✅ ADD: Validate URL format if provided
+    // Validate URL format if provided
     if (buttonUrl) {
       try {
         new URL(buttonUrl);
@@ -198,7 +235,7 @@ const createTextPost = async (req, res) => {
       },
     });
 
-    // ✅ ADD: Include buttonText and buttonUrl in database
+    // Include buttonText, buttonUrl, and attachments in database
     const item = await prisma.item.create({
       data: {
         userId,
@@ -210,8 +247,9 @@ const createTextPost = async (req, res) => {
         qrCodeUrl: qrCodeDataUrl,
         thumbnailUrl: null,
         fileSize: BigInt(content.length),
-        buttonText: buttonText || null,  // ✅ NEW
-        buttonUrl: buttonUrl || null,    // ✅ NEW
+        buttonText: buttonText || null,
+        buttonUrl: buttonUrl || null,
+        attachments: attachments || null,
       }
     });
 
@@ -236,8 +274,9 @@ const createTextPost = async (req, res) => {
         thumbnailUrl: item.thumbnailUrl,
         qrCodeUrl: item.qrCodeUrl,
         publicUrl: publicUrl,
-        buttonText: item.buttonText,     // ✅ NEW
-        buttonUrl: item.buttonUrl,       // ✅ NEW
+        buttonText: item.buttonText,
+        buttonUrl: item.buttonUrl,
+        attachments: item.attachments,
       }
     });
 

@@ -8,29 +8,30 @@ datasource db {
 }
 
 model User {
-  id                   String   @id @default(uuid())
-  email                String   @unique
-  password             String
-  name                 String
-  role                 Role     @default(INDIVIDUAL)
-  stripeCustomerId     String?  @unique
-  subscriptionId       String?
-  subscriptionStatus   String?
-  priceId              String?
-  currentPeriodStart   DateTime?
-  currentPeriodEnd     DateTime?
-  storageUsed          BigInt   @default(0)
-  storageLimit         BigInt   @default(2147483648)
-  profilePicture       String?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  
-  items                Item[]
-  campaigns            Campaign[]
-  teamMembers          TeamMember[]
-  feedback             Feedback[]
-  chatConversations    ChatConversation[]
-  
+  id                 String    @id @default(uuid())
+  email              String    @unique
+  password           String
+  name               String
+  role               Role      @default(INDIVIDUAL)
+  stripeCustomerId   String?   @unique
+  subscriptionId     String?
+  subscriptionStatus String?
+  priceId            String?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  storageUsed        BigInt    @default(0)
+  storageLimit       BigInt    @default(2147483648)
+  profilePicture     String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  items             Item[]
+  campaigns         Campaign[]
+  teamMembers       TeamMember[]       @relation("OrganizationMembers")
+  memberOf          TeamMember[]       @relation("MemberOf")
+  feedback          Feedback[]
+  chatConversations ChatConversation[]
+
   @@index([email])
 }
 
@@ -60,17 +61,18 @@ model Item {
   nfcEnabled   Boolean   @default(false)
   nfcUrl       String?
 
-  buttonText   String?
-  buttonUrl    String?
-  
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  
-  user         User      @relation(fields: [userId], references: [id])
-  campaign     Campaign? @relation(fields: [campaignId], references: [id])
-  campaignId   String?
-  analytics    Analytics[]
-  
+  buttonText  String?
+  buttonUrl   String?
+  attachments Json?   @db.JsonB
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id])
+  campaign   Campaign?   @relation(fields: [campaignId], references: [id])
+  campaignId String?
+  analytics  Analytics[]
+
   @@index([userId])
   @@index([slug])
 }
@@ -89,32 +91,36 @@ model Campaign {
   name        String
   description String?
   category    String?
+  logoUrl     String?  // ✅ ADD THIS LINE
   qrCodeUrl   String?
   userId      String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
-  user        User     @relation(fields: [userId], references: [id])
-  items       Item[]
-  
+
+  user  User   @relation(fields: [userId], references: [id])
+  items Item[]
+
   @@index([userId])
   @@index([slug])
   @@index([category])
 }
 
 model TeamMember {
-  id        String   @id @default(uuid())
-  email     String
-  role      String
-  userId    String
-  status    String   @default("PENDING")
-  token     String?  @unique
-  createdAt DateTime @default(now())
-  
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id           String   @id @default(uuid())
+  email        String
+  role         String
+  userId       String
+  memberUserId String?
+  status       String   @default("PENDING")
+  token        String?  @unique
+  createdAt    DateTime @default(now())
+
+  user       User  @relation(fields: [userId], references: [id], onDelete: Cascade, name: "OrganizationMembers")
+  memberUser User? @relation(fields: [memberUserId], references: [id], onDelete: Cascade, name: "MemberOf")
+
   @@unique([userId, email])
   @@index([userId])
+  @@index([memberUserId])
   @@index([token])
 }
 
@@ -127,25 +133,25 @@ model Analytics {
   browser   String?
   os        String?
   createdAt DateTime @default(now())
-  
-  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
   @@index([itemId])
   @@index([source])
   @@index([createdAt])
 }
 
 model Feedback {
-  id        String   @id @default(uuid())
+  id        String         @id @default(uuid())
   userId    String
   subject   String
   message   String
   status    FeedbackStatus @default(PENDING)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
   @@index([status])
   @@index([createdAt])
@@ -158,16 +164,16 @@ enum FeedbackStatus {
 }
 
 model ChatConversation {
-  id            String   @id @default(uuid())
+  id            String     @id @default(uuid())
   userId        String
   status        ChatStatus @default(ACTIVE)
-  lastMessageAt DateTime @default(now())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages      ChatMessage[]
-  
+  lastMessageAt DateTime   @default(now())
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
   @@index([userId])
   @@index([status])
   @@index([lastMessageAt])
@@ -179,16 +185,16 @@ enum ChatStatus {
 }
 
 model ChatMessage {
-  id             String   @id @default(uuid())
+  id             String     @id @default(uuid())
   conversationId String
   senderId       String
   senderType     SenderType
   message        String
-  isRead         Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  
-  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  
+  isRead         Boolean    @default(false)
+  createdAt      DateTime   @default(now())
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
   @@index([conversationId])
   @@index([createdAt])
 }

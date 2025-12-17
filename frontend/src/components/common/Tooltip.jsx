@@ -91,13 +91,14 @@ const Tooltip = ({
   };
 
   return (
-    <div className={`relative inline-flex items-center ${className}`} ref={tooltipRef}>
+    // ✅ FIXED: Changed from <div> to <span> to prevent nesting issues when used inside <p> tags
+    <span className={`relative inline-flex items-center ${className}`} ref={tooltipRef}>
       {/* Trigger Element */}
-      <div
+      <span
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
-        className="cursor-help"
+        className="cursor-help inline-flex items-center"
       >
         {children || (
           icon && (
@@ -107,7 +108,7 @@ const Tooltip = ({
             />
           )
         )}
-      </div>
+      </span>
 
       {/* Tooltip Content */}
       {isVisible && (
@@ -124,7 +125,7 @@ const Tooltip = ({
           </div>
         </div>
       )}
-    </div>
+    </span>
   );
 };
 

@@ -64,7 +64,7 @@ const generateCampaignQRCode = async (slug) => {
 
 const getUserCampaigns = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.effectiveUserId;
 
     const campaigns = await prisma.campaign.findMany({
       where: { userId },
@@ -96,8 +96,16 @@ const getUserCampaigns = async (req, res) => {
 
 const createCampaign = async (req, res) => {
   try {
-    const userId = req.user.userId;
-    const { name, description, category } = req.body;
+    // ✅ FIXED: Check if user is a VIEWER (no create permission)
+    if (req.teamRole === 'VIEWER') {
+      return res.status(403).json({
+        status: 'error',
+        message: 'VIEWER role does not have permission to create campaigns',
+      });
+    }
+
+    const userId = req.effectiveUserId;
+    const { name, description, category, logoUrl } = req.body; // ✅ NEW: Added logoUrl
 
     if (!name) {
       return res.status(400).json({
@@ -119,9 +127,12 @@ const createCampaign = async (req, res) => {
         name,
         description: description || null,
         category: category || null,
+        logoUrl: logoUrl || null, // ✅ NEW: Added logoUrl
         qrCodeUrl,
       },
     });
+
+    console.log(`✅ Campaign created: ${campaign.name}${logoUrl ? ' (with logo)' : ''}`);
 
     res.status(201).json({
       status: 'success',
@@ -139,9 +150,17 @@ const createCampaign = async (req, res) => {
 
 const updateCampaign = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    // ✅ FIXED: Check if user is a VIEWER (no edit permission)
+    if (req.teamRole === 'VIEWER') {
+      return res.status(403).json({
+        status: 'error',
+        message: 'VIEWER role does not have permission to edit campaigns',
+      });
+    }
+
+    const userId = req.effectiveUserId;
     const { id } = req.params;
-    const { name, description, category } = req.body;
+    const { name, description, category, logoUrl } = req.body; // ✅ NEW: Added logoUrl
 
     const campaign = await prisma.campaign.findFirst({
       where: { id, userId },
@@ -160,8 +179,11 @@ const updateCampaign = async (req, res) => {
         name: name || campaign.name,
         description: description !== undefined ? description : campaign.description,
         category: category !== undefined ? category : campaign.category,
+        logoUrl: logoUrl !== undefined ? logoUrl : campaign.logoUrl, // ✅ NEW: Added logoUrl
       },
     });
+
+    console.log(`✅ Campaign updated: ${updatedCampaign.name}${logoUrl ? ' (logo updated)' : ''}`);
 
     res.json({
       status: 'success',
@@ -179,7 +201,15 @@ const updateCampaign = async (req, res) => {
 
 const deleteCampaign = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    // ✅ FIXED: Check if user is a VIEWER (no delete permission)
+    if (req.teamRole === 'VIEWER') {
+      return res.status(403).json({
+        status: 'error',
+        message: 'VIEWER role does not have permission to delete campaigns',
+      });
+    }
+
+    const userId = req.effectiveUserId;
     const { id } = req.params;
 
     const campaign = await prisma.campaign.findFirst({
@@ -217,7 +247,15 @@ const deleteCampaign = async (req, res) => {
 
 const assignItemToCampaign = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    // ✅ FIXED: Check if user is a VIEWER (no assign permission)
+    if (req.teamRole === 'VIEWER') {
+      return res.status(403).json({
+        status: 'error',
+        message: 'VIEWER role does not have permission to assign items to campaigns',
+      });
+    }
+
+    const userId = req.effectiveUserId;
     const { itemId, campaignId } = req.body;
 
     const item = await prisma.item.findFirst({
@@ -262,7 +300,7 @@ const assignItemToCampaign = async (req, res) => {
   }
 };
 
-// 🆕 NEW: Get public campaign data
+// PUBLIC ROUTE - Get public campaign data
 const getPublicCampaign = async (req, res) => {
   try {
     const { slug } = req.params;
@@ -288,6 +326,9 @@ const getPublicCampaign = async (req, res) => {
 
     console.log('✅ Campaign found:', campaign.name);
     console.log('📦 Items count:', campaign.items.length);
+    if (campaign.logoUrl) {
+      console.log('🎨 Logo URL:', campaign.logoUrl);
+    }
 
     // Get user name separately (safer)
     let userName = 'Unknown';

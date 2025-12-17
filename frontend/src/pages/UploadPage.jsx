@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Upload, Image, Video, Music, FileText, X, Loader2, Plus, Folder, Link, ExternalLink } from 'lucide-react';
+import { Upload, Image, Video, Music, FileText, X, Loader2, Plus, Folder, Link, ExternalLink, Paperclip } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import api from '../services/api';
 import { useToast } from '../hooks/useToast';
 import Tooltip from '../components/common/Tooltip';
 import Toast from '../components/common/Toast';
+import RequireEditAccess from '../components/common/RequireEditAccess';
 
 const CAMPAIGN_CATEGORIES = [
   'Tickets',
@@ -36,9 +37,13 @@ const UploadPage = () => {
   const [description, setDescription] = useState('');
   const [content, setContent] = useState('');
 
-  // ✅ NEW: Button fields for TEXT content
+  // Button fields for TEXT content
   const [buttonText, setButtonText] = useState('');
   const [buttonUrl, setButtonUrl] = useState('');
+
+  // Document attachments for TEXT content
+  const [attachments, setAttachments] = useState([]);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
   // Campaign selection state
   const [campaigns, setCampaigns] = useState([]);
@@ -182,6 +187,16 @@ const UploadPage = () => {
       return;
     }
 
+    // ✅ NEW: Validate button fields
+    if (buttonText && !buttonUrl) {
+      showToast('Please enter button URL', 'error');
+      return;
+    }
+    if (buttonUrl && !buttonText) {
+      showToast('Please enter button text', 'error');
+      return;
+    }
+
     if (!selectedCampaignId) {
       showToast('Please select a campaign', 'error');
       return;
@@ -199,6 +214,7 @@ const UploadPage = () => {
 
         await simulateProgress(20, 40, 300);
 
+        // ✅ NEW: Include buttonText, buttonUrl, and attachments
         const uploadPromise = api.post('/upload/file', {
           title,
           description,
@@ -206,6 +222,9 @@ const UploadPage = () => {
           fileData,
           fileName: selectedFile.name,
           fileSize: selectedFile.size,
+          buttonText: buttonText || null,
+          buttonUrl: buttonUrl || null,
+          attachments: attachments.length > 0 ? attachments : null,
         });
 
         const progressPromise = simulateProgress(40, 95, 2000);
@@ -231,6 +250,9 @@ const UploadPage = () => {
             setPreview(null);
             setUploadType(null);
             setUploadProgress(0);
+            setButtonText('');
+            setButtonUrl('');
+            setAttachments([]);
             navigate('/dashboard/campaigns');
           }, 1000);
         }
@@ -253,7 +275,7 @@ const UploadPage = () => {
       return;
     }
 
-    // ✅ NEW: Validate button fields
+    // Validate button fields
     if (buttonText && !buttonUrl) {
       showToast('Please enter button URL', 'error');
       return;
@@ -274,13 +296,14 @@ const UploadPage = () => {
     try {
       await simulateProgress(0, 30, 300);
 
-      // ✅ NEW: Include button fields
+      // Include button fields and attachments
       const uploadPromise = api.post('/upload/text', {
         title,
         description,
         content,
         buttonText: buttonText || null,
         buttonUrl: buttonUrl || null,
+        attachments: attachments.length > 0 ? attachments : null,
       });
 
       const progressPromise = simulateProgress(30, 95, 1000);
@@ -303,8 +326,9 @@ const UploadPage = () => {
           setTitle('');
           setDescription('');
           setContent('');
-          setButtonText('');     // ✅ NEW: Clear button fields
-          setButtonUrl('');      // ✅ NEW: Clear button fields
+          setButtonText('');
+          setButtonUrl('');
+          setAttachments([]);
           setUploadType(null);
           setUploadProgress(0);
           navigate('/dashboard/campaigns');
@@ -317,6 +341,62 @@ const UploadPage = () => {
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleAttachmentUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    
+    if (files.length === 0) return;
+
+    // Validate file size (max 10MB per file)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    const oversizedFiles = files.filter(f => f.size > maxSize);
+    
+    if (oversizedFiles.length > 0) {
+      showToast('Some files are larger than 10MB and were skipped', 'error');
+      return;
+    }
+
+    // Max 5 attachments
+    if (attachments.length + files.length > 5) {
+      showToast('Maximum 5 attachments allowed', 'error');
+      return;
+    }
+
+    setUploadingAttachment(true);
+
+    try {
+      // Convert files to base64 for storage
+      const uploadPromises = files.map(async (file) => {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            resolve({
+              name: file.name,
+              url: e.target.result, // Base64 data
+              size: file.size,
+              type: file.type,
+            });
+          };
+          reader.readAsDataURL(file);
+        });
+      });
+
+      const uploadedFiles = await Promise.all(uploadPromises);
+      
+      setAttachments([...attachments, ...uploadedFiles]);
+      showToast(`${uploadedFiles.length} document(s) added successfully!`, 'success');
+    } catch (error) {
+      console.error('Attachment error:', error);
+      showToast('Failed to add attachments', 'error');
+    } finally {
+      setUploadingAttachment(false);
+    }
+  };
+
+  const handleRemoveAttachment = (index) => {
+    const newAttachments = attachments.filter((_, i) => i !== index);
+    setAttachments(newAttachments);
   };
 
   const CampaignSelector = () => (
@@ -439,7 +519,7 @@ const UploadPage = () => {
           </>
         )}
 
-        {/* ✅ TEXT UPLOAD FORM WITH BUTTON FEATURE */}
+        {/* TEXT UPLOAD FORM WITH BUTTON FEATURE AND ATTACHMENTS */}
         {uploadType === 'TEXT' && (
           <form onSubmit={handleTextPost} className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
             <div className="flex items-center justify-between mb-6">
@@ -453,6 +533,7 @@ const UploadPage = () => {
                   setContent('');
                   setButtonText('');
                   setButtonUrl('');
+                  setAttachments([]);
                 }}
                 className="text-gray-500 hover:text-gray-700"
               >
@@ -508,7 +589,7 @@ const UploadPage = () => {
                 />
               </div>
 
-              {/* ✅ NEW: CUSTOM BUTTON SECTION */}
+              {/* CUSTOM BUTTON SECTION - NO PREVIEW */}
               <div className="border-t border-gray-200 pt-6">
                 <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-xl p-6">
                   <div className="flex items-start gap-3 mb-4">
@@ -522,7 +603,7 @@ const UploadPage = () => {
                         🔗 Add Custom Button (Optional)
                       </h4>
                       <p className="text-sm text-gray-600 mb-4">
-                        Add a professional call-to-action button that appears above your text content. 
+                        Add a professional call-to-action button that appears with your text content. 
                         Perfect for "Visit Website", "Learn More", "Contact Us", etc.
                       </p>
                     </div>
@@ -563,22 +644,6 @@ const UploadPage = () => {
                     </div>
                   </div>
 
-                  {buttonText && buttonUrl && (
-                    <div className="mt-4 p-4 bg-white border border-purple-200 rounded-lg">
-                      <p className="text-xs font-semibold text-gray-600 mb-2">Preview:</p>
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all"
-                      >
-                        <ExternalLink size={18} />
-                        {buttonText}
-                      </button>
-                      <p className="text-xs text-gray-500 mt-2">
-                        Links to: {buttonUrl}
-                      </p>
-                    </div>
-                  )}
-
                   {buttonText && !buttonUrl && (
                     <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                       <p className="text-sm text-yellow-800">
@@ -590,6 +655,91 @@ const UploadPage = () => {
                     <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                       <p className="text-sm text-yellow-800">
                         ⚠️ Please enter button text
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* DOCUMENT ATTACHMENTS SECTION */}
+              <div className="border-t border-gray-200 pt-6">
+                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-6">
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="flex-shrink-0">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
+                        <Paperclip size={24} className="text-white" />
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-lg font-bold text-blue-600 mb-2">
+                        📎 Attach Documents (Optional)
+                      </h4>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Upload PDF, Word, Excel, images, or other documents to display with your text content.
+                        Max 5 files, 10MB each.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Upload Button */}
+                  <div className="mb-4">
+                    <label className="cursor-pointer inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg font-semibold hover:shadow-lg transition-all">
+                      <Paperclip size={18} />
+                      <span>{uploadingAttachment ? 'Processing...' : 'Upload Documents'}</span>
+                      <input
+                        type="file"
+                        multiple
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,image/*"
+                        onChange={handleAttachmentUpload}
+                        className="hidden"
+                        disabled={uploadingAttachment || attachments.length >= 5}
+                      />
+                    </label>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Accepted: PDF, Word, Excel, PowerPoint, Images, Text files
+                    </p>
+                  </div>
+
+                  {/* Attached Files List */}
+                  {attachments.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-gray-700">
+                        Attached Files ({attachments.length}/5):
+                      </p>
+                      {attachments.map((file, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-3 bg-white border border-blue-200 rounded-lg"
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                              <Paperclip size={18} className="text-blue-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-gray-900 truncate">
+                                {file.name}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {(file.size / 1024).toFixed(1)} KB
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAttachment(index)}
+                            className="flex-shrink-0 ml-2 text-red-500 hover:text-red-700 p-2"
+                          >
+                            <X size={18} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {attachments.length >= 5 && (
+                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        ⚠️ Maximum 5 attachments reached
                       </p>
                     </div>
                   )}
@@ -622,6 +772,7 @@ const UploadPage = () => {
                     setContent('');
                     setButtonText('');
                     setButtonUrl('');
+                    setAttachments([]);
                   }}
                   className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-all"
                   disabled={uploading}
@@ -713,6 +864,9 @@ const UploadPage = () => {
                   setPreview(null);
                   setTitle('');
                   setDescription('');
+                  setButtonText('');
+                  setButtonUrl('');
+                  setAttachments([]);
                 }}
                 className="text-gray-500 hover:text-gray-700"
               >
@@ -763,6 +917,163 @@ const UploadPage = () => {
                 />
               </div>
 
+              {/* ✅ NEW: CUSTOM BUTTON SECTION FOR ALL MEDIA TYPES */}
+              <div className="border-t border-gray-200 pt-6">
+                <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-xl p-6">
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="flex-shrink-0">
+                      <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-lg">
+                        <ExternalLink size={24} className="text-white" />
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-lg font-bold text-primary mb-2">
+                        🔗 Add Custom Button (Optional)
+                      </h4>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Add a professional call-to-action button that appears with your {uploadType.toLowerCase()} content. 
+                        Perfect for "Visit Website", "Learn More", "Contact Us", etc.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Button Text
+                      </label>
+                      <input
+                        type="text"
+                        value={buttonText}
+                        onChange={(e) => setButtonText(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                        placeholder="e.g., Visit Website"
+                        maxLength={50}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        What the button says (max 50 characters)
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Button URL
+                      </label>
+                      <input
+                        type="url"
+                        value={buttonUrl}
+                        onChange={(e) => setButtonUrl(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                        placeholder="https://example.com"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Where the button links to (must start with https://)
+                      </p>
+                    </div>
+                  </div>
+
+                  {buttonText && !buttonUrl && (
+                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        ⚠️ Please enter a button URL
+                      </p>
+                    </div>
+                  )}
+                  {buttonUrl && !buttonText && (
+                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        ⚠️ Please enter button text
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ✅ NEW: DOCUMENT ATTACHMENTS SECTION FOR ALL MEDIA TYPES */}
+              <div className="border-t border-gray-200 pt-6">
+                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-6">
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="flex-shrink-0">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
+                        <Paperclip size={24} className="text-white" />
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-lg font-bold text-blue-600 mb-2">
+                        📎 Attach Documents (Optional)
+                      </h4>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Upload PDF, Word, Excel, images, or other documents to display with your {uploadType.toLowerCase()} content.
+                        Max 5 files, 10MB each.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Upload Button */}
+                  <div className="mb-4">
+                    <label className="cursor-pointer inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg font-semibold hover:shadow-lg transition-all">
+                      <Paperclip size={18} />
+                      <span>{uploadingAttachment ? 'Processing...' : 'Upload Documents'}</span>
+                      <input
+                        type="file"
+                        multiple
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,image/*"
+                        onChange={handleAttachmentUpload}
+                        className="hidden"
+                        disabled={uploadingAttachment || attachments.length >= 5}
+                      />
+                    </label>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Accepted: PDF, Word, Excel, PowerPoint, Images, Text files
+                    </p>
+                  </div>
+
+                  {/* Attached Files List */}
+                  {attachments.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-gray-700">
+                        Attached Files ({attachments.length}/5):
+                      </p>
+                      {attachments.map((file, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-3 bg-white border border-blue-200 rounded-lg"
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                              <Paperclip size={18} className="text-blue-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-gray-900 truncate">
+                                {file.name}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {(file.size / 1024).toFixed(1)} KB
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAttachment(index)}
+                            className="flex-shrink-0 ml-2 text-red-500 hover:text-red-700 p-2"
+                          >
+                            <X size={18} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {attachments.length >= 5 && (
+                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        ⚠️ Maximum 5 attachments reached
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="text-sm text-gray-600 bg-gray-50 p-4 rounded-lg">
                 <p><strong>File:</strong> {selectedFile.name}</p>
                 <p><strong>Size:</strong> {(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
@@ -793,6 +1104,9 @@ const UploadPage = () => {
                     setPreview(null);
                     setTitle('');
                     setDescription('');
+                    setButtonText('');
+                    setButtonUrl('');
+                    setAttachments([]);
                   }}
                   className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-all"
                   disabled={uploading}
@@ -915,4 +1229,10 @@ const UploadPage = () => {
   );
 };
 
-export default UploadPage;
+const ProtectedUploadPage = () => (
+  <RequireEditAccess>
+    <UploadPage />
+  </RequireEditAccess>
+);
+
+export default ProtectedUploadPage;

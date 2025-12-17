@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const crypto = require('crypto');
+const bcrypt = require('bcrypt');
 const prisma = new PrismaClient();
 const { sendTeamInvitationEmail, sendInvitationReminderEmail } = require('../services/emailService');
 
@@ -119,29 +120,43 @@ const inviteTeamMember = async (req, res) => {
     const baseUrl = process.env.FRONTEND_URL || 'https://outbound-impact.vercel.app';
     const invitationLink = `${baseUrl}/accept-invitation/${token}`;
 
-    // ✨ Send invitation email
-    const emailResult = await sendTeamInvitationEmail({
-      recipientEmail: email,
-      inviterName: user.name,
-      inviterEmail: user.email,
-      role: role,
-      invitationLink: invitationLink,
-    });
+    // ✨ CRITICAL FIX: Send invitation email with proper error handling
+    let emailSent = false;
+    try {
+      const emailResult = await sendTeamInvitationEmail({
+        recipientEmail: email,
+        inviterName: user.name,
+        inviterEmail: user.email,
+        role: role,
+        invitationLink: invitationLink,
+      });
 
-    if (!emailResult.success) {
-      console.error('Failed to send invitation email:', emailResult.error);
-      // Don't fail the request, just log the error
+      emailSent = emailResult.success;
+
+      if (!emailResult.success) {
+        console.error('❌ Failed to send invitation email:', emailResult.error);
+      } else {
+        console.log('✅ Invitation email sent successfully');
+      }
+    } catch (emailError) {
+      // ✨ CRITICAL FIX: Catch email errors but don't fail the invitation
+      console.error('❌ Email service error:', emailError.message);
+      emailSent = false;
     }
 
     console.log(`✅ Team member invited: ${email} as ${role} by ${user.email}`);
-    console.log(`📧 Invitation email sent: ${emailResult.success ? 'Yes' : 'Failed'}`);
+    console.log(`📧 Invitation email sent: ${emailSent ? 'Yes' : 'No (but invitation created)'}`);
     console.log(`🔗 Invitation link: ${invitationLink}`);
 
+    // ✨ CRITICAL FIX: Always return success even if email fails
     res.status(201).json({
       status: 'success',
-      message: 'Team member invited successfully',
+      message: emailSent 
+        ? 'Team member invited successfully' 
+        : 'Team member invited successfully (email delivery pending)',
       teamMember,
-      emailSent: emailResult.success,
+      emailSent,
+      invitationLink, // ✨ Return link so user can manually share if email fails
     });
   } catch (error) {
     console.error('Invite team member error:', error);
@@ -196,21 +211,30 @@ const resendInvitation = async (req, res) => {
     const baseUrl = process.env.FRONTEND_URL || 'https://outbound-impact.vercel.app';
     const invitationLink = `${baseUrl}/accept-invitation/${newToken}`;
 
-    // Resend email
-    const emailResult = await sendTeamInvitationEmail({
-      recipientEmail: teamMember.email,
-      inviterName: user.name,
-      inviterEmail: user.email,
-      role: teamMember.role,
-      invitationLink: invitationLink,
-    });
+    // Resend email with error handling
+    let emailSent = false;
+    try {
+      const emailResult = await sendTeamInvitationEmail({
+        recipientEmail: teamMember.email,
+        inviterName: user.name,
+        inviterEmail: user.email,
+        role: teamMember.role,
+        invitationLink: invitationLink,
+      });
+      emailSent = emailResult.success;
+    } catch (emailError) {
+      console.error('Email error:', emailError.message);
+    }
 
     console.log(`🔄 Invitation resent to: ${teamMember.email}`);
 
     res.json({
       status: 'success',
-      message: 'Invitation resent successfully',
-      emailSent: emailResult.success,
+      message: emailSent 
+        ? 'Invitation resent successfully' 
+        : 'Invitation link generated (email delivery pending)',
+      emailSent,
+      invitationLink,
     });
   } catch (error) {
     console.error('Resend invitation error:', error);
@@ -221,10 +245,11 @@ const resendInvitation = async (req, res) => {
   }
 };
 
-// ✨ NEW: Accept invitation
+// ✨ UPDATED: Accept invitation with password setup
 const acceptInvitation = async (req, res) => {
   try {
     const { token } = req.params;
+    const { name, password } = req.body;
 
     if (!token) {
       return res.status(400).json({
@@ -279,10 +304,51 @@ const acceptInvitation = async (req, res) => {
       });
     }
 
-    // Update status to ACCEPTED
+    // ✨ NEW: Check if user exists
+    let memberUser = await prisma.user.findUnique({
+      where: { email: teamMember.email },
+    });
+
+    // ✨ NEW: If user doesn't exist, create account
+    if (!memberUser) {
+      // Validate name and password are provided
+      if (!name || !password) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Name and password are required for new accounts',
+        });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Password must be at least 6 characters',
+        });
+      }
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Create new user account
+      memberUser = await prisma.user.create({
+        data: {
+          email: teamMember.email,
+          name: name.trim(),
+          password: hashedPassword,
+          role: 'INDIVIDUAL',
+        },
+      });
+
+      console.log(`✅ New user account created for team member: ${memberUser.email}`);
+    }
+
+    // ✨ UPDATED: Update status to ACCEPTED and link memberUserId
     await prisma.teamMember.update({
       where: { id: teamMember.id },
-      data: { status: 'ACCEPTED' },
+      data: { 
+        status: 'ACCEPTED',
+        memberUserId: memberUser.id,
+      },
     });
 
     console.log(`✅ Invitation accepted: ${teamMember.email} joined ${teamMember.user.name}'s team`);
@@ -358,7 +424,7 @@ const declineInvitation = async (req, res) => {
   }
 };
 
-// ✨ NEW: Get invitation details
+// ✨ UPDATED: Get invitation details with user exists check
 const getInvitationDetails = async (req, res) => {
   try {
     const { token } = req.params;
@@ -388,6 +454,11 @@ const getInvitationDetails = async (req, res) => {
     const daysDiff = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
     const isExpired = daysDiff > 7;
 
+    // ✨ NEW: Check if user already exists with this email
+    const existingUser = await prisma.user.findUnique({
+      where: { email: teamMember.email },
+    });
+
     res.json({
       status: 'success',
       invitation: {
@@ -400,6 +471,7 @@ const getInvitationDetails = async (req, res) => {
         isExpired,
         daysRemaining: Math.max(0, 7 - daysDiff),
       },
+      userExists: !!existingUser,
     });
   } catch (error) {
     console.error('Get invitation details error:', error);
@@ -506,10 +578,10 @@ const updateTeamMember = async (req, res) => {
 module.exports = {
   getTeamMembers,
   inviteTeamMember,
-  resendInvitation,        // ✨ NEW
-  acceptInvitation,        // ✨ NEW
-  declineInvitation,       // ✨ NEW
-  getInvitationDetails,    // ✨ NEW
+  resendInvitation,
+  acceptInvitation,
+  declineInvitation,
+  getInvitationDetails,
   removeTeamMember,
   updateTeamMember,
 };

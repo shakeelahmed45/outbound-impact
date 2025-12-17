@@ -3,7 +3,7 @@ const prisma = new PrismaClient();
 
 const getDashboardStats = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.effectiveUserId; // ✅ FIXED
 
     // Get user with storage info
     const user = await prisma.user.findUnique({

@@ -165,7 +165,7 @@ const completeSignup = async (req, res) => {
 
     delete global.pendingSignups[sessionId];
 
-    // ðŸ†• SEND EMAILS IN BACKGROUND - DON'T WAIT FOR THEM!
+    // 🆕 SEND EMAILS IN BACKGROUND - DON'T WAIT FOR THEM!
     // This prevents signup from getting stuck
     setImmediate(async () => {
       try {
@@ -174,9 +174,9 @@ const completeSignup = async (req, res) => {
         // Try to send welcome email
         try {
           await emailService.sendWelcomeEmail(user.email, user.name, user.role);
-          console.log('âœ… Welcome email sent to:', user.email);
+          console.log('✅ Welcome email sent to:', user.email);
         } catch (emailError) {
-          console.error('âŒ Failed to send welcome email:', emailError.message);
+          console.error('❌ Failed to send welcome email:', emailError.message);
         }
 
         // Try to send admin notification
@@ -187,12 +187,12 @@ const completeSignup = async (req, res) => {
             userRole: user.role,
             subscriptionId: session.subscription
           });
-          console.log('âœ… Admin notification sent');
+          console.log('✅ Admin notification sent');
         } catch (emailError) {
-          console.error('âŒ Failed to send admin notification:', emailError.message);
+          console.error('❌ Failed to send admin notification:', emailError.message);
         }
       } catch (error) {
-        console.error('âŒ Email service error:', error.message);
+        console.error('❌ Email service error:', error.message);
       }
     });
 
@@ -225,6 +225,7 @@ const completeSignup = async (req, res) => {
   }
 };
 
+// ✨ UPDATED: Sign in with enhanced team member detection
 const signIn = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -256,8 +257,67 @@ const signIn = async (req, res) => {
       });
     }
 
+    // ✨ CRITICAL FIX: Check if user is a team member of any organization
+    const teamMembership = await prisma.teamMember.findFirst({
+      where: {
+        memberUserId: user.id,
+        status: 'ACCEPTED',
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            storageUsed: true,
+            storageLimit: true,
+            subscriptionStatus: true,
+            currentPeriodEnd: true,
+          },
+        },
+      },
+    });
+
     const accessToken = generateAccessToken(user.id, user.email, user.role);
     const refreshToken = generateRefreshToken(user.id);
+
+    // ✨ CRITICAL FIX: If user is a team member, return organization info as PRIMARY
+    if (teamMembership) {
+      console.log(`✅ Team member signed in: ${user.email} (${teamMembership.role}) of ${teamMembership.user.name}`);
+
+      return res.json({
+        status: 'success',
+        message: 'Sign in successful',
+        accessToken,
+        refreshToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          profilePicture: user.profilePicture,
+          role: user.role, // Keep personal role for reference
+          storageUsed: user.storageUsed.toString(),
+          storageLimit: user.storageLimit.toString(),
+          // ✨ CRITICAL: Team member flags and organization data
+          isTeamMember: true,
+          teamRole: teamMembership.role, // VIEWER, EDITOR, or ADMIN
+          organization: {
+            id: teamMembership.user.id,
+            name: teamMembership.user.name,
+            email: teamMembership.user.email,
+            role: teamMembership.user.role, // ORG_ENTERPRISE, etc.
+            storageUsed: teamMembership.user.storageUsed.toString(),
+            storageLimit: teamMembership.user.storageLimit.toString(),
+            subscriptionStatus: teamMembership.user.subscriptionStatus,
+            currentPeriodEnd: teamMembership.user.currentPeriodEnd,
+          },
+        },
+      });
+    }
+
+    // Regular user sign in (not a team member)
+    console.log(`✅ User signed in: ${user.email}`);
 
     res.json({
       status: 'success',
@@ -272,6 +332,8 @@ const signIn = async (req, res) => {
         role: user.role,
         storageUsed: user.storageUsed.toString(),
         storageLimit: user.storageLimit.toString(),
+        // ✨ CRITICAL: Explicitly mark as NOT a team member
+        isTeamMember: false,
       }
     });
 
@@ -297,6 +359,7 @@ const getCurrentUser = async (req, res) => {
         storageUsed: true,
         storageLimit: true,
         subscriptionStatus: true,
+        currentPeriodEnd: true,
       }
     });
 
@@ -307,12 +370,68 @@ const getCurrentUser = async (req, res) => {
       });
     }
 
+    // ✨ Check if user is a team member of any organization
+    const teamMembership = await prisma.teamMember.findFirst({
+      where: {
+        memberUserId: user.id,
+        status: 'ACCEPTED',
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            storageUsed: true,
+            storageLimit: true,
+            subscriptionStatus: true,
+            currentPeriodEnd: true,
+          },
+        },
+      },
+    });
+
+    // ✨ If user is a team member, return organization info
+    if (teamMembership) {
+      return res.json({
+        status: 'success',
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          profilePicture: user.profilePicture,
+          role: user.role,
+          storageUsed: user.storageUsed.toString(),
+          storageLimit: user.storageLimit.toString(),
+          subscriptionStatus: user.subscriptionStatus,
+          currentPeriodEnd: user.currentPeriodEnd,
+          // ✨ Include team membership info
+          isTeamMember: true,
+          teamRole: teamMembership.role,
+          organization: {
+            id: teamMembership.user.id,
+            name: teamMembership.user.name,
+            email: teamMembership.user.email,
+            role: teamMembership.user.role,
+            storageUsed: teamMembership.user.storageUsed.toString(),
+            storageLimit: teamMembership.user.storageLimit.toString(),
+            subscriptionStatus: teamMembership.user.subscriptionStatus,
+            currentPeriodEnd: teamMembership.user.currentPeriodEnd,
+          },
+        }
+      });
+    }
+
+    // Regular user (not a team member)
     res.json({
       status: 'success',
       user: {
         ...user,
         storageUsed: user.storageUsed.toString(),
         storageLimit: user.storageLimit.toString(),
+        // ✨ Indicate not a team member
+        isTeamMember: false,
       }
     });
 
@@ -410,14 +529,14 @@ const handleUpgradePlan = async (req, res) => {
       }
     });
 
-    console.log('âœ… User upgraded successfully');
+    console.log('✅ User upgraded successfully');
 
     // Send upgrade confirmation email in background
     setImmediate(async () => {
       try {
         const emailService = require('../services/emailService');
         // You can create an upgrade email template later
-        console.log('ðŸ“§ Upgrade email would be sent to:', user.email);
+        console.log('📧 Upgrade email would be sent to:', user.email);
       } catch (error) {
         console.error('Email error:', error);
       }

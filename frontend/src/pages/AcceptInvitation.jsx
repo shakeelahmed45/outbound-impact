@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, XCircle, Clock, AlertCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, AlertCircle, Loader2, Eye, EyeOff, Lock } from 'lucide-react';
 import api from '../services/api';
 
 const AcceptInvitation = () => {
@@ -12,7 +12,17 @@ const AcceptInvitation = () => {
   const [accepting, setAccepting] = useState(false);
   const [declining, setDeclining] = useState(false);
   const [actionComplete, setActionComplete] = useState(false);
-  const [actionType, setActionType] = useState(''); // 'accepted' or 'declined'
+  const [actionType, setActionType] = useState('');
+  
+  // Password setup state
+  const [showPasswordSetup, setShowPasswordSetup] = useState(false);
+  const [userExists, setUserExists] = useState(false);
+  const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [settingPassword, setSettingPassword] = useState(false);
 
   useEffect(() => {
     fetchInvitationDetails();
@@ -23,6 +33,7 @@ const AcceptInvitation = () => {
       const response = await api.get(`/team/invitation/${token}`);
       if (response.data.status === 'success') {
         setInvitation(response.data.invitation);
+        setUserExists(response.data.userExists);
       }
     } catch (error) {
       setError(error.response?.data?.message || 'Invalid or expired invitation');
@@ -32,9 +43,14 @@ const AcceptInvitation = () => {
   };
 
   const handleAccept = async () => {
+    if (!userExists) {
+      setShowPasswordSetup(true);
+      return;
+    }
+
     setAccepting(true);
     try {
-      const response = await api.post(`/team/invitation/${token}/accept`);
+      const response = await api.post(`/team/invitation/${token}/accept`, {});
       if (response.data.status === 'success') {
         setActionComplete(true);
         setActionType('accepted');
@@ -43,6 +59,44 @@ const AcceptInvitation = () => {
       setError(error.response?.data?.message || 'Failed to accept invitation');
     } finally {
       setAccepting(false);
+    }
+  };
+
+  const handlePasswordSetup = async (e) => {
+    e.preventDefault();
+
+    if (!name.trim()) {
+      setError('Please enter your name');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    setSettingPassword(true);
+    setError('');
+
+    try {
+      const response = await api.post(`/team/invitation/${token}/accept`, {
+        name: name.trim(),
+        password,
+      });
+
+      if (response.data.status === 'success') {
+        setActionComplete(true);
+        setActionType('accepted');
+      }
+    } catch (error) {
+      setError(error.response?.data?.message || 'Failed to setup account');
+    } finally {
+      setSettingPassword(false);
     }
   };
 
@@ -74,7 +128,7 @@ const AcceptInvitation = () => {
     );
   }
 
-  if (error) {
+  if (error && !showPasswordSetup) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl p-12 max-w-md w-full text-center">
@@ -103,12 +157,14 @@ const AcceptInvitation = () => {
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <CheckCircle size={40} className="text-green-600" />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-3">Invitation Accepted! 🎉</h1>
+              <h1 className="text-2xl font-bold text-gray-900 mb-3">Welcome to the Team! 🎉</h1>
               <p className="text-gray-600 mb-6">
-                You've successfully joined <strong>{invitation.organizationName}'s</strong> team as a <strong>{invitation.role}</strong>.
+                You have successfully joined <strong>{invitation.organizationName}</strong> team as a <strong>{invitation.role}</strong>.
               </p>
               <p className="text-sm text-gray-500 mb-6">
-                Please sign in to access your team's content and start collaborating.
+                {userExists 
+                  ? 'Please sign in with your existing credentials to access your team content.'
+                  : 'Your account has been created! Please sign in with your new credentials.'}
               </p>
               <button
                 onClick={() => navigate('/signin')}
@@ -124,7 +180,7 @@ const AcceptInvitation = () => {
               </div>
               <h1 className="text-2xl font-bold text-gray-900 mb-3">Invitation Declined</h1>
               <p className="text-gray-600 mb-6">
-                You've declined the invitation from <strong>{invitation.organizationName}</strong>.
+                You have declined the invitation from <strong>{invitation.organizationName}</strong>.
               </p>
               <button
                 onClick={() => navigate('/')}
@@ -139,6 +195,158 @@ const AcceptInvitation = () => {
     );
   }
 
+  if (showPasswordSetup) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-12 max-w-md w-full">
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <Lock size={40} className="text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-primary mb-2">Setup Your Account</h1>
+            <p className="text-gray-600 text-sm">
+              Create a password to complete your registration
+            </p>
+          </div>
+
+          <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-lg p-4 mb-6">
+            <p className="text-xs text-gray-600 mb-1">Joining:</p>
+            <p className="text-lg font-bold text-primary">{invitation.organizationName}</p>
+            <p className="text-sm text-gray-600 mt-2">
+              As <span className="font-semibold">{invitation.role}</span>
+            </p>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-center gap-3">
+              <AlertCircle className="text-red-600 flex-shrink-0" size={20} />
+              <p className="text-red-800 text-sm font-medium">{error}</p>
+            </div>
+          )}
+
+          <form onSubmit={handlePasswordSetup} className="space-y-6">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Full Name *
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                placeholder="Enter your full name"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Email Address
+              </label>
+              <input
+                type="email"
+                value={invitation.email}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed"
+                disabled
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Password *
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent pr-12"
+                  placeholder="Create a password (min 6 characters)"
+                  required
+                  minLength={6}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Confirm Password *
+              </label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent pr-12"
+                  placeholder="Confirm your password"
+                  required
+                  minLength={6}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                >
+                  {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-xs text-blue-800 font-medium mb-2">Password Requirements:</p>
+              <ul className="text-xs text-blue-700 space-y-1">
+                <li className="flex items-center gap-2">
+                  <CheckCircle size={14} className={password.length >= 6 ? 'text-green-600' : 'text-gray-400'} />
+                  At least 6 characters
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle size={14} className={password === confirmPassword && password.length > 0 ? 'text-green-600' : 'text-gray-400'} />
+                  Passwords match
+                </li>
+              </ul>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                type="submit"
+                disabled={settingPassword}
+                className="w-full gradient-btn text-white px-6 py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {settingPassword ? (
+                  <>
+                    <Loader2 className="animate-spin" size={20} />
+                    Setting Up Account...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={20} />
+                    Complete Registration
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowPasswordSetup(false)}
+                className="w-full px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50"
+                disabled={settingPassword}
+              >
+                Back
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   const isExpired = invitation.isExpired;
   const alreadyAccepted = invitation.status === 'ACCEPTED';
   const alreadyDeclined = invitation.status === 'DECLINED';
@@ -146,18 +354,16 @@ const AcceptInvitation = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl p-12 max-w-md w-full">
-        {/* Logo */}
         <div className="text-center mb-8">
           <img 
             src="/logo.webp" 
             alt="Outbound Impact" 
-            className="w-24 h-24 mx-auto mb-4"
+            className="w-50 h-24 mx-auto mb-4"
             onError={(e) => e.target.style.display = 'none'}
           />
           <h1 className="text-3xl font-bold text-primary mb-2">Team Invitation</h1>
         </div>
 
-        {/* Status Messages */}
         {isExpired && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-center gap-3">
             <AlertCircle className="text-red-600 flex-shrink-0" size={20} />
@@ -179,9 +385,26 @@ const AcceptInvitation = () => {
           </div>
         )}
 
-        {/* Invitation Details */}
+        {!isExpired && !alreadyAccepted && !alreadyDeclined && userExists && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-center gap-3">
+            <CheckCircle className="text-blue-600 flex-shrink-0" size={20} />
+            <p className="text-blue-800 text-sm font-medium">
+              Great! You already have an account. Just accept to join the team.
+            </p>
+          </div>
+        )}
+
+        {!isExpired && !alreadyAccepted && !alreadyDeclined && !userExists && (
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6 flex items-center gap-3">
+            <Lock className="text-primary flex-shrink-0" size={20} />
+            <p className="text-primary text-sm font-medium">
+              You will create your account in the next step
+            </p>
+          </div>
+        )}
+
         <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-lg p-6 mb-6">
-          <p className="text-sm text-gray-600 mb-2">You've been invited to join:</p>
+          <p className="text-sm text-gray-600 mb-2">You have been invited to join:</p>
           <h2 className="text-2xl font-bold text-primary mb-4">{invitation.organizationName}</h2>
           
           <div className="space-y-3">
@@ -201,14 +424,13 @@ const AcceptInvitation = () => {
               <div className="flex items-center gap-2 text-sm">
                 <Clock size={16} className="text-orange-600" />
                 <span className="text-orange-600 font-medium">
-                  Expires in {invitation.daysRemaining} day{invitation.daysRemaining !== 1 ? 's' : ''}
+                  Expires in {invitation.daysRemaining} {invitation.daysRemaining !== 1 ? 'days' : 'day'}
                 </span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Role Description */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
           <p className="text-xs text-blue-800">
             <strong>As a {invitation.role}:</strong>{' '}
@@ -218,7 +440,6 @@ const AcceptInvitation = () => {
           </p>
         </div>
 
-        {/* Action Buttons */}
         {!isExpired && !alreadyAccepted && !alreadyDeclined && (
           <div className="space-y-3">
             <button
@@ -229,12 +450,12 @@ const AcceptInvitation = () => {
               {accepting ? (
                 <>
                   <Loader2 className="animate-spin" size={20} />
-                  Accepting...
+                  Processing...
                 </>
               ) : (
                 <>
                   <CheckCircle size={20} />
-                  Accept Invitation
+                  {userExists ? 'Accept Invitation' : 'Accept & Setup Account'}
                 </>
               )}
             </button>

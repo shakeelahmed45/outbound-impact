@@ -3,10 +3,9 @@ const { deleteFromBunny, uploadToBunny, generateFileName } = require('../service
 
 const prisma = new PrismaClient();
 
-// ✅ UPDATED: Include buttonText and buttonUrl
 const getUserItems = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.effectiveUserId;
     const { search, type } = req.query;
 
     const where = {
@@ -41,8 +40,8 @@ const getUserItems = async (req, res) => {
         views: item.views || 0,
         createdAt: item.createdAt,
         publicUrl: `${process.env.FRONTEND_URL}/l/${item.slug}`,
-        buttonText: item.buttonText || null,  // ✅ NEW
-        buttonUrl: item.buttonUrl || null,    // ✅ NEW
+        buttonText: item.buttonText || null,
+        buttonUrl: item.buttonUrl || null,
       }))
     });
 
@@ -55,10 +54,9 @@ const getUserItems = async (req, res) => {
   }
 };
 
-// ✅ UPDATED: Include buttonText and buttonUrl
 const getItemById = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.effectiveUserId;
     const { id } = req.params;
 
     const item = await prisma.item.findFirst({
@@ -87,8 +85,8 @@ const getItemById = async (req, res) => {
         views: item.views || 0,
         createdAt: item.createdAt,
         publicUrl: `${process.env.FRONTEND_URL}/l/${item.slug}`,
-        buttonText: item.buttonText || null,  // ✅ NEW
-        buttonUrl: item.buttonUrl || null,    // ✅ NEW
+        buttonText: item.buttonText || null,
+        buttonUrl: item.buttonUrl || null,
       }
     });
 
@@ -150,10 +148,17 @@ const getPublicItem = async (req, res) => {
   }
 };
 
-// ✅ UPDATED: Support content, buttonText, and buttonUrl
 const updateItem = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    // ✅ FIXED: Check if user is a VIEWER (no edit permission)
+    if (req.teamRole === 'VIEWER') {
+      return res.status(403).json({
+        status: 'error',
+        message: 'VIEWER role does not have permission to edit items',
+      });
+    }
+
+    const userId = req.effectiveUserId;
     const { id } = req.params;
     const { title, description, content, buttonText, buttonUrl } = req.body;
 
@@ -168,7 +173,7 @@ const updateItem = async (req, res) => {
       });
     }
 
-    // ✅ Validate button fields for TEXT items
+    // Validate button fields for TEXT items
     if (item.type === 'TEXT') {
       if (buttonText && !buttonUrl) {
         return res.status(400).json({
@@ -183,7 +188,7 @@ const updateItem = async (req, res) => {
         });
       }
       
-      // ✅ Validate URL format
+      // Validate URL format
       if (buttonUrl) {
         try {
           new URL(buttonUrl);
@@ -208,13 +213,13 @@ const updateItem = async (req, res) => {
     if (title) updateData.title = title;
     if (description !== undefined) updateData.description = description;
     
-    // ✅ Update content for TEXT items
+    // Update content for TEXT items
     if (item.type === 'TEXT' && content !== undefined) {
       updateData.mediaUrl = content;
       updateData.fileSize = BigInt(content.length);
     }
     
-    // ✅ Update button fields for TEXT items
+    // Update button fields for TEXT items
     if (item.type === 'TEXT') {
       if (buttonText !== undefined) updateData.buttonText = buttonText || null;
       if (buttonUrl !== undefined) updateData.buttonUrl = buttonUrl || null;
@@ -246,7 +251,15 @@ const updateItem = async (req, res) => {
 // Upload custom thumbnail
 const uploadThumbnail = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    // ✅ FIXED: Check if user is a VIEWER (no edit permission)
+    if (req.teamRole === 'VIEWER') {
+      return res.status(403).json({
+        status: 'error',
+        message: 'VIEWER role does not have permission to upload thumbnails',
+      });
+    }
+
+    const userId = req.effectiveUserId;
     const { id } = req.params;
     const { thumbnailData, fileName } = req.body;
 
@@ -322,7 +335,15 @@ const uploadThumbnail = async (req, res) => {
 // Remove custom thumbnail (revert to auto-generated or null)
 const removeThumbnail = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    // ✅ FIXED: Check if user is a VIEWER (no edit permission)
+    if (req.teamRole === 'VIEWER') {
+      return res.status(403).json({
+        status: 'error',
+        message: 'VIEWER role does not have permission to remove thumbnails',
+      });
+    }
+
+    const userId = req.effectiveUserId;
     const { id } = req.params;
 
     const item = await prisma.item.findFirst({
@@ -377,7 +398,15 @@ const removeThumbnail = async (req, res) => {
 
 const deleteItem = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    // ✅ FIXED: Check if user is a VIEWER (no delete permission)
+    if (req.teamRole === 'VIEWER') {
+      return res.status(403).json({
+        status: 'error',
+        message: 'VIEWER role does not have permission to delete items',
+      });
+    }
+
+    const userId = req.effectiveUserId;
     const { id } = req.params;
 
     const item = await prisma.item.findFirst({

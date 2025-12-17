@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, CreditCard, Shield, LogOut, Upload, Trash2, MessageSquare, MessagesSquare, BookOpen, TrendingUp } from 'lucide-react';
+import { User, CreditCard, Shield, LogOut, Upload, Trash2, MessageSquare, MessagesSquare, BookOpen, TrendingUp, UserCheck } from 'lucide-react'; // ✅ Added UserCheck
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import Tooltip from '../components/common/Tooltip';
 import useAuthStore from '../store/authStore';
@@ -13,6 +13,12 @@ const SettingsPage = () => {
   const navigate = useNavigate();
   const { user, logout, setUser } = useAuthStore();
   const { toasts, showToast, removeToast } = useToast();
+
+  // ✅ FIXED: Get effective user data (organization for team members)
+  const effectiveUser = user?.isTeamMember ? user.organization : user;
+  const userIsTeamMember = user?.isTeamMember === true;
+  const effectiveRole = effectiveUser?.role;
+
   const [activeTab, setActiveTab] = useState('profile');
   const [loading, setLoading] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -194,17 +200,20 @@ const SettingsPage = () => {
             <BookOpen size={20} className="inline mr-2 group-hover:animate-pulse" />
             <span className="hidden sm:inline">User Guide</span>
           </button>
-          <button
-            onClick={() => setActiveTab('security')}
-            className={`pb-4 px-2 font-semibold transition-all whitespace-nowrap ${
-              activeTab === 'security'
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Shield size={20} className="inline mr-2" />
-            <span className="hidden sm:inline">Security</span>
-          </button>
+          {/* ✅ FIXED: Hide Security tab for team members */}
+          {!userIsTeamMember && (
+            <button
+              onClick={() => setActiveTab('security')}
+              className={`pb-4 px-2 font-semibold transition-all whitespace-nowrap ${
+                activeTab === 'security'
+                  ? 'text-primary border-b-2 border-primary'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Shield size={20} className="inline mr-2" />
+              <span className="hidden sm:inline">Security</span>
+            </button>
+          )}
         </div>
 
         {activeTab === 'profile' && (
@@ -301,8 +310,8 @@ const SettingsPage = () => {
           <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 border border-gray-100">
             <h3 className="text-2xl font-bold text-primary mb-6">Subscription Details</h3>
             
-            {/* Upgrade Plan Section - NEW */}
-            {user?.role !== 'ORG_ENTERPRISE' && (
+            {/* ✅ FIXED: Hide Upgrade Plan button for team members */}
+            {!userIsTeamMember && effectiveRole !== 'ORG_ENTERPRISE' && (
               <div className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl p-6 border border-purple-200 mb-6">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div>
@@ -331,7 +340,8 @@ const SettingsPage = () => {
                     Current Plan
                     <Tooltip content="Your active subscription tier" iconSize={14} />
                   </p>
-                  <p className="text-xl md:text-2xl font-bold text-primary">{getPlanName(user?.role)}</p>
+                  {/* ✅ FIXED: Show organization plan for team members */}
+                  <p className="text-xl md:text-2xl font-bold text-primary">{getPlanName(effectiveRole)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 mb-2">Status</p>
@@ -349,19 +359,20 @@ const SettingsPage = () => {
                 <div className="flex items-center gap-4">
                   <div className="flex-1">
                     <div className="flex justify-between mb-2">
+                      {/* ✅ FIXED: Show organization storage for team members */}
                       <span className="text-xs md:text-sm font-medium text-gray-700">
-                        {formatStorage(Number(user?.storageUsed || 0))} / {formatStorage(Number(user?.storageLimit || 2147483648))}
+                        {formatStorage(Number(effectiveUser?.storageUsed || 0))} / {formatStorage(Number(effectiveUser?.storageLimit || 2147483648))}
                       </span>
                       <span className="text-xs md:text-sm font-medium text-primary">
-                        {user?.storageLimit ? Math.round((Number(user.storageUsed) / Number(user.storageLimit)) * 100) : 0}%
+                        {effectiveUser?.storageLimit ? Math.round((Number(effectiveUser.storageUsed) / Number(effectiveUser.storageLimit)) * 100) : 0}%
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-3">
                       <div
                         className="bg-gradient-to-r from-primary to-secondary h-3 rounded-full transition-all"
                         style={{
-                          width: user?.storageLimit
-                            ? Math.min((Number(user.storageUsed) / Number(user.storageLimit)) * 100, 100) + '%'
+                          width: effectiveUser?.storageLimit
+                            ? Math.min((Number(effectiveUser.storageUsed) / Number(effectiveUser.storageLimit)) * 100, 100) + '%'
                             : '0%',
                         }}
                       />
@@ -379,7 +390,8 @@ const SettingsPage = () => {
                   </li>
                   <li className="flex items-center gap-2 text-gray-600">
                     <span className="text-green-500">✓</span>
-                    <span>{formatStorage(Number(user?.storageLimit || 2147483648))} Storage</span>
+                    {/* ✅ FIXED: Show organization storage limit for team members */}
+                    <span>{formatStorage(Number(effectiveUser?.storageLimit || 2147483648))} Storage</span>
                     <Tooltip 
                       content="Total storage space available in your plan" 
                       iconSize={12}
@@ -389,7 +401,8 @@ const SettingsPage = () => {
                     <span className="text-green-500">✓</span>
                     Analytics & Tracking
                   </li>
-                  {(user?.role === 'ORG_SMALL' || user?.role === 'ORG_MEDIUM' || user?.role === 'ORG_ENTERPRISE') && (
+                  {/* ✅ FIXED: Check effective role for team collaboration feature */}
+                  {(effectiveRole === 'ORG_SMALL' || effectiveRole === 'ORG_MEDIUM' || effectiveRole === 'ORG_ENTERPRISE') && (
                     <li className="flex items-center gap-2 text-gray-600">
                       <span className="text-green-500">✓</span>
                       Team Collaboration
@@ -398,14 +411,43 @@ const SettingsPage = () => {
                 </ul>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <button
-                  onClick={() => showToast('Contact support to cancel your subscription.', 'warning')}
-                  className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50"
-                >
-                  Cancel Subscription
-                </button>
-              </div>
+              {/* ✅ FIXED: Hide cancel subscription for team members */}
+              {!userIsTeamMember && (
+                <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                  <button
+                    onClick={() => showToast('Contact support to cancel your subscription.', 'warning')}
+                    className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50"
+                  >
+                    Cancel Subscription
+                  </button>
+                </div>
+              )}
+
+              {/* ✅ NEW: Team Member Info Banner */}
+              {userIsTeamMember && (
+                <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-6">
+                  <h4 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                    <UserCheck size={20} />
+                    Team Member Account
+                  </h4>
+                  <p className="text-blue-800 text-sm mb-2">
+                    You're viewing <strong>{user.organization.name}</strong>'s organization account.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                    <div>
+                      <p className="text-xs text-blue-600 mb-1">Your Role</p>
+                      <p className="text-blue-900 font-semibold">{user.teamRole}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-600 mb-1">Organization Contact</p>
+                      <p className="text-blue-900 font-semibold">{user.organization.email}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-blue-700 mt-4">
+                    Contact your organization administrator to modify subscription settings or access additional features.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -511,11 +553,11 @@ const SettingsPage = () => {
         </div>
       </div>
 
-      {/* Upgrade Modal - NEW */}
+      {/* ✅ FIXED: Use effective role for upgrade modal */}
       <UpgradePlanModal
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
-        currentPlan={user?.role}
+        currentPlan={effectiveRole}
         onUpgradeSuccess={(updatedUser) => {
           setUser(updatedUser);
           showToast('Plan upgraded successfully!', 'success');
