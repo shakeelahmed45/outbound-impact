@@ -531,12 +531,31 @@ const removeTeamMember = async (req, res) => {
       });
     }
 
-    // Delete team member
-    await prisma.teamMember.delete({
-      where: { id },
-    });
-
-    console.log(`✅ Team member removed: ${teamMember.email}`);
+    // ✅ SIMPLE LOGIC: Always delete user account when removing team member
+    // This frees up the email for new registration
+    if (teamMember.memberUserId) {
+      try {
+        // Delete user account completely
+        await prisma.user.delete({
+          where: { id: teamMember.memberUserId }
+        });
+        console.log(`✅ Team member removed and user account deleted: ${teamMember.email}`);
+        console.log(`   Email is now available for new registration`);
+      } catch (deleteError) {
+        // If user delete fails (e.g., foreign key constraints), just remove team member
+        await prisma.teamMember.delete({
+          where: { id },
+        });
+        console.log(`✅ Team member removed: ${teamMember.email}`);
+        console.log(`   (User account could not be deleted - may have dependencies)`);
+      }
+    } else {
+      // No linked user, just delete the team member record
+      await prisma.teamMember.delete({
+        where: { id },
+      });
+      console.log(`✅ Team member removed: ${teamMember.email}`);
+    }
 
     res.json({
       status: 'success',
