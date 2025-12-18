@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, Mail, Trash2, AlertCircle, Loader2, RefreshCw, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { UserPlus, Mail, Trash2, AlertCircle, Loader2, RefreshCw, Clock, CheckCircle, XCircle, X } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import useAuthStore from '../store/authStore';
 import api from '../services/api';
@@ -16,6 +16,7 @@ const TeamPage = () => {
     role: 'VIEWER',
   });
   const [error, setError] = useState('');
+  const [showWarningPopup, setShowWarningPopup] = useState(false);
 
   useEffect(() => {
     fetchInitialData();
@@ -66,7 +67,14 @@ const TeamPage = () => {
       }
     } catch (error) {
       console.error('Failed to invite team member:', error);
-      setError(error.response?.data?.message || 'Failed to invite team member');
+      
+      const errorData = error.response?.data;
+      if (errorData?.code === 'EMAIL_ALREADY_REGISTERED') {
+        // Show simple warning popup
+        setShowWarningPopup(true);
+      } else {
+        setError(errorData?.message || 'Failed to invite team member');
+      }
     } finally {
       setInviting(false);
     }
@@ -179,7 +187,10 @@ const TeamPage = () => {
             <p className="text-secondary">Manage your team members and permissions</p>
           </div>
           <button
-            onClick={() => setShowInviteModal(true)}
+            onClick={() => {
+              setShowInviteModal(true);
+              setError('');
+            }}
             className="gradient-btn text-white px-6 py-3 rounded-lg font-semibold flex items-center gap-2 hover:shadow-lg transition-all"
           >
             <UserPlus size={20} />
@@ -204,7 +215,10 @@ const TeamPage = () => {
               Invite team members to collaborate on your content.
             </p>
             <button
-              onClick={() => setShowInviteModal(true)}
+              onClick={() => {
+                setShowInviteModal(true);
+                setError('');
+              }}
               className="gradient-btn text-white px-6 py-3 rounded-lg font-semibold inline-flex items-center gap-2 hover:shadow-lg transition-all"
             >
               <UserPlus size={20} />
@@ -287,6 +301,39 @@ const TeamPage = () => {
           </div>
         )}
 
+        {/* Simple Warning Popup */}
+        {showWarningPopup && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                    <AlertCircle className="text-red-600" size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Email Already Registered</h3>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowWarningPopup(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <p className="text-gray-700 mb-6">
+                This email is already registered. Please use a different email ID.
+              </p>
+              <button
+                onClick={() => setShowWarningPopup(false)}
+                className="w-full gradient-btn text-white px-4 py-3 rounded-lg font-semibold hover:shadow-lg transition-all"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Invite Modal */}
         {showInviteModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -312,7 +359,7 @@ const TeamPage = () => {
                 <div className="space-y-4 mb-6">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Email Address *
+                      Email Address <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="email"
@@ -327,7 +374,7 @@ const TeamPage = () => {
 
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Role *
+                      Role <span className="text-red-500">*</span>
                     </label>
                     <select
                       value={formData.role}

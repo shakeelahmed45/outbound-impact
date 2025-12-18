@@ -87,7 +87,39 @@ const inviteTeamMember = async (req, res) => {
       });
     }
 
-    // Check if member already exists
+    // ✅ CRITICAL CHECK: Prevent inviting already registered emails
+    const existingUser = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+      select: { 
+        id: true, 
+        email: true, 
+        name: true,
+        _count: {
+          select: {
+            campaigns: true,
+            items: true
+          }
+        }
+      }
+    });
+
+    if (existingUser) {
+      console.log(`❌ Invitation blocked: ${email} is already registered`);
+      console.log(`   User: ${existingUser.name}`);
+      console.log(`   Has ${existingUser._count.campaigns} campaigns and ${existingUser._count.items} items`);
+      
+      return res.status(400).json({
+        status: 'error',
+        message: `This email (${email}) is already registered in the system. Team invitations can only be sent to new, unregistered email addresses. Please ask the person to use a different email for team membership.`,
+        code: 'EMAIL_ALREADY_REGISTERED',
+        details: {
+          registeredEmail: existingUser.email,
+          hasExistingData: (existingUser._count.campaigns > 0 || existingUser._count.items > 0)
+        }
+      });
+    }
+
+    // Check if member already exists (already invited to this team)
     const existingMember = await prisma.teamMember.findFirst({
       where: {
         userId,
@@ -98,7 +130,7 @@ const inviteTeamMember = async (req, res) => {
     if (existingMember) {
       return res.status(400).json({
         status: 'error',
-        message: 'This team member has already been invited',
+        message: 'This email has already been invited to your team',
       });
     }
 
@@ -454,7 +486,7 @@ const getInvitationDetails = async (req, res) => {
     const daysDiff = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
     const isExpired = daysDiff > 7;
 
-    // ✨ NEW: Check if user already exists with this email
+    // ✅ NEW: Check if user already exists with this email
     const existingUser = await prisma.user.findUnique({
       where: { email: teamMember.email },
     });
