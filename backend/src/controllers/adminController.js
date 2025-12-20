@@ -1,5 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
+const crypto = require('crypto');
 
 // Get admin dashboard stats
 const getAdminStats = async (req, res) => {
@@ -26,7 +26,6 @@ const getAdminStats = async (req, res) => {
       })
     ]);
 
-    // Get users by role
     const usersByRole = await prisma.user.groupBy({
       by: ['role'],
       _count: {
@@ -59,7 +58,6 @@ const getAdminStats = async (req, res) => {
   }
 };
 
-// Get all users with pagination and search
 const getAllUsers = async (req, res) => {
   try {
     const { page = 1, limit = 10, search = '', role = '' } = req.query;
@@ -94,6 +92,21 @@ const getAllUsers = async (req, res) => {
               items: true,
               campaigns: true
             }
+          },
+          memberOf: {
+            select: {
+              id: true,
+              role: true,
+              status: true,
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  role: true
+                }
+              }
+            }
           }
         },
         orderBy: {
@@ -103,7 +116,6 @@ const getAllUsers = async (req, res) => {
       prisma.user.count({ where })
     ]);
 
-    // Convert BigInt to string
     const usersWithStringStorage = users.map(user => ({
       ...user,
       storageUsed: user.storageUsed.toString(),
@@ -129,7 +141,6 @@ const getAllUsers = async (req, res) => {
   }
 };
 
-// Get all items with pagination and search
 const getAllItems = async (req, res) => {
   try {
     const { page = 1, limit = 10, search = '', type = '' } = req.query;
@@ -166,7 +177,6 @@ const getAllItems = async (req, res) => {
       prisma.item.count({ where })
     ]);
 
-    // Convert BigInt to string
     const itemsWithStringSize = items.map(item => ({
       ...item,
       fileSize: item.fileSize.toString()
@@ -191,7 +201,6 @@ const getAllItems = async (req, res) => {
   }
 };
 
-// Update user (admin only)
 const updateUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -234,12 +243,10 @@ const updateUser = async (req, res) => {
   }
 };
 
-// Delete user (admin only)
 const deleteUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    // Delete user and all related data
     await prisma.user.delete({
       where: { id: userId }
     });
@@ -257,7 +264,6 @@ const deleteUser = async (req, res) => {
   }
 };
 
-// Delete item (admin only)
 const deleteItem = async (req, res) => {
   try {
     const { itemId } = req.params;
@@ -274,12 +280,10 @@ const deleteItem = async (req, res) => {
       });
     }
 
-    // Delete item
     await prisma.item.delete({
       where: { id: itemId }
     });
 
-    // Update user storage
     await prisma.user.update({
       where: { id: item.userId },
       data: {
@@ -302,11 +306,116 @@ const deleteItem = async (req, res) => {
   }
 };
 
+const removeUserFromTeam = async (req, res) => {
+  try {
+    const { teamMemberId } = req.params;
+
+    const teamMember = await prisma.teamMember.findUnique({
+      where: { id: teamMemberId },
+      include: {
+        user: {
+          select: { name: true, email: true }
+        }
+      }
+    });
+
+    if (!teamMember) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Team member not found'
+      });
+    }
+
+    if (teamMember.memberUserId) {
+      try {
+        await prisma.user.delete({
+          where: { id: teamMember.memberUserId }
+        });
+        console.log(`✅ Admin removed team member and deleted user: ${teamMember.email}`);
+        console.log(`   Organization: ${teamMember.user.name}`);
+      } catch (deleteError) {
+        await prisma.teamMember.delete({
+          where: { id: teamMemberId }
+        });
+        console.log(`✅ Admin removed team member: ${teamMember.email}`);
+      }
+    } else {
+      await prisma.teamMember.delete({
+        where: { id: teamMemberId }
+      });
+      console.log(`✅ Admin removed team member: ${teamMember.email}`);
+    }
+
+    res.json({
+      status: 'success',
+      message: 'User removed from team successfully'
+    });
+  } catch (error) {
+    console.error('Remove user from team error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to remove user from team'
+    });
+  }
+};
+
+const sendPasswordReset = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date(Date.now() + 3600000);
+
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        resetToken: hashedToken,
+        resetTokenExpiry: resetTokenExpiry
+      }
+    });
+
+    const frontendUrl = process.env.FRONTEND_URL || 'https://outbound-impact.vercel.app';
+    const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
+
+    console.log(`✅ Admin generated password reset for: ${user.email}`);
+    console.log(`🔗 Reset link: ${resetLink}`);
+
+    res.json({
+      status: 'success',
+      message: 'Password reset link generated',
+      resetLink: resetLink,
+      expiresIn: '1 hour'
+    });
+  } catch (error) {
+    console.error('Send password reset error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to generate password reset link'
+    });
+  }
+};
+
 module.exports = {
   getAdminStats,
   getAllUsers,
   getAllItems,
   updateUser,
   deleteUser,
-  deleteItem
+  deleteItem,
+  removeUserFromTeam,
+  sendPasswordReset
 };

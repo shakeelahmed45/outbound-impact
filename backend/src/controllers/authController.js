@@ -1,24 +1,17 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { generateAccessToken, generateRefreshToken } = require('../utils/jwt');
 const { createCheckoutSession, getCheckoutSession, upgradePlan } = require('../services/stripeService');
-
-const prisma = new PrismaClient();
 
 // Create checkout session
 const createCheckout = async (req, res) => {
   try {
     const { email, name, password, plan, enterpriseConfig } = req.body;
 
-    // DEBUG LOGGING
     console.log('=== CHECKOUT REQUEST DEBUG ===');
     console.log('Received plan:', plan);
     console.log('Enterprise config:', enterpriseConfig);
-    console.log('Environment variables:');
-    console.log('- STRIPE_INDIVIDUAL_PRICE:', process.env.STRIPE_INDIVIDUAL_PRICE);
-    console.log('- STRIPE_SMALL_ORG_PRICE:', process.env.STRIPE_SMALL_ORG_PRICE);
-    console.log('- STRIPE_MEDIUM_ORG_PRICE:', process.env.STRIPE_MEDIUM_ORG_PRICE);
-    console.log('- STRIPE_ENTERPRISE_PRICE:', process.env.STRIPE_ENTERPRISE_PRICE);
     console.log('==============================');
 
     if (!email || !name || !password || !plan) {
@@ -28,8 +21,11 @@ const createCheckout = async (req, res) => {
       });
     }
 
+    // ✅ NORMALIZE EMAIL TO LOWERCASE
+    const normalizedEmail = email.toLowerCase().trim();
+
     const existingUser = await prisma.user.findUnique({
-      where: { email }
+      where: { email: normalizedEmail } // ✅ Use normalized email
     });
 
     if (existingUser) {
@@ -58,20 +54,15 @@ const createCheckout = async (req, res) => {
         storageLimit = 30 * 1024 * 1024 * 1024;
         break;
       case 'ORG_ENTERPRISE':
-        console.log('Matched ORG_ENTERPRISE case!');
         priceId = process.env.STRIPE_ENTERPRISE_PRICE;
         role = 'ORG_ENTERPRISE';
-        // Use custom storage from enterprise config or default to 100GB
         if (enterpriseConfig && enterpriseConfig.storageGB) {
           storageLimit = enterpriseConfig.storageGB * 1024 * 1024 * 1024;
         } else {
           storageLimit = 100 * 1024 * 1024 * 1024;
         }
-        console.log('Enterprise priceId:', priceId);
-        console.log('Enterprise storageLimit:', storageLimit);
         break;
       default:
-        console.log('No plan matched! Received plan value:', plan, 'Type:', typeof plan);
         return res.status(400).json({
           status: 'error',
           message: 'Invalid plan selected'
@@ -79,11 +70,11 @@ const createCheckout = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const session = await createCheckoutSession(email, priceId, plan);
+    const session = await createCheckoutSession(normalizedEmail, priceId, plan); // ✅ Use normalized email
 
     global.pendingSignups = global.pendingSignups || {};
     global.pendingSignups[session.id] = {
-      email,
+      email: normalizedEmail, // ✅ Store normalized email
       name,
       password: hashedPassword,
       role,
@@ -136,7 +127,9 @@ const completeSignup = async (req, res) => {
       });
     }
 
-    // Get subscription details if it's a subscription plan
+    // ✅ Email is already normalized from createCheckout
+    const normalizedEmail = signupData.email.toLowerCase().trim();
+
     let subscriptionData = {};
     if (session.subscription) {
       const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -151,7 +144,7 @@ const completeSignup = async (req, res) => {
 
     const user = await prisma.user.create({
       data: {
-        email: signupData.email,
+        email: normalizedEmail, // ✅ Store normalized email
         name: signupData.name,
         password: signupData.password,
         role: signupData.role,
@@ -159,19 +152,16 @@ const completeSignup = async (req, res) => {
         stripeCustomerId: session.customer,
         subscriptionId: session.subscription || null,
         subscriptionStatus: 'active',
-        ...subscriptionData, // Add period start/end and priceId
+        ...subscriptionData,
       }
     });
 
     delete global.pendingSignups[sessionId];
 
-    // 🆕 SEND EMAILS IN BACKGROUND - DON'T WAIT FOR THEM!
-    // This prevents signup from getting stuck
     setImmediate(async () => {
       try {
         const emailService = require('../services/emailService');
         
-        // Try to send welcome email
         try {
           await emailService.sendWelcomeEmail(user.email, user.name, user.role);
           console.log('✅ Welcome email sent to:', user.email);
@@ -179,7 +169,6 @@ const completeSignup = async (req, res) => {
           console.error('❌ Failed to send welcome email:', emailError.message);
         }
 
-        // Try to send admin notification
         try {
           await emailService.sendAdminNotification({
             userName: user.name,
@@ -196,7 +185,6 @@ const completeSignup = async (req, res) => {
       }
     });
 
-    // IMMEDIATELY RESPOND TO USER - DON'T WAIT FOR EMAILS!
     const accessToken = generateAccessToken(user.id, user.email, user.role);
     const refreshToken = generateRefreshToken(user.id);
 
@@ -225,7 +213,6 @@ const completeSignup = async (req, res) => {
   }
 };
 
-// ✨ UPDATED: Sign in with enhanced team member detection
 const signIn = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -237,8 +224,11 @@ const signIn = async (req, res) => {
       });
     }
 
+    // ✅ NORMALIZE EMAIL TO LOWERCASE
+    const normalizedEmail = email.toLowerCase().trim();
+
     const user = await prisma.user.findUnique({
-      where: { email }
+      where: { email: normalizedEmail } // ✅ Use normalized email
     });
 
     if (!user) {
@@ -257,7 +247,6 @@ const signIn = async (req, res) => {
       });
     }
 
-    // ✨ CRITICAL FIX: Check if user is a team member of any organization
     const teamMembership = await prisma.teamMember.findFirst({
       where: {
         memberUserId: user.id,
@@ -282,7 +271,6 @@ const signIn = async (req, res) => {
     const accessToken = generateAccessToken(user.id, user.email, user.role);
     const refreshToken = generateRefreshToken(user.id);
 
-    // ✨ CRITICAL FIX: If user is a team member, return organization info as PRIMARY
     if (teamMembership) {
       console.log(`✅ Team member signed in: ${user.email} (${teamMembership.role}) of ${teamMembership.user.name}`);
 
@@ -296,17 +284,16 @@ const signIn = async (req, res) => {
           email: user.email,
           name: user.name,
           profilePicture: user.profilePicture,
-          role: user.role, // Keep personal role for reference
+          role: user.role,
           storageUsed: user.storageUsed.toString(),
           storageLimit: user.storageLimit.toString(),
-          // ✨ CRITICAL: Team member flags and organization data
           isTeamMember: true,
-          teamRole: teamMembership.role, // VIEWER, EDITOR, or ADMIN
+          teamRole: teamMembership.role,
           organization: {
             id: teamMembership.user.id,
             name: teamMembership.user.name,
             email: teamMembership.user.email,
-            role: teamMembership.user.role, // ORG_ENTERPRISE, etc.
+            role: teamMembership.user.role,
             storageUsed: teamMembership.user.storageUsed.toString(),
             storageLimit: teamMembership.user.storageLimit.toString(),
             subscriptionStatus: teamMembership.user.subscriptionStatus,
@@ -316,7 +303,6 @@ const signIn = async (req, res) => {
       });
     }
 
-    // Regular user sign in (not a team member)
     console.log(`✅ User signed in: ${user.email}`);
 
     res.json({
@@ -332,7 +318,6 @@ const signIn = async (req, res) => {
         role: user.role,
         storageUsed: user.storageUsed.toString(),
         storageLimit: user.storageLimit.toString(),
-        // ✨ CRITICAL: Explicitly mark as NOT a team member
         isTeamMember: false,
       }
     });
@@ -370,7 +355,6 @@ const getCurrentUser = async (req, res) => {
       });
     }
 
-    // ✨ Check if user is a team member of any organization
     const teamMembership = await prisma.teamMember.findFirst({
       where: {
         memberUserId: user.id,
@@ -392,7 +376,6 @@ const getCurrentUser = async (req, res) => {
       },
     });
 
-    // ✨ If user is a team member, return organization info
     if (teamMembership) {
       return res.json({
         status: 'success',
@@ -406,7 +389,6 @@ const getCurrentUser = async (req, res) => {
           storageLimit: user.storageLimit.toString(),
           subscriptionStatus: user.subscriptionStatus,
           currentPeriodEnd: user.currentPeriodEnd,
-          // ✨ Include team membership info
           isTeamMember: true,
           teamRole: teamMembership.role,
           organization: {
@@ -423,14 +405,12 @@ const getCurrentUser = async (req, res) => {
       });
     }
 
-    // Regular user (not a team member)
     res.json({
       status: 'success',
       user: {
         ...user,
         storageUsed: user.storageUsed.toString(),
         storageLimit: user.storageLimit.toString(),
-        // ✨ Indicate not a team member
         isTeamMember: false,
       }
     });
@@ -444,19 +424,11 @@ const getCurrentUser = async (req, res) => {
   }
 };
 
-/**
- * Upgrade user's subscription plan with prorated billing
- */
 const handleUpgradePlan = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { newPlan } = req.body; // ORG_SMALL, ORG_MEDIUM, ORG_ENTERPRISE
+    const { newPlan } = req.body;
 
-    console.log('=== UPGRADE PLAN REQUEST ===');
-    console.log('User ID:', userId);
-    console.log('New Plan:', newPlan);
-
-    // Validate input
     if (!newPlan) {
       return res.status(400).json({
         status: 'error',
@@ -464,7 +436,6 @@ const handleUpgradePlan = async (req, res) => {
       });
     }
 
-    // Get current user
     const user = await prisma.user.findUnique({
       where: { id: userId }
     });
@@ -476,7 +447,6 @@ const handleUpgradePlan = async (req, res) => {
       });
     }
 
-    // Check if user is trying to "upgrade" to same plan
     if (user.role === newPlan) {
       return res.status(400).json({
         status: 'error',
@@ -484,21 +454,20 @@ const handleUpgradePlan = async (req, res) => {
       });
     }
 
-    // Determine new price ID and storage limit
     let newPriceId, newStorageLimit;
     
     switch (newPlan) {
       case 'ORG_SMALL':
         newPriceId = process.env.STRIPE_SMALL_ORG_PRICE;
-        newStorageLimit = 10 * 1024 * 1024 * 1024; // 10GB
+        newStorageLimit = 10 * 1024 * 1024 * 1024;
         break;
       case 'ORG_MEDIUM':
         newPriceId = process.env.STRIPE_MEDIUM_ORG_PRICE;
-        newStorageLimit = 30 * 1024 * 1024 * 1024; // 30GB
+        newStorageLimit = 30 * 1024 * 1024 * 1024;
         break;
       case 'ORG_ENTERPRISE':
         newPriceId = process.env.STRIPE_ENTERPRISE_PRICE;
-        newStorageLimit = 100 * 1024 * 1024 * 1024; // 100GB
+        newStorageLimit = 100 * 1024 * 1024 * 1024;
         break;
       default:
         return res.status(400).json({
@@ -507,15 +476,8 @@ const handleUpgradePlan = async (req, res) => {
         });
     }
 
-    console.log('New Price ID:', newPriceId);
-    console.log('New Storage Limit:', newStorageLimit);
-
-    // Perform upgrade in Stripe with prorated billing
     const upgradeResult = await upgradePlan(user, newPriceId, newPlan);
 
-    console.log('Upgrade result:', upgradeResult);
-
-    // Update user in database
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
@@ -530,17 +492,6 @@ const handleUpgradePlan = async (req, res) => {
     });
 
     console.log('✅ User upgraded successfully');
-
-    // Send upgrade confirmation email in background
-    setImmediate(async () => {
-      try {
-        const emailService = require('../services/emailService');
-        // You can create an upgrade email template later
-        console.log('📧 Upgrade email would be sent to:', user.email);
-      } catch (error) {
-        console.error('Email error:', error);
-      }
-    });
 
     res.json({
       status: 'success',
@@ -570,10 +521,125 @@ const handleUpgradePlan = async (req, res) => {
   }
 };
 
+const verifyResetToken = async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Reset token is required'
+      });
+    }
+
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await prisma.user.findFirst({
+      where: {
+        resetToken: hashedToken,
+        resetTokenExpiry: {
+          gte: new Date()
+        }
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true
+      }
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid or expired reset token'
+      });
+    }
+
+    res.json({
+      status: 'success',
+      message: 'Token is valid',
+      user: {
+        email: user.email,
+        name: user.name
+      }
+    });
+  } catch (error) {
+    console.error('Verify reset token error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to verify reset token'
+    });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Token and password are required'
+      });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Password must be at least 8 characters long'
+      });
+    }
+
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await prisma.user.findFirst({
+      where: {
+        resetToken: hashedToken,
+        resetTokenExpiry: {
+          gte: new Date()
+        }
+      }
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid or expired reset token'
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        resetToken: null,
+        resetTokenExpiry: null
+      }
+    });
+
+    console.log(`✅ Password reset successful for: ${user.email}`);
+
+    res.json({
+      status: 'success',
+      message: 'Password reset successful'
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to reset password'
+    });
+  }
+};
+
 module.exports = {
   createCheckout,
   completeSignup,
   signIn,
   getCurrentUser,
   handleUpgradePlan,
+  verifyResetToken,
+  resetPassword,
 };

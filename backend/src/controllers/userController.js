@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma'); // ✅ Use shared Prisma instance
 
 const uploadProfilePhoto = async (req, res) => {
   try {
@@ -101,8 +100,97 @@ const deleteAccount = async (req, res) => {
   }
 };
 
+// ✅ Change user email with normalization
+const changeEmail = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { newEmail } = req.body;
+
+    if (!newEmail) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'New email is required'
+      });
+    }
+
+    // ✅ NORMALIZE EMAIL TO LOWERCASE
+    const normalizedEmail = newEmail.toLowerCase().trim();
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid email format'
+      });
+    }
+
+    // Check if email already taken (case-insensitive)
+    const existingUser = await prisma.user.findUnique({
+      where: { email: normalizedEmail } // ✅ Use normalized email
+    });
+
+    if (existingUser && existingUser.id !== userId) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'This email is already registered to another account'
+      });
+    }
+
+    // Get current user
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true }
+    });
+
+    if (normalizedEmail === currentUser.email) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'New email is the same as current email'
+      });
+    }
+
+    // Update email with normalized version
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { email: normalizedEmail }, // ✅ Store normalized email
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        profilePicture: true,
+        role: true,
+        storageUsed: true,
+        storageLimit: true,
+        subscriptionStatus: true,
+        currentPeriodEnd: true
+      }
+    });
+
+    console.log(`✅ Email changed: ${currentUser.email} → ${normalizedEmail}`);
+
+    res.json({
+      status: 'success',
+      message: 'Email changed successfully. Please sign in with your new email.',
+      user: {
+        ...updatedUser,
+        storageUsed: updatedUser.storageUsed.toString(),
+        storageLimit: updatedUser.storageLimit.toString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Change email error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to change email'
+    });
+  }
+};
+
 module.exports = {
   uploadProfilePhoto,
   updateProfile,
   deleteAccount,
+  changeEmail,
 };

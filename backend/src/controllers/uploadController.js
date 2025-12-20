@@ -1,13 +1,10 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { uploadToBunny, generateFileName, generateSlug } = require('../services/bunnyService');
 const QRCode = require('qrcode');
-
-const prisma = new PrismaClient();
 
 const uploadFile = async (req, res) => {
   try {
     const userId = req.effectiveUserId;
-    // ✅ NEW: Added buttonText, buttonUrl, and attachments support
     const { title, description, type, fileData, fileName, fileSize, buttonText, buttonUrl, attachments } = req.body;
 
     if (!title || !type || !fileData || !fileName) {
@@ -17,7 +14,6 @@ const uploadFile = async (req, res) => {
       });
     }
 
-    // ✅ NEW: Validate button fields if provided
     if (buttonText && !buttonUrl) {
       return res.status(400).json({
         status: 'error',
@@ -32,7 +28,6 @@ const uploadFile = async (req, res) => {
       });
     }
 
-    // ✅ NEW: Validate URL format if provided
     if (buttonUrl) {
       try {
         new URL(buttonUrl);
@@ -68,7 +63,6 @@ const uploadFile = async (req, res) => {
     const base64Data = fileData.split(',')[1] || fileData;
     const fileBuffer = Buffer.from(base64Data, 'base64');
 
-    // Upload to Bunny.net
     const uploadResult = await uploadToBunny(
       fileBuffer,
       uniqueFileName,
@@ -82,9 +76,8 @@ const uploadFile = async (req, res) => {
       console.log('✅ File uploaded to Bunny.net CDN');
       mediaUrl = uploadResult.url;
       
-      // Auto-generate thumbnail for images
       if (type === 'IMAGE') {
-        thumbnailUrl = mediaUrl; // Use the image itself as thumbnail
+        thumbnailUrl = mediaUrl;
       }
     } else {
       console.log('⚠️ Bunny.net upload failed, storing as base64');
@@ -96,7 +89,6 @@ const uploadFile = async (req, res) => {
       }
     }
 
-    // Generate unique slug
     let slug = generateSlug();
     let slugExists = await prisma.item.findUnique({ where: { slug } });
     
@@ -105,20 +97,17 @@ const uploadFile = async (req, res) => {
       slugExists = await prisma.item.findUnique({ where: { slug } });
     }
 
-    // Generate public URL
     const publicUrl = `${process.env.FRONTEND_URL}/l/${slug}`;
 
-    // Generate QR code (keeping for backward compatibility)
     const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
       width: 512,
       margin: 2,
       color: {
-        dark: '#800080', // Purple
+        dark: '#800080',
         light: '#FFFFFF',
       },
     });
 
-    // ✅ NEW: Create item with button and attachments support
     const item = await prisma.item.create({
       data: {
         userId,
@@ -170,7 +159,6 @@ const uploadFile = async (req, res) => {
 const createTextPost = async (req, res) => {
   try {
     const userId = req.effectiveUserId;
-    // Get buttonText, buttonUrl, and attachments from request
     const { title, description, content, buttonText, buttonUrl, attachments } = req.body;
 
     if (!title || !content) {
@@ -180,7 +168,6 @@ const createTextPost = async (req, res) => {
       });
     }
 
-    // Validate button fields if provided
     if (buttonText && !buttonUrl) {
       return res.status(400).json({
         status: 'error',
@@ -195,7 +182,6 @@ const createTextPost = async (req, res) => {
       });
     }
 
-    // Validate URL format if provided
     if (buttonUrl) {
       try {
         new URL(buttonUrl);
@@ -213,7 +199,6 @@ const createTextPost = async (req, res) => {
       }
     }
 
-    // Generate unique slug
     let slug = generateSlug();
     let slugExists = await prisma.item.findUnique({ where: { slug } });
     
@@ -222,10 +207,8 @@ const createTextPost = async (req, res) => {
       slugExists = await prisma.item.findUnique({ where: { slug } });
     }
 
-    // Generate public URL
     const publicUrl = `${process.env.FRONTEND_URL}/l/${slug}`;
 
-    // Generate QR code
     const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
       width: 512,
       margin: 2,
@@ -235,7 +218,6 @@ const createTextPost = async (req, res) => {
       },
     });
 
-    // Include buttonText, buttonUrl, and attachments in database
     const item = await prisma.item.create({
       data: {
         userId,

@@ -30,7 +30,8 @@ import IntegrationsPage from './pages/enterprise/IntegrationsPage';
 import AdvancedAnalyticsPage from './pages/enterprise/AdvancedAnalyticsPage';
 import SecurityPage from './pages/enterprise/SecurityPage';
 import UserGuidePage from './pages/UserGuidePage';
-import AcceptInvitation from './pages/AcceptInvitation'; // ✨ NEW: Team invitation acceptance page
+import AcceptInvitation from './pages/AcceptInvitation';
+import ResetPassword from './pages/ResetPassword'; // ✅ NEW: Password reset page
 
 function App() {
   const [showSplash, setShowSplash] = useState(() => {
@@ -55,6 +56,7 @@ function App() {
         <Route path="/" element={<Navigate to="/signin" replace />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/signin" element={<SignIn />} />
+        <Route path="/reset-password" element={<ResetPassword />} /> {/* ✅ NEW: Password reset route */}
         <Route path="/plans" element={<Plans />} />
         <Route path="/enterprise" element={<EnterprisePage />} />
         <Route path="/auth/success" element={<AuthSuccess />} />
@@ -63,7 +65,7 @@ function App() {
         <Route path="/l/:slug" element={<PublicViewer />} />
         <Route path="/c/:slug" element={<PublicCampaignViewer />} />
         
-        {/* ✨ NEW: Team Invitation Route (Public - No Authentication Required) */}
+        {/* Team Invitation Route */}
         <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
         
         {/* User Dashboard Routes */}

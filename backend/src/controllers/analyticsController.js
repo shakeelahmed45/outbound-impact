@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 const trackView = async (req, res) => {
   try {
@@ -23,14 +22,12 @@ const trackView = async (req, res) => {
       });
     }
 
-    // Extract user agent and other info from request
     const userAgent = req.headers['user-agent'] || '';
     const ipAddress = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 
                       req.headers['x-real-ip'] || 
                       req.connection.remoteAddress || 
                       req.socket.remoteAddress;
 
-    // Detect device type
     let device = 'Desktop';
     if (/mobile/i.test(userAgent)) {
       device = 'Mobile';
@@ -38,7 +35,6 @@ const trackView = async (req, res) => {
       device = 'Tablet';
     }
 
-    // Detect browser
     let browser = 'Other';
     if (userAgent.includes('Chrome') && !userAgent.includes('Edg')) {
       browser = 'Chrome';
@@ -50,7 +46,6 @@ const trackView = async (req, res) => {
       browser = 'Edge';
     }
 
-    // Detect OS
     let os = 'Other';
     if (userAgent.includes('Windows')) {
       os = 'Windows';
@@ -64,10 +59,8 @@ const trackView = async (req, res) => {
       os = 'iOS';
     }
 
-    // Get country from IP address using ip-api.com (free service)
     let country = 'Unknown';
     try {
-      // Skip geolocation for localhost/private IPs
       if (ipAddress && 
           !ipAddress.includes('127.0.0.1') && 
           !ipAddress.includes('localhost') &&
@@ -77,7 +70,7 @@ const trackView = async (req, res) => {
         
         const axios = require('axios');
         const geoResponse = await axios.get(`http://ip-api.com/json/${ipAddress}?fields=country`, {
-          timeout: 3000 // 3 second timeout
+          timeout: 3000
         });
         
         if (geoResponse.data && geoResponse.data.country) {
@@ -86,10 +79,8 @@ const trackView = async (req, res) => {
       }
     } catch (geoError) {
       console.log('Geolocation lookup failed, using Unknown:', geoError.message);
-      // Continue with 'Unknown' country
     }
 
-    // Create analytics entry
     await prisma.analytics.create({
       data: {
         itemId: item.id,
@@ -115,7 +106,7 @@ const trackView = async (req, res) => {
 
 const getAnalytics = async (req, res) => {
   try {
-    const userId = req.effectiveUserId; // ✅ FIXED
+    const userId = req.effectiveUserId;
 
     const items = await prisma.item.findMany({
       where: { userId },
@@ -136,7 +127,6 @@ const getAnalytics = async (req, res) => {
 
     const totalItems = items.length;
 
-    // Calculate total views from analytics table
     const itemIds = items.map(item => item.id);
     const totalViews = await prisma.analytics.count({
       where: {
@@ -149,7 +139,6 @@ const getAnalytics = async (req, res) => {
       return acc;
     }, {});
 
-    // Get view counts for each item
     const itemViewCounts = await Promise.all(
       items.map(async (item) => {
         const views = await prisma.analytics.count({
@@ -185,7 +174,6 @@ const getAnalytics = async (req, res) => {
       },
     });
 
-    // Calculate views for each campaign
     const campaignStats = await Promise.all(
       campaigns.map(async (campaign) => {
         const campaignItemIds = campaign.items.map(item => item.id);
@@ -225,7 +213,7 @@ const getAnalytics = async (req, res) => {
 
 const getItemAnalytics = async (req, res) => {
   try {
-    const userId = req.effectiveUserId; // ✅ FIXED
+    const userId = req.effectiveUserId;
     const { id } = req.params;
 
     const item = await prisma.item.findFirst({
@@ -239,12 +227,10 @@ const getItemAnalytics = async (req, res) => {
       });
     }
 
-    // Get total views
     const totalViews = await prisma.analytics.count({
       where: { itemId: id }
     });
 
-    // Get views by date (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -257,13 +243,11 @@ const getItemAnalytics = async (req, res) => {
       _count: true,
     });
 
-    // Format views by date
     const formattedViewsByDate = viewsByDate.map(view => ({
       date: view.createdAt.toISOString().split('T')[0],
       views: view._count
     }));
 
-    // Get top locations
     const topLocations = await prisma.analytics.groupBy({
       by: ['country'],
       where: { itemId: id },

@@ -1,7 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
-const prisma = new PrismaClient();
 const { sendTeamInvitationEmail, sendInvitationReminderEmail } = require('../services/emailService');
 
 // Generate unique invitation token
@@ -56,9 +55,12 @@ const inviteTeamMember = async (req, res) => {
       });
     }
 
+    // ✅ NORMALIZE EMAIL TO LOWERCASE
+    const normalizedEmail = email.toLowerCase().trim();
+
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(normalizedEmail)) {
       return res.status(400).json({
         status: 'error',
         message: 'Invalid email format',
@@ -87,9 +89,9 @@ const inviteTeamMember = async (req, res) => {
       });
     }
 
-    // ✅ CRITICAL CHECK: Prevent inviting already registered emails
+    // ✅ CRITICAL CHECK: Prevent inviting already registered emails (case-insensitive)
     const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email: normalizedEmail }, // ✅ Use normalized email
       select: { 
         id: true, 
         email: true, 
@@ -104,13 +106,13 @@ const inviteTeamMember = async (req, res) => {
     });
 
     if (existingUser) {
-      console.log(`❌ Invitation blocked: ${email} is already registered`);
+      console.log(`❌ Invitation blocked: ${normalizedEmail} is already registered`);
       console.log(`   User: ${existingUser.name}`);
       console.log(`   Has ${existingUser._count.campaigns} campaigns and ${existingUser._count.items} items`);
       
       return res.status(400).json({
         status: 'error',
-        message: `This email (${email}) is already registered in the system. Team invitations can only be sent to new, unregistered email addresses. Please ask the person to use a different email for team membership.`,
+        message: `This email (${normalizedEmail}) is already registered in the system. Team invitations can only be sent to new, unregistered email addresses. Please ask the person to use a different email for team membership.`,
         code: 'EMAIL_ALREADY_REGISTERED',
         details: {
           registeredEmail: existingUser.email,
@@ -119,11 +121,11 @@ const inviteTeamMember = async (req, res) => {
       });
     }
 
-    // Check if member already exists (already invited to this team)
+    // Check if member already exists (already invited to this team) - case-insensitive
     const existingMember = await prisma.teamMember.findFirst({
       where: {
         userId,
-        email,
+        email: normalizedEmail, // ✅ Use normalized email
       },
     });
 
@@ -137,11 +139,11 @@ const inviteTeamMember = async (req, res) => {
     // ✨ Generate invitation token
     const token = generateInvitationToken();
 
-    // ✨ Create team member with PENDING status and token
+    // ✨ Create team member with PENDING status and normalized email
     const teamMember = await prisma.teamMember.create({
       data: {
         userId,
-        email,
+        email: normalizedEmail, // ✅ Store normalized email
         role,
         status: 'PENDING',
         token,
@@ -156,7 +158,7 @@ const inviteTeamMember = async (req, res) => {
     let emailSent = false;
     try {
       const emailResult = await sendTeamInvitationEmail({
-        recipientEmail: email,
+        recipientEmail: normalizedEmail, // ✅ Use normalized email
         inviterName: user.name,
         inviterEmail: user.email,
         role: role,
@@ -171,16 +173,14 @@ const inviteTeamMember = async (req, res) => {
         console.log('✅ Invitation email sent successfully');
       }
     } catch (emailError) {
-      // ✨ CRITICAL FIX: Catch email errors but don't fail the invitation
       console.error('❌ Email service error:', emailError.message);
       emailSent = false;
     }
 
-    console.log(`✅ Team member invited: ${email} as ${role} by ${user.email}`);
+    console.log(`✅ Team member invited: ${normalizedEmail} as ${role} by ${user.email}`);
     console.log(`📧 Invitation email sent: ${emailSent ? 'Yes' : 'No (but invitation created)'}`);
     console.log(`🔗 Invitation link: ${invitationLink}`);
 
-    // ✨ CRITICAL FIX: Always return success even if email fails
     res.status(201).json({
       status: 'success',
       message: emailSent 
@@ -188,7 +188,7 @@ const inviteTeamMember = async (req, res) => {
         : 'Team member invited successfully (email delivery pending)',
       teamMember,
       emailSent,
-      invitationLink, // ✨ Return link so user can manually share if email fails
+      invitationLink,
     });
   } catch (error) {
     console.error('Invite team member error:', error);
@@ -199,13 +199,11 @@ const inviteTeamMember = async (req, res) => {
   }
 };
 
-// ✨ NEW: Resend invitation
 const resendInvitation = async (req, res) => {
   try {
     const userId = req.user.userId;
     const { id } = req.params;
 
-    // Get team member
     const teamMember = await prisma.teamMember.findFirst({
       where: { id, userId },
     });
@@ -224,30 +222,25 @@ const resendInvitation = async (req, res) => {
       });
     }
 
-    // Get user info
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { name: true, email: true },
     });
 
-    // Generate new token
     const newToken = generateInvitationToken();
 
-    // Update token
     await prisma.teamMember.update({
       where: { id },
       data: { token: newToken },
     });
 
-    // Create new invitation link
     const baseUrl = process.env.FRONTEND_URL || 'https://outbound-impact.vercel.app';
     const invitationLink = `${baseUrl}/accept-invitation/${newToken}`;
 
-    // Resend email with error handling
     let emailSent = false;
     try {
       const emailResult = await sendTeamInvitationEmail({
-        recipientEmail: teamMember.email,
+        recipientEmail: teamMember.email, // Already normalized when created
         inviterName: user.name,
         inviterEmail: user.email,
         role: teamMember.role,
@@ -277,7 +270,6 @@ const resendInvitation = async (req, res) => {
   }
 };
 
-// ✨ UPDATED: Accept invitation with password setup
 const acceptInvitation = async (req, res) => {
   try {
     const { token } = req.params;
@@ -290,7 +282,6 @@ const acceptInvitation = async (req, res) => {
       });
     }
 
-    // Find team member by token
     const teamMember = await prisma.teamMember.findUnique({
       where: { token },
       include: {
@@ -324,7 +315,6 @@ const acceptInvitation = async (req, res) => {
       });
     }
 
-    // Check if invitation is expired (7 days)
     const createdAt = new Date(teamMember.createdAt);
     const now = new Date();
     const daysDiff = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
@@ -336,14 +326,14 @@ const acceptInvitation = async (req, res) => {
       });
     }
 
-    // ✨ NEW: Check if user exists
+    // ✅ Check for existing user with normalized email (case-insensitive)
+    const normalizedEmail = teamMember.email.toLowerCase().trim();
+    
     let memberUser = await prisma.user.findUnique({
-      where: { email: teamMember.email },
+      where: { email: normalizedEmail }, // ✅ Use normalized email
     });
 
-    // ✨ NEW: If user doesn't exist, create account
     if (!memberUser) {
-      // Validate name and password are provided
       if (!name || !password) {
         return res.status(400).json({
           status: 'error',
@@ -358,23 +348,21 @@ const acceptInvitation = async (req, res) => {
         });
       }
 
-      // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // Create new user account
+      // ✅ Create new user with normalized email
       memberUser = await prisma.user.create({
         data: {
-          email: teamMember.email,
+          email: normalizedEmail, // ✅ Store normalized email
           name: name.trim(),
           password: hashedPassword,
           role: 'INDIVIDUAL',
         },
       });
 
-      console.log(`✅ New user account created for team member: ${memberUser.email}`);
+      console.log(`✅ New user account created for team member: ${normalizedEmail}`);
     }
 
-    // ✨ UPDATED: Update status to ACCEPTED and link memberUserId
     await prisma.teamMember.update({
       where: { id: teamMember.id },
       data: { 
@@ -383,13 +371,13 @@ const acceptInvitation = async (req, res) => {
       },
     });
 
-    console.log(`✅ Invitation accepted: ${teamMember.email} joined ${teamMember.user.name}'s team`);
+    console.log(`✅ Invitation accepted: ${normalizedEmail} joined ${teamMember.user.name}'s team`);
 
     res.json({
       status: 'success',
       message: 'Invitation accepted successfully',
       teamMember: {
-        email: teamMember.email,
+        email: normalizedEmail,
         role: teamMember.role,
         organizationName: teamMember.user.name,
         organizationEmail: teamMember.user.email,
@@ -404,7 +392,6 @@ const acceptInvitation = async (req, res) => {
   }
 };
 
-// ✨ NEW: Decline invitation
 const declineInvitation = async (req, res) => {
   try {
     const { token } = req.params;
@@ -416,7 +403,6 @@ const declineInvitation = async (req, res) => {
       });
     }
 
-    // Find team member by token
     const teamMember = await prisma.teamMember.findUnique({
       where: { token },
     });
@@ -435,7 +421,6 @@ const declineInvitation = async (req, res) => {
       });
     }
 
-    // Update status to DECLINED
     await prisma.teamMember.update({
       where: { id: teamMember.id },
       data: { status: 'DECLINED' },
@@ -456,7 +441,6 @@ const declineInvitation = async (req, res) => {
   }
 };
 
-// ✨ UPDATED: Get invitation details with user exists check
 const getInvitationDetails = async (req, res) => {
   try {
     const { token } = req.params;
@@ -480,15 +464,16 @@ const getInvitationDetails = async (req, res) => {
       });
     }
 
-    // Check if expired
     const createdAt = new Date(teamMember.createdAt);
     const now = new Date();
     const daysDiff = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
     const isExpired = daysDiff > 7;
 
-    // ✅ NEW: Check if user already exists with this email
+    // ✅ Check for existing user with normalized email
+    const normalizedEmail = teamMember.email.toLowerCase().trim();
+    
     const existingUser = await prisma.user.findUnique({
-      where: { email: teamMember.email },
+      where: { email: normalizedEmail }, // ✅ Use normalized email
     });
 
     res.json({
@@ -519,7 +504,6 @@ const removeTeamMember = async (req, res) => {
     const userId = req.user.userId;
     const { id } = req.params;
 
-    // Verify team member exists and belongs to this user
     const teamMember = await prisma.teamMember.findFirst({
       where: { id, userId },
     });
@@ -531,18 +515,14 @@ const removeTeamMember = async (req, res) => {
       });
     }
 
-    // ✅ SIMPLE LOGIC: Always delete user account when removing team member
-    // This frees up the email for new registration
     if (teamMember.memberUserId) {
       try {
-        // Delete user account completely
         await prisma.user.delete({
           where: { id: teamMember.memberUserId }
         });
         console.log(`✅ Team member removed and user account deleted: ${teamMember.email}`);
         console.log(`   Email is now available for new registration`);
       } catch (deleteError) {
-        // If user delete fails (e.g., foreign key constraints), just remove team member
         await prisma.teamMember.delete({
           where: { id },
         });
@@ -550,7 +530,6 @@ const removeTeamMember = async (req, res) => {
         console.log(`   (User account could not be deleted - may have dependencies)`);
       }
     } else {
-      // No linked user, just delete the team member record
       await prisma.teamMember.delete({
         where: { id },
       });
@@ -583,7 +562,6 @@ const updateTeamMember = async (req, res) => {
       });
     }
 
-    // Validate role
     const validRoles = ['VIEWER', 'EDITOR', 'ADMIN'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({
@@ -592,7 +570,6 @@ const updateTeamMember = async (req, res) => {
       });
     }
 
-    // Verify team member exists and belongs to this user
     const teamMember = await prisma.teamMember.findFirst({
       where: { id, userId },
     });
@@ -604,7 +581,6 @@ const updateTeamMember = async (req, res) => {
       });
     }
 
-    // Update team member
     const updatedMember = await prisma.teamMember.update({
       where: { id },
       data: { role },

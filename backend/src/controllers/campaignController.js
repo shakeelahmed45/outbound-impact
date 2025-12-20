@@ -1,9 +1,7 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const QRCode = require('qrcode');
 const axios = require('axios');
 const { nanoid } = require('nanoid');
-
-const prisma = new PrismaClient();
 
 // Generate unique slug
 const generateUniqueSlug = async () => {
@@ -11,7 +9,7 @@ const generateUniqueSlug = async () => {
   let exists = true;
 
   while (exists) {
-    slug = nanoid(8); // Generate 8-character random string
+    slug = nanoid(8);
     const existing = await prisma.campaign.findUnique({
       where: { slug },
     });
@@ -27,17 +25,15 @@ const generateCampaignQRCode = async (slug) => {
     const baseUrl = process.env.FRONTEND_URL || 'https://outboundimpact.net';
     const campaignUrl = `${baseUrl}/c/${slug}`;
 
-    // Generate QR code as buffer
     const qrCodeBuffer = await QRCode.toBuffer(campaignUrl, {
       width: 500,
       margin: 2,
       color: {
-        dark: '#800080',  // Purple
+        dark: '#800080',
         light: '#FFFFFF',
       },
     });
 
-    // Upload to Bunny CDN
     const bunnyHostname = process.env.BUNNY_HOSTNAME || 'storage.bunnycdn.com';
     const bunnyStorageZone = process.env.BUNNY_STORAGE_ZONE;
     const bunnyStoragePassword = process.env.BUNNY_STORAGE_PASSWORD;
@@ -96,7 +92,6 @@ const getUserCampaigns = async (req, res) => {
 
 const createCampaign = async (req, res) => {
   try {
-    // ✅ FIXED: Check if user is a VIEWER (no create permission)
     if (req.teamRole === 'VIEWER') {
       return res.status(403).json({
         status: 'error',
@@ -105,7 +100,7 @@ const createCampaign = async (req, res) => {
     }
 
     const userId = req.effectiveUserId;
-    const { name, description, category, logoUrl } = req.body; // ✅ NEW: Added logoUrl
+    const { name, description, category, logoUrl } = req.body;
 
     if (!name) {
       return res.status(400).json({
@@ -114,10 +109,7 @@ const createCampaign = async (req, res) => {
       });
     }
 
-    // Generate unique slug
     const slug = await generateUniqueSlug();
-
-    // Generate QR code
     const qrCodeUrl = await generateCampaignQRCode(slug);
 
     const campaign = await prisma.campaign.create({
@@ -127,7 +119,7 @@ const createCampaign = async (req, res) => {
         name,
         description: description || null,
         category: category || null,
-        logoUrl: logoUrl || null, // ✅ NEW: Added logoUrl
+        logoUrl: logoUrl || null,
         qrCodeUrl,
       },
     });
@@ -150,7 +142,6 @@ const createCampaign = async (req, res) => {
 
 const updateCampaign = async (req, res) => {
   try {
-    // ✅ FIXED: Check if user is a VIEWER (no edit permission)
     if (req.teamRole === 'VIEWER') {
       return res.status(403).json({
         status: 'error',
@@ -160,7 +151,7 @@ const updateCampaign = async (req, res) => {
 
     const userId = req.effectiveUserId;
     const { id } = req.params;
-    const { name, description, category, logoUrl } = req.body; // ✅ NEW: Added logoUrl
+    const { name, description, category, logoUrl } = req.body;
 
     const campaign = await prisma.campaign.findFirst({
       where: { id, userId },
@@ -179,7 +170,7 @@ const updateCampaign = async (req, res) => {
         name: name || campaign.name,
         description: description !== undefined ? description : campaign.description,
         category: category !== undefined ? category : campaign.category,
-        logoUrl: logoUrl !== undefined ? logoUrl : campaign.logoUrl, // ✅ NEW: Added logoUrl
+        logoUrl: logoUrl !== undefined ? logoUrl : campaign.logoUrl,
       },
     });
 
@@ -201,7 +192,6 @@ const updateCampaign = async (req, res) => {
 
 const deleteCampaign = async (req, res) => {
   try {
-    // ✅ FIXED: Check if user is a VIEWER (no delete permission)
     if (req.teamRole === 'VIEWER') {
       return res.status(403).json({
         status: 'error',
@@ -247,7 +237,6 @@ const deleteCampaign = async (req, res) => {
 
 const assignItemToCampaign = async (req, res) => {
   try {
-    // ✅ FIXED: Check if user is a VIEWER (no assign permission)
     if (req.teamRole === 'VIEWER') {
       return res.status(403).json({
         status: 'error',
@@ -300,7 +289,6 @@ const assignItemToCampaign = async (req, res) => {
   }
 };
 
-// PUBLIC ROUTE - Get public campaign data
 const getPublicCampaign = async (req, res) => {
   try {
     const { slug } = req.params;
@@ -330,7 +318,6 @@ const getPublicCampaign = async (req, res) => {
       console.log('🎨 Logo URL:', campaign.logoUrl);
     }
 
-    // Get user name separately (safer)
     let userName = 'Unknown';
     try {
       const user = await prisma.user.findUnique({
@@ -344,7 +331,6 @@ const getPublicCampaign = async (req, res) => {
       console.error('⚠️ Could not fetch user name:', userError.message);
     }
 
-    // Convert BigInt values to strings for JSON serialization
     const campaignData = {
       ...campaign,
       items: campaign.items.map(item => ({

@@ -8,6 +8,10 @@ router.post('/checkout', authController.createCheckout);
 router.post('/complete-signup', authController.completeSignup);
 router.post('/signin', authController.signIn);
 
+// ✅ NEW: Password reset routes (public - no authentication required)
+router.get('/verify-reset-token', authController.verifyResetToken);
+router.post('/reset-password', authController.resetPassword);
+
 // Protected routes
 router.get('/me', authMiddleware, authController.getCurrentUser);
 router.post('/upgrade-plan', authMiddleware, authController.handleUpgradePlan);

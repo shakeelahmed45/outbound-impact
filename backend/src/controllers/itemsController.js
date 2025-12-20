@@ -1,7 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { deleteFromBunny, uploadToBunny, generateFileName } = require('../services/bunnyService');
-
-const prisma = new PrismaClient();
 
 const getUserItems = async (req, res) => {
   try {
@@ -99,7 +97,6 @@ const getItemById = async (req, res) => {
   }
 };
 
-// PUBLIC ROUTE - Get item by slug (no auth required)
 const getPublicItem = async (req, res) => {
   try {
     const { slug } = req.params;
@@ -123,7 +120,6 @@ const getPublicItem = async (req, res) => {
       });
     }
 
-    // Update view count
     await prisma.item.update({
       where: { id: item.id },
       data: {
@@ -150,7 +146,6 @@ const getPublicItem = async (req, res) => {
 
 const updateItem = async (req, res) => {
   try {
-    // ✅ FIXED: Check if user is a VIEWER (no edit permission)
     if (req.teamRole === 'VIEWER') {
       return res.status(403).json({
         status: 'error',
@@ -173,7 +168,6 @@ const updateItem = async (req, res) => {
       });
     }
 
-    // Validate button fields for TEXT items
     if (item.type === 'TEXT') {
       if (buttonText && !buttonUrl) {
         return res.status(400).json({
@@ -188,7 +182,6 @@ const updateItem = async (req, res) => {
         });
       }
       
-      // Validate URL format
       if (buttonUrl) {
         try {
           new URL(buttonUrl);
@@ -207,19 +200,16 @@ const updateItem = async (req, res) => {
       }
     }
 
-    // Build update data object
     const updateData = {};
     
     if (title) updateData.title = title;
     if (description !== undefined) updateData.description = description;
     
-    // Update content for TEXT items
     if (item.type === 'TEXT' && content !== undefined) {
       updateData.mediaUrl = content;
       updateData.fileSize = BigInt(content.length);
     }
     
-    // Update button fields for TEXT items
     if (item.type === 'TEXT') {
       if (buttonText !== undefined) updateData.buttonText = buttonText || null;
       if (buttonUrl !== undefined) updateData.buttonUrl = buttonUrl || null;
@@ -248,10 +238,8 @@ const updateItem = async (req, res) => {
   }
 };
 
-// Upload custom thumbnail
 const uploadThumbnail = async (req, res) => {
   try {
-    // ✅ FIXED: Check if user is a VIEWER (no edit permission)
     if (req.teamRole === 'VIEWER') {
       return res.status(403).json({
         status: 'error',
@@ -281,7 +269,6 @@ const uploadThumbnail = async (req, res) => {
       });
     }
 
-    // Delete old thumbnail from CDN if exists and is different from mediaUrl
     if (item.thumbnailUrl && item.thumbnailUrl !== item.mediaUrl && item.thumbnailUrl.includes('b-cdn.net')) {
       try {
         const urlPath = new URL(item.thumbnailUrl).pathname;
@@ -291,7 +278,6 @@ const uploadThumbnail = async (req, res) => {
       }
     }
 
-    // Upload new thumbnail
     const uniqueFileName = generateFileName(fileName || 'thumbnail.jpg', `${userId}-thumb`);
     const base64Data = thumbnailData.split(',')[1] || thumbnailData;
     const fileBuffer = Buffer.from(base64Data, 'base64');
@@ -306,7 +292,7 @@ const uploadThumbnail = async (req, res) => {
     if (uploadResult.success) {
       thumbnailUrl = uploadResult.url;
     } else {
-      thumbnailUrl = thumbnailData; // Fallback to base64
+      thumbnailUrl = thumbnailData;
     }
 
     const updatedItem = await prisma.item.update({
@@ -332,10 +318,8 @@ const uploadThumbnail = async (req, res) => {
   }
 };
 
-// Remove custom thumbnail (revert to auto-generated or null)
 const removeThumbnail = async (req, res) => {
   try {
-    // ✅ FIXED: Check if user is a VIEWER (no edit permission)
     if (req.teamRole === 'VIEWER') {
       return res.status(403).json({
         status: 'error',
@@ -357,7 +341,6 @@ const removeThumbnail = async (req, res) => {
       });
     }
 
-    // Delete thumbnail from CDN if exists and is different from mediaUrl
     if (item.thumbnailUrl && item.thumbnailUrl !== item.mediaUrl && item.thumbnailUrl.includes('b-cdn.net')) {
       try {
         const urlPath = new URL(item.thumbnailUrl).pathname;
@@ -367,7 +350,6 @@ const removeThumbnail = async (req, res) => {
       }
     }
 
-    // Set thumbnail to mediaUrl for images, null for others
     let newThumbnailUrl = null;
     if (item.type === 'IMAGE') {
       newThumbnailUrl = item.mediaUrl;
@@ -398,7 +380,6 @@ const removeThumbnail = async (req, res) => {
 
 const deleteItem = async (req, res) => {
   try {
-    // ✅ FIXED: Check if user is a VIEWER (no delete permission)
     if (req.teamRole === 'VIEWER') {
       return res.status(403).json({
         status: 'error',
@@ -420,7 +401,6 @@ const deleteItem = async (req, res) => {
       });
     }
 
-    // Delete media from Bunny.net if it's a CDN URL
     if (item.type !== 'TEXT' && item.mediaUrl && item.mediaUrl.includes('b-cdn.net')) {
       try {
         const urlPath = new URL(item.mediaUrl).pathname;
@@ -430,7 +410,6 @@ const deleteItem = async (req, res) => {
       }
     }
 
-    // Delete thumbnail from Bunny.net if it's a separate file
     if (item.thumbnailUrl && item.thumbnailUrl !== item.mediaUrl && item.thumbnailUrl.includes('b-cdn.net')) {
       try {
         const urlPath = new URL(item.thumbnailUrl).pathname;
