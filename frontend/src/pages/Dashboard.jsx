@@ -170,8 +170,8 @@ const Dashboard = () => {
                     <Users size={24} />
                   </div>
                   <div>
-                    <p className="text-3xl font-bold">{stats?.totalTeamMembers || 0}</p>
-                    <p className="text-sm opacity-90">Team Members</p>
+                    <p className="text-2xl font-bold">{stats?.totalTeamMembers || 0}</p>
+                    <p className="text-sm opacity-90">Contributors</p>
                   </div>
                 </div>
               </div>
@@ -179,7 +179,7 @@ const Dashboard = () => {
                 onClick={() => navigate('/dashboard/team')}
                 className="px-6 py-3 bg-white text-indigo-600 rounded-lg font-semibold hover:bg-opacity-90 transition-all"
               >
-                Manage Team
+                Manage Contributors
               </button>
             </div>
           </div>
