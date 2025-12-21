@@ -22,7 +22,7 @@ const BottomNav = () => {
   ];
 
   // ✅ REMOVED RESTRICTION - Team navigation now available for ALL users
-  navItems.push({ path: '/dashboard/team', icon: Users, label: 'Team' });
+  navItems.push({ path: '/dashboard/team', icon: Users, label: 'Contributor' });
 
   navItems.push({ path: '/dashboard/settings', icon: Settings, label: 'Settings' });
 

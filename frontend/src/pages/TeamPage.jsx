@@ -60,17 +60,17 @@ const TeamPage = () => {
         setTeamMembers([response.data.teamMember, ...teamMembers]);
         setShowInviteModal(false);
         setFormData({ email: '', role: 'VIEWER' });
-        alert('✅ Team member invited successfully! Invitation email sent.');
+        alert('✅ Contributor invited successfully! Invitation email sent.');
       }
     } catch (error) {
-      console.error('Failed to invite team member:', error);
+      console.error('Failed to invite contributor:', error);
       
       const errorData = error.response?.data;
       if (errorData?.code === 'EMAIL_ALREADY_REGISTERED') {
         // Show simple warning popup
         setShowWarningPopup(true);
       } else {
-        setError(errorData?.message || 'Failed to invite team member');
+        setError(errorData?.message || 'Failed to invite contributor');
       }
     } finally {
       setInviting(false);
@@ -162,7 +162,7 @@ const TeamPage = () => {
             className="gradient-btn text-white px-6 py-3 rounded-lg font-semibold flex items-center gap-2 hover:shadow-lg transition-all"
           >
             <UserPlus size={20} />
-            Invite Member
+            Invite Contributor
           </button>
         </div>
 
@@ -180,7 +180,7 @@ const TeamPage = () => {
             </div>
             <h3 className="text-2xl font-bold text-primary mb-3">No Team Members Yet</h3>
             <p className="text-secondary mb-6">
-              Invite team members to collaborate on your content.
+              Invite contributor to collaborate on your content.
             </p>
             <button
               onClick={() => {
@@ -190,7 +190,7 @@ const TeamPage = () => {
               className="gradient-btn text-white px-6 py-3 rounded-lg font-semibold inline-flex items-center gap-2 hover:shadow-lg transition-all"
             >
               <UserPlus size={20} />
-              Invite Your First Member
+              Invite Your First Contributor
             </button>
           </div>
         ) : (
@@ -310,7 +310,7 @@ const TeamPage = () => {
                 <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center">
                   <Mail size={24} className="text-white" />
                 </div>
-                <h3 className="text-2xl font-bold text-primary">Invite Team Member</h3>
+                <h3 className="text-2xl font-bold text-primary">Invite Contributor</h3>
               </div>
               <p className="text-sm text-gray-600 mb-6 ml-15">
                 Send a professional invitation email with a secure link
