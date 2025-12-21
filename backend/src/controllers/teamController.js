@@ -12,16 +12,16 @@ const getTeamMembers = async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    // Verify user has organization role
+    // ✅ REMOVED RESTRICTION - Team features now available for ALL plans including INDIVIDUAL
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { role: true },
     });
 
-    if (!user || (user.role !== 'ORG_SMALL' && user.role !== 'ORG_MEDIUM' && user.role !== 'ORG_ENTERPRISE')) {
-      return res.status(403).json({
+    if (!user) {
+      return res.status(404).json({
         status: 'error',
-        message: 'Team features are only available for organization plans',
+        message: 'User not found',
       });
     }
 
@@ -76,22 +76,22 @@ const inviteTeamMember = async (req, res) => {
       });
     }
 
-    // Get user info for email
+    // ✅ REMOVED RESTRICTION - Team features now available for ALL plans including INDIVIDUAL
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { role: true, name: true, email: true },
     });
 
-    if (!user || (user.role !== 'ORG_SMALL' && user.role !== 'ORG_MEDIUM' && user.role !== 'ORG_ENTERPRISE')) {
-      return res.status(403).json({
+    if (!user) {
+      return res.status(404).json({
         status: 'error',
-        message: 'Team features are only available for organization plans',
+        message: 'User not found',
       });
     }
 
     // ✅ CRITICAL CHECK: Prevent inviting already registered emails (case-insensitive)
     const existingUser = await prisma.user.findUnique({
-      where: { email: normalizedEmail }, // ✅ Use normalized email
+      where: { email: normalizedEmail },
       select: { 
         id: true, 
         email: true, 
@@ -125,7 +125,7 @@ const inviteTeamMember = async (req, res) => {
     const existingMember = await prisma.teamMember.findFirst({
       where: {
         userId,
-        email: normalizedEmail, // ✅ Use normalized email
+        email: normalizedEmail,
       },
     });
 
@@ -136,29 +136,29 @@ const inviteTeamMember = async (req, res) => {
       });
     }
 
-    // ✨ Generate invitation token
+    // Generate invitation token
     const token = generateInvitationToken();
 
-    // ✨ Create team member with PENDING status and normalized email
+    // Create team member with PENDING status and normalized email
     const teamMember = await prisma.teamMember.create({
       data: {
         userId,
-        email: normalizedEmail, // ✅ Store normalized email
+        email: normalizedEmail,
         role,
         status: 'PENDING',
         token,
       },
     });
 
-    // ✨ Create invitation link
+    // Create invitation link
     const baseUrl = process.env.FRONTEND_URL || 'https://outbound-impact.vercel.app';
     const invitationLink = `${baseUrl}/accept-invitation/${token}`;
 
-    // ✨ CRITICAL FIX: Send invitation email with proper error handling
+    // Send invitation email with proper error handling
     let emailSent = false;
     try {
       const emailResult = await sendTeamInvitationEmail({
-        recipientEmail: normalizedEmail, // ✅ Use normalized email
+        recipientEmail: normalizedEmail,
         inviterName: user.name,
         inviterEmail: user.email,
         role: role,
@@ -240,7 +240,7 @@ const resendInvitation = async (req, res) => {
     let emailSent = false;
     try {
       const emailResult = await sendTeamInvitationEmail({
-        recipientEmail: teamMember.email, // Already normalized when created
+        recipientEmail: teamMember.email,
         inviterName: user.name,
         inviterEmail: user.email,
         role: teamMember.role,
@@ -326,11 +326,11 @@ const acceptInvitation = async (req, res) => {
       });
     }
 
-    // ✅ Check for existing user with normalized email (case-insensitive)
+    // Check for existing user with normalized email (case-insensitive)
     const normalizedEmail = teamMember.email.toLowerCase().trim();
     
     let memberUser = await prisma.user.findUnique({
-      where: { email: normalizedEmail }, // ✅ Use normalized email
+      where: { email: normalizedEmail },
     });
 
     if (!memberUser) {
@@ -350,10 +350,10 @@ const acceptInvitation = async (req, res) => {
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // ✅ Create new user with normalized email
+      // Create new user with normalized email
       memberUser = await prisma.user.create({
         data: {
-          email: normalizedEmail, // ✅ Store normalized email
+          email: normalizedEmail,
           name: name.trim(),
           password: hashedPassword,
           role: 'INDIVIDUAL',
@@ -469,11 +469,11 @@ const getInvitationDetails = async (req, res) => {
     const daysDiff = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
     const isExpired = daysDiff > 7;
 
-    // ✅ Check for existing user with normalized email
+    // Check for existing user with normalized email
     const normalizedEmail = teamMember.email.toLowerCase().trim();
     
     const existingUser = await prisma.user.findUnique({
-      where: { email: normalizedEmail }, // ✅ Use normalized email
+      where: { email: normalizedEmail },
     });
 
     res.json({

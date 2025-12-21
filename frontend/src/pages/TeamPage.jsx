@@ -27,11 +27,8 @@ const TeamPage = () => {
       const userRes = await api.get('/auth/me');
       if (userRes.data.status === 'success') {
         setUser(userRes.data.user);
-        
-        const userRole = userRes.data.user.role;
-        if (userRole === 'ORG_SMALL' || userRole === 'ORG_MEDIUM' || userRole === 'ORG_ENTERPRISE') {
-          await fetchTeamMembers();
-        }
+        // ✅ REMOVED RESTRICTION - Load team members for ALL users including INDIVIDUAL
+        await fetchTeamMembers();
       }
     } catch (error) {
       console.error('Failed to fetch initial data:', error);
@@ -63,17 +60,17 @@ const TeamPage = () => {
         setTeamMembers([response.data.teamMember, ...teamMembers]);
         setShowInviteModal(false);
         setFormData({ email: '', role: 'VIEWER' });
-        alert('✅ Contributor invited successfully! Invitation email sent.');
+        alert('✅ Team member invited successfully! Invitation email sent.');
       }
     } catch (error) {
-      console.error('Failed to invite contributor member:', error);
+      console.error('Failed to invite team member:', error);
       
       const errorData = error.response?.data;
       if (errorData?.code === 'EMAIL_ALREADY_REGISTERED') {
         // Show simple warning popup
         setShowWarningPopup(true);
       } else {
-        setError(errorData?.message || 'Failed to invite contributor');
+        setError(errorData?.message || 'Failed to invite team member');
       }
     } finally {
       setInviting(false);
@@ -96,12 +93,12 @@ const TeamPage = () => {
   };
 
   const handleRemove = async (id) => {
-    if (!confirm('Are you sure you want to remove this contributor?')) return;
+    if (!confirm('Are you sure you want to remove this team member?')) return;
 
     try {
       await api.delete('/team/' + id);
       setTeamMembers(teamMembers.filter(m => m.id !== id));
-      alert('✅ Contributor removed successfully!');
+      alert('✅ Team member removed successfully!');
     } catch (error) {
       console.error('Failed to remove team member:', error);
       alert('❌ Failed to remove team member');
@@ -138,41 +135,12 @@ const TeamPage = () => {
     );
   };
 
-  const isOrganization = user?.role === 'ORG_SMALL' || user?.role === 'ORG_MEDIUM' || user?.role === 'ORG_ENTERPRISE';
-
   if (loading) {
     return (
       <DashboardLayout>
         <div className="flex flex-col items-center justify-center h-64">
           <Loader2 className="animate-spin text-primary mb-4" size={48} />
-          <p className="text-gray-600">Loading contributors data...</p>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  if (!isOrganization) {
-    return (
-      <DashboardLayout>
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-lg p-12 text-center border border-gray-100">
-            <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <AlertCircle size={40} className="text-yellow-600" />
-            </div>
-            <h3 className="text-2xl font-bold text-primary mb-3">Team Features Not Available</h3>
-            <p className="text-secondary mb-2">
-              Contributors management is available for Small Organization, Medium Organization, and Enterprise plans.
-            </p>
-            <p className="text-sm text-gray-500 mb-6">
-              Current Plan: <span className="font-semibold text-primary">{user?.role || 'INDIVIDUAL'}</span>
-            </p>
-            <a
-              href="/plans"
-              className="gradient-btn text-white px-6 py-3 rounded-lg font-semibold inline-flex items-center gap-2 hover:shadow-lg transition-all"
-            >
-              View Plans & Upgrade
-            </a>
-          </div>
+          <p className="text-gray-600">Loading team data...</p>
         </div>
       </DashboardLayout>
     );
@@ -183,8 +151,8 @@ const TeamPage = () => {
       <div>
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-primary mb-2">Contributor Management</h1>
-            <p className="text-secondary">Manage your contributors and permissions</p>
+            <h1 className="text-3xl font-bold text-primary mb-2">Team Management</h1>
+            <p className="text-secondary">Manage your team members and permissions</p>
           </div>
           <button
             onClick={() => {
@@ -194,7 +162,7 @@ const TeamPage = () => {
             className="gradient-btn text-white px-6 py-3 rounded-lg font-semibold flex items-center gap-2 hover:shadow-lg transition-all"
           >
             <UserPlus size={20} />
-            Invite Contributor
+            Invite Member
           </button>
         </div>
 
@@ -210,9 +178,9 @@ const TeamPage = () => {
             <div className="w-20 h-20 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center mx-auto mb-6">
               <UserPlus size={40} className="text-white" />
             </div>
-            <h3 className="text-2xl font-bold text-primary mb-3">No Contributors Yet</h3>
+            <h3 className="text-2xl font-bold text-primary mb-3">No Team Members Yet</h3>
             <p className="text-secondary mb-6">
-              Invite contributor to collaborate on your content.
+              Invite team members to collaborate on your content.
             </p>
             <button
               onClick={() => {

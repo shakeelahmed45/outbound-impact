@@ -82,26 +82,37 @@ const Dashboard = () => {
   return (
     <DashboardLayout>
       <div>
-        {/* Header */}
+        {/* ✨ NEW: Animated Header with Soundwave/Mic Animation */}
         <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-primary mb-2 flex items-center gap-3">
-              Welcome back, {user?.name}!
-              {/* ✅ FIXED: Show VIEWER badge for team members */}
-              {isTeamMemberViewer && (
-                <span className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-400 to-blue-600 text-white px-4 py-1 rounded-full text-sm font-semibold">
-                  <Eye size={16} />
-                  VIEWER
-                </span>
-              )}
-              {isEnterprise && !isTeamMemberViewer && (
-                <span className="inline-flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white px-4 py-1 rounded-full text-sm font-semibold">
-                  <Crown size={16} />
-                  Enterprise
-                </span>
-              )}
-            </h1>
-            <p className="text-secondary">Here's what's happening with your content today.</p>
+          <div className="flex items-center gap-4">
+            {/* ✨ Animated Soundwave Bars (Mic Animation) */}
+            <div className="hidden sm:flex items-center gap-1">
+              <div className="w-1 bg-gradient-to-t from-purple-400 to-purple-600 rounded-full animate-soundwave-1" style={{ height: '24px' }}></div>
+              <div className="w-1 bg-gradient-to-t from-purple-500 to-violet-600 rounded-full animate-soundwave-2" style={{ height: '32px' }}></div>
+              <div className="w-1 bg-gradient-to-t from-violet-400 to-purple-600 rounded-full animate-soundwave-3" style={{ height: '40px' }}></div>
+              <div className="w-1 bg-gradient-to-t from-purple-500 to-violet-600 rounded-full animate-soundwave-4" style={{ height: '32px' }}></div>
+              <div className="w-1 bg-gradient-to-t from-purple-400 to-purple-600 rounded-full animate-soundwave-5" style={{ height: '24px' }}></div>
+            </div>
+
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 via-violet-600 to-purple-600 bg-clip-text text-transparent mb-2 flex items-center gap-3 flex-wrap animate-pulse-gentle">
+                Welcome back, {user?.name}!
+                {/* ✅ FIXED: Show VIEWER badge for team members */}
+                {isTeamMemberViewer && (
+                  <span className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-400 to-blue-600 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                    <Eye size={16} />
+                    VIEWER
+                  </span>
+                )}
+                {isEnterprise && !isTeamMemberViewer && (
+                  <span className="inline-flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                    <Crown size={16} />
+                    Enterprise
+                  </span>
+                )}
+              </h1>
+              <p className="text-secondary">Here's what's happening with your content today.</p>
+            </div>
           </div>
         </div>
 
@@ -160,8 +171,8 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Team Members Card - Only show for organizations */}
-        {isOrganization && !isTeamMemberViewer && (
+        {/* ✅ FIXED: Team Members Card - Now available for ALL users including INDIVIDUAL */}
+        {!isTeamMemberViewer && (
           <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl shadow-lg p-6 mb-8 text-white">
             <div className="flex items-center justify-between">
               <div>
@@ -170,8 +181,8 @@ const Dashboard = () => {
                     <Users size={24} />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{stats?.totalTeamMembers || 0}</p>
-                    <p className="text-sm opacity-90">Contributors</p>
+                    <p className="text-3xl font-bold">{stats?.totalTeamMembers || 0}</p>
+                    <p className="text-sm opacity-90">Team Members</p>
                   </div>
                 </div>
               </div>
@@ -179,7 +190,7 @@ const Dashboard = () => {
                 onClick={() => navigate('/dashboard/team')}
                 className="px-6 py-3 bg-white text-indigo-600 rounded-lg font-semibold hover:bg-opacity-90 transition-all"
               >
-                Manage Contributors
+                Manage Team
               </button>
             </div>
           </div>
@@ -305,6 +316,62 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* ✨ Custom CSS for Soundwave Animation */}
+      <style jsx>{`
+        @keyframes soundwave-1 {
+          0%, 100% { height: 24px; }
+          50% { height: 32px; }
+        }
+        @keyframes soundwave-2 {
+          0%, 100% { height: 32px; }
+          50% { height: 48px; }
+        }
+        @keyframes soundwave-3 {
+          0%, 100% { height: 40px; }
+          50% { height: 56px; }
+        }
+        @keyframes soundwave-4 {
+          0%, 100% { height: 32px; }
+          50% { height: 44px; }
+        }
+        @keyframes soundwave-5 {
+          0%, 100% { height: 24px; }
+          50% { height: 36px; }
+        }
+        @keyframes pulse-gentle {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.95;
+            transform: scale(1.02);
+          }
+        }
+        .animate-soundwave-1 {
+          animation: soundwave-1 1.2s ease-in-out infinite;
+        }
+        .animate-soundwave-2 {
+          animation: soundwave-2 1s ease-in-out infinite;
+          animation-delay: 0.1s;
+        }
+        .animate-soundwave-3 {
+          animation: soundwave-3 1.4s ease-in-out infinite;
+          animation-delay: 0.2s;
+        }
+        .animate-soundwave-4 {
+          animation: soundwave-4 1.1s ease-in-out infinite;
+          animation-delay: 0.15s;
+        }
+        .animate-soundwave-5 {
+          animation: soundwave-5 1.3s ease-in-out infinite;
+          animation-delay: 0.25s;
+        }
+        .animate-pulse-gentle {
+          animation: pulse-gentle 3s ease-in-out infinite;
+        }
+      `}</style>
     </DashboardLayout>
   );
 };

@@ -7,7 +7,7 @@ const BottomNav = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
 
-  const isOrg = user?.role === 'ORG_SMALL' || user?.role === 'ORG_MEDIUM' || user?.role === 'ORG_ENTERPRISE';
+  // ✅ REMOVED RESTRICTION - Team features now available for ALL plans including INDIVIDUAL
   const isSmallOrAbove = user?.role === 'ORG_SMALL' || user?.role === 'ORG_MEDIUM' || user?.role === 'ORG_ENTERPRISE';
 
   const navItems = [
@@ -21,9 +21,8 @@ const BottomNav = () => {
       : { path: '/dashboard/analytics', icon: BarChart3, label: 'Analytics' },
   ];
 
-  if (isOrg) {
-    navItems.push({ path: '/dashboard/team', icon: Users, label: 'Contributor' });
-  }
+  // ✅ REMOVED RESTRICTION - Team navigation now available for ALL users
+  navItems.push({ path: '/dashboard/team', icon: Users, label: 'Team' });
 
   navItems.push({ path: '/dashboard/settings', icon: Settings, label: 'Settings' });
 
