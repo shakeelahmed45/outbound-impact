@@ -428,13 +428,131 @@ const sendInvitationReminderEmail = async (reminderData) => {
   }
 };
 
+// ✨ NEW: Send password reset email
+const sendPasswordResetEmail = async (resetData) => {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.log('⚠️ Resend not configured - skipping password reset email');
+      return { success: false, error: 'Resend not configured' };
+    }
+
+    const { recipientEmail, recipientName, resetLink } = resetData;
+
+    const { data, error } = await resend.emails.send({
+      from: 'Outbound Impact <noreply@outboundimpact.org>',
+      to: [recipientEmail],
+      replyTo: 'support@outboundimpact.org',
+      subject: '🔒 Reset Your Password - Outbound Impact',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 40px 20px;">
+            <tr>
+              <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                  
+                  <!-- Header -->
+                  <tr>
+                    <td style="background: linear-gradient(135deg, #800080 0%, #EE82EE 100%); padding: 40px; text-align: center; border-radius: 16px 16px 0 0;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 28px;">🔒 Password Reset</h1>
+                      <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Reset your Outbound Impact password</p>
+                    </td>
+                  </tr>
+                  
+                  <!-- Content -->
+                  <tr>
+                    <td style="padding: 40px;">
+                      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
+                        Hi ${recipientName}! 👋
+                      </p>
+                      
+                      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
+                        We received a request to reset your password for your <strong>Outbound Impact</strong> account. Click the button below to reset it.
+                      </p>
+                      
+                      <!-- Security notice -->
+                      <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                        <p style="color: #856404; font-size: 14px; margin: 0;">
+                          <strong>⚠️ Security Notice:</strong> If you didn't request this password reset, please ignore this email. Your password will remain unchanged.
+                        </p>
+                      </div>
+                      
+                      <!-- CTA Button -->
+                      <table width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td align="center" style="padding: 30px 0;">
+                            <a href="${resetLink}" style="background: linear-gradient(135deg, #800080 0%, #EE82EE 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 12px rgba(128, 0, 128, 0.3);">
+                              Reset Password →
+                            </a>
+                          </td>
+                        </tr>
+                      </table>
+                      
+                      <p style="color: #999999; font-size: 13px; line-height: 1.6; margin: 30px 0 0; padding-top: 20px; border-top: 1px solid #eeeeee;">
+                        Or copy and paste this link into your browser:<br>
+                        <a href="${resetLink}" style="color: #800080; word-break: break-all;">${resetLink}</a>
+                      </p>
+                      
+                      <p style="color: #999999; font-size: 13px; line-height: 1.6; margin: 20px 0 0;">
+                        <strong>⏰ This link will expire in 1 hour</strong> for security reasons.
+                      </p>
+                      
+                      <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 30px 0 0;">
+                        Need help? Contact us at <a href="mailto:support@outboundimpact.org" style="color: #800080;">support@outboundimpact.org</a>
+                      </p>
+                    </td>
+                  </tr>
+                  
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background-color: #f9f9f9; padding: 30px 40px; text-align: center; border-top: 1px solid #eeeeee;">
+                      <p style="color: #999999; font-size: 13px; margin: 0 0 10px;">
+                        <strong style="color: #800080;">Outbound Impact</strong> - Share Content. Track Analytics. Grow Your Reach.
+                      </p>
+                      <p style="color: #cccccc; font-size: 12px; margin: 0;">
+                        © ${new Date().getFullYear()} Outbound Impact. All rights reserved.
+                      </p>
+                      <p style="color: #cccccc; font-size: 11px; margin: 10px 0 0;">
+                        You received this email because a password reset was requested for your account.
+                      </p>
+                    </td>
+                  </tr>
+                  
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Failed to send password reset email:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('✅ Password reset email sent to:', recipientEmail, '(ID:', data.id, ')');
+    return { success: true, messageId: data.id };
+  } catch (error) {
+    console.error('❌ Failed to send password reset email:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
 // Test connection when service loads
 testConnection();
 
 module.exports = {
   sendWelcomeEmail,
   sendAdminNotification,
-  sendTeamInvitationEmail,      // ✨ NEW
-  sendInvitationReminderEmail,   // ✨ NEW
+  sendTeamInvitationEmail,
+  sendInvitationReminderEmail,
+  sendPasswordResetEmail,        // ✨ NEW
   testConnection
 };

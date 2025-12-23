@@ -521,6 +521,80 @@ const handleUpgradePlan = async (req, res) => {
   }
 };
 
+// ✨ NEW: Forgot Password - Send reset email
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Email is required'
+      });
+    }
+
+    // Normalize email
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: {
+        id: true,
+        email: true,
+        name: true
+      }
+    });
+
+    // Always return success even if user doesn't exist (security best practice)
+    if (!user) {
+      console.log(`⚠️ Password reset requested for non-existent email: ${normalizedEmail}`);
+      return res.json({
+        status: 'success',
+        message: 'If an account exists with this email, you will receive password reset instructions.'
+      });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+
+    // Save hashed token to database
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetToken: hashedToken,
+        resetTokenExpiry: resetTokenExpiry
+      }
+    });
+
+    // Send reset email
+    const { sendPasswordResetEmail } = require('../services/emailService');
+    const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+    
+    await sendPasswordResetEmail({
+      recipientEmail: user.email,
+      recipientName: user.name,
+      resetLink: resetLink
+    });
+
+    console.log(`✅ Password reset email sent to: ${user.email}`);
+
+    res.json({
+      status: 'success',
+      message: 'If an account exists with this email, you will receive password reset instructions.'
+    });
+
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to process password reset request'
+    });
+  }
+};
+
 const verifyResetToken = async (req, res) => {
   try {
     const { token } = req.query;
@@ -640,6 +714,7 @@ module.exports = {
   signIn,
   getCurrentUser,
   handleUpgradePlan,
+  forgotPassword,       // ✨ NEW
   verifyResetToken,
   resetPassword,
 };

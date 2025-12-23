@@ -92,9 +92,17 @@ const SignIn = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Password
+                </label>
+                <Link 
+                  to="/forgot-password" 
+                  className="text-sm text-primary font-semibold hover:text-secondary transition-colors"
+                >
+                  Forgot Password?
+                </Link>
+              </div>
               <input
                 type="password"
                 name="password"

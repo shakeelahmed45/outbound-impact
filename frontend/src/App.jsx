@@ -31,6 +31,7 @@ import AdvancedAnalyticsPage from './pages/enterprise/AdvancedAnalyticsPage';
 import SecurityPage from './pages/enterprise/SecurityPage';
 import UserGuidePage from './pages/UserGuidePage';
 import AcceptInvitation from './pages/AcceptInvitation';
+import ForgotPassword from './pages/ForgotPassword'; // ✅ NEW: Forgot password page
 import ResetPassword from './pages/ResetPassword'; // ✅ NEW: Password reset page
 
 function App() {
@@ -56,6 +57,7 @@ function App() {
         <Route path="/" element={<Navigate to="/signin" replace />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/signin" element={<SignIn />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} /> {/* ✅ NEW: Forgot password route */}
         <Route path="/reset-password" element={<ResetPassword />} /> {/* ✅ NEW: Password reset route */}
         <Route path="/plans" element={<Plans />} />
         <Route path="/enterprise" element={<EnterprisePage />} />
