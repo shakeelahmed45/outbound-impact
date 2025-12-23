@@ -7,5 +7,6 @@ const { resolveEffectiveUserId } = require('../middleware/resolveEffectiveUserId
 // ✅ FIXED: Add resolveEffectiveUserId middleware to all routes
 router.post('/file', authMiddleware, resolveEffectiveUserId, uploadController.uploadFile);
 router.post('/text', authMiddleware, resolveEffectiveUserId, uploadController.createTextPost);
+router.post('/embed', authMiddleware, resolveEffectiveUserId, uploadController.createEmbedPost);
 
 module.exports = router;

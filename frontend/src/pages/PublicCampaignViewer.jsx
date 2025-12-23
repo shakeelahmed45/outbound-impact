@@ -72,6 +72,8 @@ const PublicCampaignViewer = () => {
         return <Music className="text-white" size={32} />;
       case 'TEXT':
         return <FileText className="text-white" size={32} />;
+      case 'EMBED':
+        return <Play className="text-white" size={32} />;
       default:
         return <ImageIcon className="text-white" size={32} />;
     }
@@ -200,6 +202,52 @@ const PublicCampaignViewer = () => {
       );
     }
 
+    // ✅ NEW: EMBED card with video/link design
+    if (item.type === 'EMBED') {
+      // Detect embed type from buttonText (which stores the platform type)
+      const platformType = item.buttonText || 'External';
+      const platformIcon = platformType.includes('YouTube') || platformType.includes('Vimeo') ? '🎬' : 
+                          platformType.includes('SoundCloud') || platformType.includes('Spotify') ? '🎵' :
+                          platformType.includes('Google') ? '📄' : '🔗';
+      
+      return (
+        <div className="w-full h-full bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 p-4 flex flex-col items-center justify-center overflow-hidden relative">
+          {/* Animated background */}
+          <div className="absolute inset-0 bg-gradient-to-tr from-indigo-600/30 via-blue-500/30 to-purple-600/30 animate-pulse pointer-events-none"></div>
+          
+          {/* Content */}
+          <div className="relative z-10 flex flex-col items-center text-center h-full justify-center space-y-4">
+            {/* Platform badge */}
+            <div className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full border border-white/30">
+              <p className="text-white text-xs font-bold tracking-wide">
+                {platformIcon} {platformType.toUpperCase()}
+              </p>
+            </div>
+            
+            {/* Play icon */}
+            <div className="relative my-2">
+              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
+                <Play className="text-indigo-600" size={32} />
+              </div>
+            </div>
+            
+            {/* Description */}
+            <p className="text-white text-sm font-semibold px-2">
+              Click to view embedded content
+            </p>
+            
+            {/* Call to action */}
+            <div className="mt-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-lg border border-white/30">
+              <div className="flex items-center gap-2 text-white text-xs font-bold">
+                <Eye className="w-4 h-4" />
+                <span>Click to view</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="w-full h-full bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center">
         {getMediaIcon(item.type)}
@@ -208,7 +256,9 @@ const PublicCampaignViewer = () => {
   };
 
   const openItem = (item) => {
-    navigate(`/l/${item.slug}?from=${slug}`);
+    // Preserve preview parameter when navigating to item
+    const previewParam = isPreviewMode ? '&preview=true' : '';
+    navigate(`/l/${item.slug}?from=${slug}${previewParam}`);
   };
 
   if (loading) {

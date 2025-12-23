@@ -45,6 +45,10 @@ const UploadPage = () => {
   const [attachments, setAttachments] = useState([]);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
+  // Embed fields
+  const [embedUrl, setEmbedUrl] = useState('');
+  const [embedType, setEmbedType] = useState('');
+
   // Campaign selection state
   const [campaigns, setCampaigns] = useState([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
@@ -343,6 +347,171 @@ const UploadPage = () => {
     }
   };
 
+  const handleEmbedPost = async (e) => {
+    e.preventDefault();
+
+    if (!title || !embedUrl) {
+      showToast('Please enter title and embed URL', 'error');
+      return;
+    }
+
+    // Validate URL
+    try {
+      new URL(embedUrl);
+    } catch (error) {
+      showToast('Please enter a valid URL', 'error');
+      return;
+    }
+
+    if (!selectedCampaignId) {
+      showToast('Please select a campaign', 'error');
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+
+    try {
+      await simulateProgress(0, 30, 300);
+
+      // Convert URL to embed format
+      const convertedEmbedUrl = convertToEmbedUrl(embedUrl);
+
+      const uploadPromise = api.post('/upload/embed', {
+        title,
+        description,
+        embedUrl: convertedEmbedUrl, // Use converted URL
+        embedType,
+      });
+
+      const progressPromise = simulateProgress(30, 95, 1000);
+
+      const [response] = await Promise.all([uploadPromise, progressPromise]);
+
+      setUploadProgress(100);
+
+      if (response.data.status === 'success') {
+        const itemId = response.data.item.id;
+
+        await api.post('/campaigns/assign', {
+          itemId,
+          campaignId: selectedCampaignId,
+        });
+
+        showToast('Embed created and added to campaign!', 'success');
+        
+        setTimeout(() => {
+          setTitle('');
+          setDescription('');
+          setEmbedUrl('');
+          setEmbedType('');
+          setUploadType(null);
+          setUploadProgress(0);
+          navigate('/dashboard/campaigns');
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('Embed creation error:', error);
+      showToast(error.response?.data?.message || 'Failed to create embed', 'error');
+      setUploadProgress(0);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const detectEmbedType = (url) => {
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      setEmbedType('YouTube');
+      return 'YouTube Video';
+    } else if (url.includes('vimeo.com')) {
+      setEmbedType('Vimeo');
+      return 'Vimeo Video';
+    } else if (url.includes('soundcloud.com')) {
+      setEmbedType('SoundCloud');
+      return 'SoundCloud Audio';
+    } else if (url.includes('spotify.com')) {
+      setEmbedType('Spotify');
+      return 'Spotify Playlist/Track';
+    } else if (url.includes('drive.google.com')) {
+      setEmbedType('Google Drive');
+      return 'Google Drive Document';
+    } else if (url.includes('docs.google.com')) {
+      setEmbedType('Google Docs');
+      return 'Google Document';
+    } else if (url.includes('sheets.google.com')) {
+      setEmbedType('Google Sheets');
+      return 'Google Spreadsheet';
+    } else if (url.includes('slides.google.com')) {
+      setEmbedType('Google Slides');
+      return 'Google Presentation';
+    } else {
+      setEmbedType('External');
+      return 'External Content';
+    }
+  };
+
+  // Convert YouTube URLs to embed format
+  const convertToEmbedUrl = (url) => {
+    if (!url) return url;
+
+    // YouTube short URL: https://youtu.be/VIDEO_ID
+    if (url.includes('youtu.be/')) {
+      const videoId = url.split('youtu.be/')[1]?.split('?')[0]?.split('&')[0];
+      if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}`;
+      }
+    }
+
+    // YouTube watch URL: https://www.youtube.com/watch?v=VIDEO_ID
+    if (url.includes('youtube.com/watch')) {
+      const urlParams = new URLSearchParams(url.split('?')[1]);
+      const videoId = urlParams.get('v');
+      if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}`;
+      }
+    }
+
+    // YouTube embed URL (already correct)
+    if (url.includes('youtube.com/embed/')) {
+      return url;
+    }
+
+    // Vimeo: https://vimeo.com/VIDEO_ID → https://player.vimeo.com/video/VIDEO_ID
+    if (url.includes('vimeo.com/') && !url.includes('player.vimeo.com')) {
+      const videoId = url.split('vimeo.com/')[1]?.split('?')[0]?.split('/')[0];
+      if (videoId) {
+        return `https://player.vimeo.com/video/${videoId}`;
+      }
+    }
+
+    // Google Drive: Convert to preview format
+    if (url.includes('drive.google.com/file/d/')) {
+      const fileId = url.split('/d/')[1]?.split('/')[0];
+      if (fileId) {
+        return `https://drive.google.com/file/d/${fileId}/preview`;
+      }
+    }
+
+    // Google Docs: Add /preview if not present
+    if (url.includes('docs.google.com/document/d/') && !url.includes('/preview')) {
+      const docId = url.split('/d/')[1]?.split('/')[0];
+      if (docId) {
+        return `https://docs.google.com/document/d/${docId}/preview`;
+      }
+    }
+
+    // Google Sheets: Add /preview if not present
+    if (url.includes('docs.google.com/spreadsheets/d/') && !url.includes('/preview')) {
+      const sheetId = url.split('/d/')[1]?.split('/')[0];
+      if (sheetId) {
+        return `https://docs.google.com/spreadsheets/d/${sheetId}/preview`;
+      }
+    }
+
+    // Return original URL if no conversion needed
+    return url;
+  };
+
   const handleAttachmentUpload = async (e) => {
     const files = Array.from(e.target.files);
     
@@ -458,7 +627,7 @@ const UploadPage = () => {
 
         {!uploadType && (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
               <button
                 onClick={() => setUploadType('IMAGE')}
                 className="p-6 bg-white rounded-xl border-2 border-gray-200 hover:border-primary hover:bg-purple-50 transition-all"
@@ -486,6 +655,13 @@ const UploadPage = () => {
               >
                 <FileText className="mx-auto mb-3 text-primary" size={32} />
                 <span className="block font-semibold text-gray-700">Text</span>
+              </button>
+              <button
+                onClick={() => setUploadType('EMBED')}
+                className="p-6 bg-white rounded-xl border-2 border-gray-200 hover:border-primary hover:bg-purple-50 transition-all"
+              >
+                <Link className="mx-auto mb-3 text-primary" size={32} />
+                <span className="block font-semibold text-gray-700">Embed Link</span>
               </button>
             </div>
 
@@ -1125,6 +1301,272 @@ const UploadPage = () => {
                     </span>
                   ) : (
                     'Upload File'
+                  )}
+                </button>
+              </div>
+            </div>
+          </form>
+        )}
+
+        {/* EMBED UPLOAD FORM */}
+        {uploadType === 'EMBED' && (
+          <form onSubmit={handleEmbedPost} className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-bold text-primary">Embed External Content</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setUploadType(null);
+                  setTitle('');
+                  setDescription('');
+                  setEmbedUrl('');
+                  setEmbedType('');
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Info Box - Beautiful Card Design */}
+            <div className="mb-6 bg-gradient-to-br from-purple-50 via-blue-50 to-cyan-50 border-2 border-purple-200 rounded-2xl p-6 shadow-xl">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-14 h-14 bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform">
+                  <Link size={28} className="text-white" />
+                </div>
+                <div>
+                  <h4 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                    Supported Platforms
+                  </h4>
+                  <p className="text-sm text-gray-600">Embed content from these sources</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {/* YouTube */}
+                <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all">
+                  <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">▶️</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm">YouTube</p>
+                    <p className="text-xs text-gray-500">Videos</p>
+                  </div>
+                </div>
+
+                {/* Vimeo */}
+                <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all">
+                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">🎬</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm">Vimeo</p>
+                    <p className="text-xs text-gray-500">Videos</p>
+                  </div>
+                </div>
+
+                {/* Google Drive */}
+                <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all">
+                  <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">📁</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm">Google Drive</p>
+                    <p className="text-xs text-gray-500">Files</p>
+                  </div>
+                </div>
+
+                {/* Google Docs */}
+                <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all">
+                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">📄</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm">Google Docs</p>
+                    <p className="text-xs text-gray-500">Documents</p>
+                  </div>
+                </div>
+
+                {/* Google Sheets */}
+                <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all">
+                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">📊</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm">Google Sheets</p>
+                    <p className="text-xs text-gray-500">Spreadsheets</p>
+                  </div>
+                </div>
+
+                {/* SoundCloud */}
+                <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all">
+                  <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">🎵</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm">SoundCloud</p>
+                    <p className="text-xs text-gray-500">Audio</p>
+                  </div>
+                </div>
+
+                {/* Spotify */}
+                <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all">
+                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">🎧</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm">Spotify</p>
+                    <p className="text-xs text-gray-500">Playlists</p>
+                  </div>
+                </div>
+
+                {/* Custom iFrame */}
+                <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all">
+                  <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">🔗</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm">Custom iFrame</p>
+                    <p className="text-xs text-gray-500">Any Embed</p>
+                  </div>
+                </div>
+
+                {/* External Links */}
+                <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all">
+                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">🌐</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm">External Links</p>
+                    <p className="text-xs text-gray-500">Websites</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 p-3 bg-white rounded-lg border border-purple-200">
+                <p className="text-xs text-gray-600 flex items-start gap-2">
+                  <span className="text-purple-600 font-bold">💡</span>
+                  <span><strong>Pro Tip:</strong> Make sure your embedded content is set to "Public" or "Anyone with the link" for Google Drive/Docs files.</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <CampaignSelector />
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  Embed URL * 
+                  <Tooltip content="Paste the share/embed link from YouTube, Vimeo, Google Drive, etc." />
+                </label>
+                <input
+                  type="url"
+                  value={embedUrl}
+                  onChange={(e) => {
+                    setEmbedUrl(e.target.value);
+                    if (e.target.value) {
+                      detectEmbedType(e.target.value);
+                    }
+                  }}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="https://youtube.com/watch?v=... or https://drive.google.com/file/d/..."
+                  required
+                />
+                {embedUrl && embedType && (
+                  <div className="mt-2 flex items-center gap-2 text-sm">
+                    <div className="px-3 py-1 bg-green-100 text-green-800 rounded-full font-semibold">
+                      ✓ Detected: {embedType}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  Title *
+                  <Tooltip content="Give your embedded content a descriptive title" />
+                </label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="e.g., Product Demo Video, Company Presentation, etc."
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  Description (Optional)
+                  <Tooltip content="Add optional details about this embedded content" />
+                </label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+                  placeholder="Add a description..."
+                />
+              </div>
+
+              {/* Preview Box */}
+              {embedUrl && (
+                <div className="border-t border-gray-200 pt-6">
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
+                    <h4 className="text-sm font-bold text-gray-700 mb-3">📋 Embed Preview:</h4>
+                    <div className="bg-white p-4 rounded-lg border border-gray-300">
+                      <p className="text-sm text-gray-600 break-all">{embedUrl}</p>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      This content will be embedded and viewable by anyone with the QR code or link.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {uploading && uploadProgress > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-gray-700">Creating embed...</span>
+                    <span className="text-sm font-bold text-primary">{Math.round(uploadProgress)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div
+                      className="bg-gradient-to-r from-primary to-secondary h-full rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUploadType(null);
+                    setTitle('');
+                    setDescription('');
+                    setEmbedUrl('');
+                    setEmbedType('');
+                  }}
+                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
+                  disabled={uploading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 gradient-btn text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={uploading || !title || !embedUrl}
+                >
+                  {uploading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="animate-spin" size={18} />
+                      Creating...
+                    </span>
+                  ) : (
+                    'Create Embed'
                   )}
                 </button>
               </div>

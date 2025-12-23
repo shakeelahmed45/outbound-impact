@@ -9,6 +9,8 @@ router.post('/track', analyticsController.trackView);
 
 // ✅ FIXED: Add resolveEffectiveUserId middleware to protected routes
 router.get('/', authMiddleware, resolveEffectiveUserId, analyticsController.getAnalytics);
+router.get('/activity', authMiddleware, resolveEffectiveUserId, analyticsController.getActivityData);
+router.get('/time-of-day', authMiddleware, resolveEffectiveUserId, analyticsController.getTimeOfDayActivity);
 router.get('/item/:id', authMiddleware, resolveEffectiveUserId, analyticsController.getItemAnalytics);
 
 module.exports = router;

@@ -64,10 +64,16 @@ const PublicViewer = () => {
   };
 
   const handleBack = () => {
-    const fromCampaign = new URLSearchParams(window.location.search).get('from');
+    const searchParams = new URLSearchParams(window.location.search);
+    const fromCampaign = searchParams.get('from');
+    const isPreview = searchParams.get('preview');
     
     if (fromCampaign) {
-      window.location.href = '/c/' + fromCampaign;
+      // Preserve preview parameter when navigating back to campaign
+      const targetUrl = isPreview === 'true' 
+        ? `/c/${fromCampaign}?preview=true`
+        : `/c/${fromCampaign}`;
+      navigate(targetUrl);
       return;
     }
 
@@ -77,7 +83,7 @@ const PublicViewer = () => {
       return;
     }
 
-    window.location.href = '/';
+    navigate('/');
   };
 
   const handleDocumentClick = (doc) => {
@@ -415,8 +421,44 @@ const PublicViewer = () => {
           </div>
         )}
 
+        {/* EMBED - External Content */}
+        {item.type === 'EMBED' && (
+          <div className="w-full max-w-6xl px-4 sm:px-8 py-12">
+            <div className="bg-white bg-opacity-95 p-6 sm:p-8 rounded-3xl">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">{item.title}</h2>
+              {item.description && (
+                <p className="text-gray-600 mb-6">{item.description}</p>
+              )}
+              
+              {/* Embed Container */}
+              <div className="relative w-full bg-gray-100 rounded-2xl overflow-hidden" style={{ paddingBottom: '56.25%' }}>
+                <iframe
+                  src={item.mediaUrl}
+                  className="absolute top-0 left-0 w-full h-full border-0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  title={item.title}
+                />
+              </div>
+
+              {/* Open in New Tab Button */}
+              <div className="mt-6 flex justify-center">
+                <a
+                  href={item.mediaUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-xl font-semibold shadow-lg hover:shadow-2xl transition-all transform hover:scale-105"
+                >
+                  <ExternalLink size={20} />
+                  Open in New Tab
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* OTHER FILE TYPES */}
-        {item.type !== 'IMAGE' && item.type !== 'VIDEO' && item.type !== 'AUDIO' && item.type !== 'TEXT' && (
+        {item.type !== 'IMAGE' && item.type !== 'VIDEO' && item.type !== 'AUDIO' && item.type !== 'TEXT' && item.type !== 'EMBED' && (
           <div className="bg-white bg-opacity-95 p-12 rounded-3xl text-center max-w-md">
             <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-violet-500 rounded-full flex items-center justify-center mx-auto mb-6">
               <span className="text-5xl">📄</span>

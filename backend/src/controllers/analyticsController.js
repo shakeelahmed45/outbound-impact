@@ -234,19 +234,32 @@ const getItemAnalytics = async (req, res) => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const viewsByDate = await prisma.analytics.groupBy({
-      by: ['createdAt'],
+    // Get all analytics records for this item in the last 30 days
+    const analyticsRecords = await prisma.analytics.findMany({
       where: {
         itemId: id,
         createdAt: { gte: thirtyDaysAgo }
       },
-      _count: true,
+      select: {
+        createdAt: true,
+      },
     });
 
-    const formattedViewsByDate = viewsByDate.map(view => ({
-      date: view.createdAt.toISOString().split('T')[0],
-      views: view._count
-    }));
+    // Group by date (not timestamp)
+    const viewsByDateMap = {};
+    analyticsRecords.forEach(record => {
+      const dateStr = record.createdAt.toISOString().split('T')[0];
+      if (!viewsByDateMap[dateStr]) {
+        viewsByDateMap[dateStr] = 0;
+      }
+      viewsByDateMap[dateStr]++;
+    });
+
+    // Convert to array format
+    const formattedViewsByDate = Object.entries(viewsByDateMap).map(([date, views]) => ({
+      date,
+      views
+    })).sort((a, b) => a.date.localeCompare(b.date));
 
     const topLocations = await prisma.analytics.groupBy({
       by: ['country'],
@@ -278,8 +291,136 @@ const getItemAnalytics = async (req, res) => {
   }
 };
 
+const getActivityData = async (req, res) => {
+  try {
+    const userId = req.effectiveUserId;
+
+    // Get all items for the user
+    const items = await prisma.item.findMany({
+      where: { userId },
+      select: { id: true },
+    });
+
+    const itemIds = items.map(item => item.id);
+
+    if (itemIds.length === 0) {
+      return res.json({
+        status: 'success',
+        activity: [],
+      });
+    }
+
+    // Get all analytics records for user's items
+    const analyticsRecords = await prisma.analytics.findMany({
+      where: {
+        itemId: { in: itemIds }
+      },
+      select: {
+        createdAt: true,
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+    });
+
+    // Process data by date
+    const activityByDate = {};
+    
+    analyticsRecords.forEach(record => {
+      const dateStr = record.createdAt.toISOString().split('T')[0];
+      if (!activityByDate[dateStr]) {
+        activityByDate[dateStr] = {
+          date: dateStr,
+          views: 0,
+          createdAt: record.createdAt,
+        };
+      }
+      activityByDate[dateStr].views += 1;
+    });
+
+    // Convert to array and sort by date
+    const activity = Object.values(activityByDate).sort((a, b) => 
+      new Date(a.date) - new Date(b.date)
+    );
+
+    res.json({
+      status: 'success',
+      activity,
+    });
+  } catch (error) {
+    console.error('Get activity data error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get activity data',
+    });
+  }
+};
+
+const getTimeOfDayActivity = async (req, res) => {
+  try {
+    const userId = req.effectiveUserId;
+
+    // Get all items for the user
+    const items = await prisma.item.findMany({
+      where: { userId },
+      select: { id: true },
+    });
+
+    const itemIds = items.map(item => item.id);
+
+    if (itemIds.length === 0) {
+      return res.json({
+        status: 'success',
+        activityByHour: Array.from({ length: 24 }, (_, i) => ({
+          hour: i,
+          hourLabel: `${String(i).padStart(2, '0')}:00`,
+          views: 0
+        }))
+      });
+    }
+
+    // Get all analytics records for user's items
+    const analyticsRecords = await prisma.analytics.findMany({
+      where: {
+        itemId: { in: itemIds }
+      },
+      select: {
+        createdAt: true,
+      },
+    });
+
+    // Count views by hour (0-23)
+    const hourCounts = Array(24).fill(0);
+    
+    analyticsRecords.forEach(record => {
+      const hour = record.createdAt.getHours();
+      hourCounts[hour]++;
+    });
+
+    // Format response
+    const activityByHour = hourCounts.map((count, hour) => ({
+      hour,
+      hourLabel: `${String(hour).padStart(2, '0')}:00`,
+      views: count
+    }));
+
+    res.json({
+      status: 'success',
+      activityByHour,
+    });
+  } catch (error) {
+    console.error('Get time of day activity error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get time of day activity',
+    });
+  }
+};
+
 module.exports = {
   trackView,
   getAnalytics,
   getItemAnalytics,
+  getActivityData,
+  getTimeOfDayActivity,
 };

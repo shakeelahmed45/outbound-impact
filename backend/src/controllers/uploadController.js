@@ -271,7 +271,96 @@ const createTextPost = async (req, res) => {
   }
 };
 
+const createEmbedPost = async (req, res) => {
+  try {
+    const userId = req.effectiveUserId;
+    const { title, description, embedUrl, embedType } = req.body;
+
+    if (!title || !embedUrl) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Title and embed URL are required'
+      });
+    }
+
+    // Validate embed URL
+    try {
+      new URL(embedUrl);
+    } catch (error) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid embed URL format'
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { storageUsed: true, storageLimit: true }
+    });
+
+    const slug = generateSlug();
+    const publicUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/l/${slug}`;
+
+    // Generate QR code
+    const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
+      width: 512,
+      margin: 2,
+      color: {
+        dark: '#800080',
+        light: '#FFFFFF',
+      },
+    });
+    const base64Data = qrCodeDataUrl.split(',')[1];
+    const qrBuffer = Buffer.from(base64Data, 'base64');
+    const qrFileName = `qr-${slug}.png`;
+    
+    // Upload to Bunny and extract URL
+    const qrUploadResult = await uploadToBunny(qrBuffer, qrFileName, 'image/png');
+    const qrCodeUrl = qrUploadResult.success ? qrUploadResult.url : qrCodeDataUrl;
+
+    // Create item with embed URL stored in mediaUrl
+    const item = await prisma.item.create({
+      data: {
+        userId,
+        slug,
+        title,
+        description: description || `${embedType || 'External'} Embed`,
+        type: 'EMBED',
+        mediaUrl: embedUrl, // Store the embed URL
+        fileSize: 0, // No file size for embeds
+        qrCodeUrl, // Now it's a string, not an object
+        thumbnailUrl: null,
+        buttonText: embedType || 'External Content',
+        buttonUrl: null,
+        attachments: null,
+      }
+    });
+
+    res.status(201).json({
+      status: 'success',
+      message: 'Embed created successfully',
+      item: {
+        id: item.id,
+        title: item.title,
+        slug: item.slug,
+        type: item.type,
+        mediaUrl: item.mediaUrl,
+        qrCodeUrl: item.qrCodeUrl,
+        publicUrl: publicUrl,
+      }
+    });
+
+  } catch (error) {
+    console.error('Embed creation error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to create embed'
+    });
+  }
+};
+
 module.exports = {
   uploadFile,
   createTextPost,
+  createEmbedPost,
 };

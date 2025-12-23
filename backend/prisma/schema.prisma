@@ -88,6 +88,7 @@ enum MediaType {
   VIDEO
   AUDIO
   TEXT
+  EMBED
   OTHER
 }
 
