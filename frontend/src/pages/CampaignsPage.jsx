@@ -5,6 +5,7 @@ import NFCWriter from '../components/NFCWriter';
 import ShareModal from '../components/share/ShareModal';
 import EditItemModal from '../components/EditItemModal';
 import Tooltip from '../components/common/Tooltip';
+import Toast from '../components/common/Toast';
 import api from '../services/api';
 
 const CAMPAIGN_CATEGORIES = [
@@ -57,6 +58,17 @@ const CampaignsPage = () => {
   // Edit Item State
   const [showEditItemModal, setShowEditItemModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+
+  // Toast State
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+  };
+
+  const closeToast = () => {
+    setToast({ show: false, message: '', type: 'success' });
+  };
 
   useEffect(() => {
     fetchData();
@@ -166,7 +178,7 @@ const CampaignsPage = () => {
       return null;
     } catch (error) {
       console.error('Failed to upload logo:', error);
-      alert('Failed to upload logo: ' + (error.response?.data?.message || error.message));
+      showToast('Failed to upload logo: ' + (error.response?.data?.message || error.message), 'error');
       return null;
     } finally {
       setUploadingLogo(false);
@@ -191,7 +203,7 @@ const CampaignsPage = () => {
       if (logoFile) {
         logoUrl = await uploadLogo();
         if (!logoUrl) {
-          alert('Failed to upload logo. Please try again.');
+          showToast('Failed to upload logo. Please try again.', 'error');
           return;
         }
       }
@@ -206,11 +218,11 @@ const CampaignsPage = () => {
         setShowCreateModal(false);
         setFormData({ name: '', description: '', category: '', logoUrl: '' });
         clearLogo();
-        alert('Campaign created successfully!');
+        showToast('Campaign created successfully!', 'success');
       }
     } catch (error) {
       console.error('Failed to create campaign:', error);
-      alert('Failed to create campaign');
+      showToast('Failed to create campaign', 'error');
     }
   };
 
@@ -224,7 +236,7 @@ const CampaignsPage = () => {
       if (logoFile) {
         logoUrl = await uploadLogo();
         if (!logoUrl) {
-          alert('Failed to upload logo. Please try again.');
+          showToast('Failed to upload logo. Please try again.', 'error');
           return;
         }
       }
@@ -240,11 +252,11 @@ const CampaignsPage = () => {
         setSelectedCampaign(null);
         setFormData({ name: '', description: '', category: '', logoUrl: '' });
         clearLogo();
-        alert('Campaign updated successfully!');
+        showToast('Campaign updated successfully!', 'success');
       }
     } catch (error) {
       console.error('Failed to update campaign:', error);
-      alert('Failed to update campaign');
+      showToast('Failed to update campaign', 'error');
     }
   };
 
@@ -254,10 +266,10 @@ const CampaignsPage = () => {
     try {
       await api.delete('/campaigns/' + id);
       setCampaigns(campaigns.filter(c => c.id !== id));
-      alert('Campaign deleted successfully!');
+      showToast('Campaign deleted successfully!', 'success');
     } catch (error) {
       console.error('Failed to delete campaign:', error);
-      alert('Failed to delete campaign');
+      showToast('Failed to delete campaign', 'error');
     }
   };
 
@@ -287,10 +299,10 @@ const CampaignsPage = () => {
       ));
       
       fetchData();
-      alert('Item removed from campaign');
+      showToast('Item removed from campaign', 'success');
     } catch (error) {
       console.error('Failed to remove item:', error);
-      alert('Failed to remove item');
+      showToast('Failed to remove item', 'error');
     }
   };
 
@@ -389,10 +401,10 @@ const CampaignsPage = () => {
         message = `Removed ${removedCount} item(s) from campaign`;
       }
       
-      alert(message);
+      showToast(message, 'success');
     } catch (error) {
       console.error('Failed to update items:', error);
-      alert('Failed to update items: ' + error.message);
+      showToast('Failed to update items: ' + error.message, 'error');
     } finally {
       setSavingItems(false);
     }
@@ -467,6 +479,15 @@ const CampaignsPage = () => {
 
   return (
     <DashboardLayout>
+      {/* Toast Notification */}
+      {toast.show && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={closeToast}
+        />
+      )}
+
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
           <div>

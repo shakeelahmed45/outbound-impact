@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { UserPlus, Mail, Trash2, AlertCircle, Loader2, RefreshCw, Clock, CheckCircle, XCircle, X } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
+import Toast from '../components/common/Toast';
 import useAuthStore from '../store/authStore';
 import api from '../services/api';
 
@@ -18,6 +19,19 @@ const TeamPage = () => {
   });
   const [error, setError] = useState('');
   const [showWarningPopup, setShowWarningPopup] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState(null);
+
+  // Toast State
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+  };
+
+  const closeToast = () => {
+    setToast({ show: false, message: '', type: 'success' });
+  };
 
   useEffect(() => {
     fetchInitialData();
@@ -61,7 +75,7 @@ const TeamPage = () => {
         setTeamMembers([response.data.teamMember, ...teamMembers]);
         setShowInviteModal(false);
         setFormData({ email: '', role: 'VIEWER', message: '' });
-        alert('✅ Contributor invited successfully! Invitation email sent.');
+        showToast('Contributor invited successfully! Invitation email sent.', 'success');
       }
     } catch (error) {
       console.error('Failed to invite contributor:', error);
@@ -83,27 +97,40 @@ const TeamPage = () => {
     try {
       const response = await api.post(`/team/${id}/resend`);
       if (response.data.status === 'success') {
-        alert('✅ Invitation resent successfully!');
+        showToast('Invitation resent successfully!', 'success');
       }
     } catch (error) {
       console.error('Failed to resend invitation:', error);
-      alert('❌ Failed to resend invitation');
+      showToast('Failed to resend invitation', 'error');
     } finally {
       setResendingId(null);
     }
   };
 
-  const handleRemove = async (id) => {
-    if (!confirm('Are you sure you want to remove this team member?')) return;
+  const handleRemove = (member) => {
+    setMemberToDelete(member);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!memberToDelete) return;
 
     try {
-      await api.delete('/team/' + id);
-      setTeamMembers(teamMembers.filter(m => m.id !== id));
-      alert('✅ Team member removed successfully!');
+      await api.delete('/team/' + memberToDelete.id);
+      setTeamMembers(teamMembers.filter(m => m.id !== memberToDelete.id));
+      showToast('Team member removed successfully!', 'success');
     } catch (error) {
       console.error('Failed to remove team member:', error);
-      alert('❌ Failed to remove team member');
+      showToast('Failed to remove team member', 'error');
+    } finally {
+      setShowDeleteConfirm(false);
+      setMemberToDelete(null);
     }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setMemberToDelete(null);
   };
 
   const getStatusBadge = (status) => {
@@ -149,6 +176,15 @@ const TeamPage = () => {
 
   return (
     <DashboardLayout>
+      {/* Toast Notification */}
+      {toast.show && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={closeToast}
+        />
+      )}
+
       <div className="space-y-6">
         {/* Header Section - Fully Responsive */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -157,7 +193,7 @@ const TeamPage = () => {
               Contributors Management
             </h1>
             <p className="text-sm sm:text-base text-secondary">
-              Manage your contributors and permissions
+              Manage your team members and permissions
             </p>
           </div>
           <button
@@ -260,7 +296,7 @@ const TeamPage = () => {
                             </button>
                           )}
                           <button
-                            onClick={() => handleRemove(member.id)}
+                            onClick={() => handleRemove(member)}
                             className="text-red-600 hover:text-red-700 font-medium flex items-center gap-1 transition-colors text-xs lg:text-sm"
                           >
                             <Trash2 size={14} />
@@ -340,7 +376,7 @@ const TeamPage = () => {
                       </button>
                     )}
                     <button
-                      onClick={() => handleRemove(member.id)}
+                      onClick={() => handleRemove(member)}
                       className="flex-1 px-3 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg font-medium flex items-center justify-center gap-1.5 transition-colors text-sm"
                     >
                       <Trash2 size={16} />
@@ -386,81 +422,130 @@ const TeamPage = () => {
           </div>
         )}
 
-        {/* Invite Modal - Mobile Responsive */}
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && memberToDelete && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Trash2 className="text-red-600" size={24} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">Remove Team Member?</h3>
+                  <p className="text-sm text-gray-600">
+                    Are you sure you want to remove <strong>{memberToDelete.email}</strong> from your team?
+                  </p>
+                </div>
+              </div>
+              
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-6">
+                <p className="text-sm text-yellow-800">
+                  ⚠️ This action cannot be undone. The team member will lose access immediately.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={cancelDelete}
+                  className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all flex items-center justify-center gap-2"
+                >
+                  <Trash2 size={16} />
+                  Remove
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Invite Modal - Fixed Scrolling */}
         {showInviteModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl p-4 sm:p-6 md:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Mail size={20} className="text-white sm:w-6 sm:h-6" />
+            <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] flex flex-col">
+              {/* Header - Fixed at top */}
+              <div className="p-4 sm:p-6 border-b border-gray-200 flex-shrink-0">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Mail size={20} className="text-white sm:w-6 sm:h-6" />
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-bold text-primary">Invite Contributor</h3>
                 </div>
-                <h3 className="text-xl sm:text-2xl font-bold text-primary">Invite Contributor</h3>
+                <p className="text-xs sm:text-sm text-gray-600 ml-13 sm:ml-15">
+                  Send a professional invitation email with a secure link
+                </p>
               </div>
-              <p className="text-xs sm:text-sm text-gray-600 mb-4 sm:mb-6 ml-13 sm:ml-15">
-                Send a professional invitation email with a secure link
-              </p>
-              
-              <form onSubmit={handleInvite}>
-                {error && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-center gap-2">
-                    <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
-                    <p className="text-red-800 text-sm">{error}</p>
-                  </div>
-                )}
 
-                <div className="space-y-3 sm:space-y-4 mb-4 sm:mb-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Email Address <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm sm:text-base"
-                      placeholder="colleague@company.com"
-                      required
-                      disabled={inviting}
-                    />
-                  </div>
+              {/* Scrollable Content */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+                <form onSubmit={handleInvite} id="invite-form">
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-center gap-2">
+                      <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
+                      <p className="text-red-800 text-sm">{error}</p>
+                    </div>
+                  )}
 
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Role <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={formData.role}
-                      onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                      className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm sm:text-base"
-                      disabled={inviting}
-                    >
-                      <option value="VIEWER">👁️ Viewer - Can view content</option>
-                      <option value="EDITOR">✏️ Editor - Can edit content</option>
-                      <option value="ADMIN">👑 Admin - Full access</option>
-                    </select>
-                  </div>
+                  <div className="space-y-3 sm:space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Email Address <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm sm:text-base"
+                        placeholder="colleague@company.com"
+                        required
+                        disabled={inviting}
+                      />
+                    </div>
 
-                  {/* ✨ Personal Message Field - Mobile Optimized */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Personal Message (Optional)
-                    </label>
-                    <textarea
-                      value={formData.message}
-                      onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                      className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none text-sm sm:text-base"
-                      placeholder="e.g., Would love you to add content and stories about nan as we are putting together a memorial for her..."
-                      rows={3}
-                      disabled={inviting}
-                      maxLength={500}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      {formData.message.length}/500 characters • Explain why you're inviting this person
-                    </p>
-                  </div>
-                </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Role <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={formData.role}
+                        onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                        className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm sm:text-base"
+                        disabled={inviting}
+                      >
+                        <option value="VIEWER">👁️ Viewer - Can view content</option>
+                        <option value="EDITOR">✏️ Editor - Can edit content</option>
+                        <option value="ADMIN">👑 Admin - Full access</option>
+                      </select>
+                    </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4 border-t border-gray-200">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Personal Message (Optional)
+                      </label>
+                      <textarea
+                        value={formData.message}
+                        onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                        className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none text-sm sm:text-base"
+                        placeholder="e.g., Would love you to add content and stories about nan as we are putting together a memorial for her..."
+                        rows={3}
+                        disabled={inviting}
+                        maxLength={500}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        {formData.message.length}/500 characters • Explain why you're inviting this person
+                      </p>
+                    </div>
+                  </div>
+                </form>
+              </div>
+
+              {/* Footer - Fixed at bottom */}
+              <div className="p-4 sm:p-6 border-t border-gray-200 flex-shrink-0">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <button
                     type="button"
                     onClick={() => {
@@ -475,6 +560,7 @@ const TeamPage = () => {
                   </button>
                   <button
                     type="submit"
+                    form="invite-form"
                     className="flex-1 gradient-btn text-white px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm sm:text-base"
                     disabled={inviting}
                   >
@@ -491,7 +577,7 @@ const TeamPage = () => {
                     )}
                   </button>
                 </div>
-              </form>
+              </div>
             </div>
           </div>
         )}
