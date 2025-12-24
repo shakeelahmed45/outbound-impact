@@ -454,8 +454,16 @@ const UploadPage = () => {
   const convertToEmbedUrl = (url) => {
     if (!url) return url;
 
+    // YouTube Shorts: https://youtube.com/shorts/VIDEO_ID → https://www.youtube.com/embed/VIDEO_ID
+    if (url.includes('youtube.com/shorts/') || url.includes('youtu.be/shorts/')) {
+      const videoId = url.split('/shorts/')[1]?.split('?')[0]?.split('&')[0];
+      if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}`;
+      }
+    }
+
     // YouTube short URL: https://youtu.be/VIDEO_ID
-    if (url.includes('youtu.be/')) {
+    if (url.includes('youtu.be/') && !url.includes('/shorts/')) {
       const videoId = url.split('youtu.be/')[1]?.split('?')[0]?.split('&')[0];
       if (videoId) {
         return `https://www.youtube.com/embed/${videoId}`;

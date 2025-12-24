@@ -128,12 +128,28 @@ const PublicCampaignViewer = () => {
               </div>
             </div>
             
-            {/* ✅ "Click to read more" indicator */}
+            {/* ✅ "Click to read more" indicator with pulsing animation */}
             {hasLongContent && (
               <div className="mt-auto pt-3 border-t border-white/30">
-                <div className="flex items-center gap-2 text-white text-xs font-semibold">
-                  <Eye className="w-4 h-4" />
-                  <span>Click to read full text</span>
+                <div className="flex items-center gap-2 sm:gap-3">
+                  {/* Eye icon with animated pulsing waves */}
+                  <div className="relative flex-shrink-0">
+                    {/* Animated pulsing waves */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-full bg-white/10 animate-ping"></div>
+                    </div>
+                    <div className="absolute inset-0 flex items-center justify-center animation-delay-150">
+                      <div className="w-8 h-8 rounded-full bg-white/20 animate-ping"></div>
+                    </div>
+                    
+                    {/* Eye icon */}
+                    <div className="relative z-10 w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/30">
+                      <Eye className="w-4 h-4 text-white" />
+                    </div>
+                  </div>
+                  
+                  {/* Text only - no wave bars */}
+                  <span className="text-white text-xs sm:text-sm font-bold">Click to read full text</span>
                 </div>
               </div>
             )}
@@ -224,11 +240,29 @@ const PublicCampaignViewer = () => {
               </p>
             </div>
             
-            {/* Play icon */}
+            {/* Play icon with animated waves (same as audio) */}
             <div className="relative my-2">
-              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
+              {/* Animated pulsing waves */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-20 h-20 rounded-full bg-white/10 animate-ping"></div>
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center animation-delay-150">
+                <div className="w-16 h-16 rounded-full bg-white/20 animate-ping"></div>
+              </div>
+              
+              {/* Play icon */}
+              <div className="relative z-10 w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
                 <Play className="text-indigo-600" size={32} />
               </div>
+            </div>
+            
+            {/* Visual wave bars (same as audio) */}
+            <div className="flex items-center gap-1 justify-center">
+              <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '8px', animationDelay: '0ms' }}></div>
+              <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '16px', animationDelay: '150ms' }}></div>
+              <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '24px', animationDelay: '300ms' }}></div>
+              <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '16px', animationDelay: '450ms' }}></div>
+              <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '8px', animationDelay: '600ms' }}></div>
             </div>
             
             {/* Description */}

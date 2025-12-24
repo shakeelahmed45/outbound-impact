@@ -96,6 +96,76 @@ const PublicViewer = () => {
     setSelectedDocument(null);
   };
 
+  // Convert URLs to proper embed format
+  const convertToEmbedUrl = (url) => {
+    if (!url) return url;
+
+    // YouTube Shorts: https://youtube.com/shorts/VIDEO_ID → https://www.youtube.com/embed/VIDEO_ID
+    if (url.includes('youtube.com/shorts/') || url.includes('youtu.be/shorts/')) {
+      const videoId = url.split('/shorts/')[1]?.split('?')[0]?.split('&')[0];
+      if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}`;
+      }
+    }
+
+    // YouTube short URL: https://youtu.be/VIDEO_ID
+    if (url.includes('youtu.be/') && !url.includes('/shorts/')) {
+      const videoId = url.split('youtu.be/')[1]?.split('?')[0]?.split('&')[0];
+      if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}`;
+      }
+    }
+
+    // YouTube watch URL: https://www.youtube.com/watch?v=VIDEO_ID
+    if (url.includes('youtube.com/watch')) {
+      const urlParams = new URLSearchParams(url.split('?')[1]);
+      const videoId = urlParams.get('v');
+      if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}`;
+      }
+    }
+
+    // YouTube embed URL (already correct)
+    if (url.includes('youtube.com/embed/')) {
+      return url;
+    }
+
+    // Vimeo: https://vimeo.com/VIDEO_ID → https://player.vimeo.com/video/VIDEO_ID
+    if (url.includes('vimeo.com/') && !url.includes('player.vimeo.com')) {
+      const videoId = url.split('vimeo.com/')[1]?.split('?')[0]?.split('/')[0];
+      if (videoId) {
+        return `https://player.vimeo.com/video/${videoId}`;
+      }
+    }
+
+    // Google Drive: Convert to preview format
+    if (url.includes('drive.google.com/file/d/')) {
+      const fileId = url.split('/d/')[1]?.split('/')[0];
+      if (fileId) {
+        return `https://drive.google.com/file/d/${fileId}/preview`;
+      }
+    }
+
+    // Google Docs: Add /preview if not present
+    if (url.includes('docs.google.com/document/d/') && !url.includes('/preview')) {
+      const docId = url.split('/d/')[1]?.split('/')[0];
+      if (docId) {
+        return `https://docs.google.com/document/d/${docId}/preview`;
+      }
+    }
+
+    // Google Sheets: Add /preview if not present
+    if (url.includes('docs.google.com/spreadsheets/d/') && !url.includes('/preview')) {
+      const sheetId = url.split('/d/')[1]?.split('/')[0];
+      if (sheetId) {
+        return `https://docs.google.com/spreadsheets/d/${sheetId}/preview`;
+      }
+    }
+
+    // Return original URL if no conversion needed
+    return url;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -423,36 +493,51 @@ const PublicViewer = () => {
 
         {/* EMBED - External Content */}
         {item.type === 'EMBED' && (
-          <div className="w-full max-w-6xl px-4 sm:px-8 py-12">
-            <div className="bg-white bg-opacity-95 p-6 sm:p-8 rounded-3xl">
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">{item.title}</h2>
+          <div className="w-full max-w-6xl px-4 sm:px-6 md:px-8 py-8 sm:py-12">
+            <div className="bg-white bg-opacity-95 p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl shadow-2xl max-h-[85vh] overflow-y-auto">
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">
+                {item.title}
+              </h2>
               {item.description && (
-                <p className="text-gray-600 mb-6">{item.description}</p>
+                <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">
+                  {item.description}
+                </p>
               )}
               
               {/* Embed Container */}
-              <div className="relative w-full bg-gray-100 rounded-2xl overflow-hidden" style={{ paddingBottom: '56.25%' }}>
+              <div className="relative w-full bg-gray-100 rounded-xl sm:rounded-2xl overflow-hidden mb-4 sm:mb-6" 
+                   style={{ paddingBottom: '56.25%' }}>
                 <iframe
-                  src={item.mediaUrl}
+                  src={convertToEmbedUrl(item.mediaUrl)}
                   className="absolute top-0 left-0 w-full h-full border-0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                  allowFullScreen={true}
                   title={item.title}
+                  loading="lazy"
                 />
               </div>
 
               {/* Open in New Tab Button */}
-              <div className="mt-6 flex justify-center">
+              <div className="flex justify-center pt-2">
                 <a
                   href={item.mediaUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-xl font-semibold shadow-lg hover:shadow-2xl transition-all transform hover:scale-105"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 sm:px-6 sm:py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg sm:rounded-xl font-semibold shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 text-sm sm:text-base"
                 >
-                  <ExternalLink size={20} />
+                  <ExternalLink size={18} className="sm:w-5 sm:h-5" />
                   Open in New Tab
                 </a>
               </div>
+
+              {/* Debug Info (Remove after testing) */}
+              {import.meta.env.DEV && (
+                <div className="mt-4 p-3 bg-gray-100 rounded-lg text-xs">
+                  <p className="font-semibold mb-1">Debug Info:</p>
+                  <p className="text-gray-600 break-all">Original URL: {item.mediaUrl}</p>
+                  <p className="text-gray-600 break-all">Converted URL: {convertToEmbedUrl(item.mediaUrl)}</p>
+                </div>
+              )}
             </div>
           </div>
         )}

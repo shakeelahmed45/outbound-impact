@@ -141,7 +141,7 @@ const TeamPage = () => {
       <DashboardLayout>
         <div className="flex flex-col items-center justify-center h-64">
           <Loader2 className="animate-spin text-primary mb-4" size={48} />
-          <p className="text-gray-600">Loading team data...</p>
+          <p className="text-gray-600">Loading contributors data...</p>
         </div>
       </DashboardLayout>
     );
@@ -154,10 +154,10 @@ const TeamPage = () => {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex-1">
             <h1 className="text-2xl sm:text-3xl font-bold text-primary mb-1 sm:mb-2">
-              Team Management
+              Contributors Management
             </h1>
             <p className="text-sm sm:text-base text-secondary">
-              Manage your team members and permissions
+              Manage your contributors and permissions
             </p>
           </div>
           <button
