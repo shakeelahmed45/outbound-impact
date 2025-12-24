@@ -120,6 +120,7 @@ model TeamMember {
   memberUserId String?
   status       String   @default("PENDING")
   token        String?  @unique
+  message      String?  // ✨ Custom invitation message
   createdAt    DateTime @default(now())
 
   user       User  @relation(fields: [userId], references: [id], onDelete: Cascade, name: "OrganizationMembers")

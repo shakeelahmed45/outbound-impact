@@ -229,7 +229,7 @@ const sendTeamInvitationEmail = async (invitationData) => {
       return { success: false, error: 'Resend not configured' };
     }
 
-    const { recipientEmail, inviterName, inviterEmail, role, invitationLink } = invitationData;
+    const { recipientEmail, inviterName, inviterEmail, role, invitationLink, message } = invitationData;
 
     const roleDescriptions = {
       VIEWER: '👁️ <strong>Viewer Access:</strong> You can view all content, campaigns, and analytics.',
@@ -286,6 +286,21 @@ const sendTeamInvitationEmail = async (invitationData) => {
                       <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 0 0 30px; background-color: #f9f9f9; padding: 15px; border-radius: 8px; border-left: 4px solid #800080;">
                         ${roleDescriptions[role] || 'Team member access'}
                       </p>
+                      
+                      ${message ? `
+                      <!-- ✨ Personal Message from Inviter -->
+                      <div style="background: linear-gradient(135deg, #fff5f5 0%, #ffe5ff 100%); border: 2px solid #EE82EE; border-radius: 12px; padding: 20px; margin: 0 0 30px;">
+                        <p style="color: #800080; font-size: 13px; font-weight: bold; margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.5px;">
+                          💌 Personal Message
+                        </p>
+                        <p style="color: #333333; font-size: 15px; line-height: 1.6; margin: 0; font-style: italic; white-space: pre-wrap;">
+                          "${message}"
+                        </p>
+                        <p style="color: #999999; font-size: 12px; margin: 12px 0 0; text-align: right;">
+                          — ${inviterName}
+                        </p>
+                      </div>
+                      ` : ''}
                       
                       <!-- CTA Button -->
                       <table width="100%" cellpadding="0" cellspacing="0">

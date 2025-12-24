@@ -14,6 +14,7 @@ const TeamPage = () => {
   const [formData, setFormData] = useState({
     email: '',
     role: 'VIEWER',
+    message: '', // ✨ NEW: Custom invitation message
   });
   const [error, setError] = useState('');
   const [showWarningPopup, setShowWarningPopup] = useState(false);
@@ -59,7 +60,7 @@ const TeamPage = () => {
       if (response.data.status === 'success') {
         setTeamMembers([response.data.teamMember, ...teamMembers]);
         setShowInviteModal(false);
-        setFormData({ email: '', role: 'VIEWER' });
+        setFormData({ email: '', role: 'VIEWER', message: '' });
         alert('✅ Contributor invited successfully! Invitation email sent.');
       }
     } catch (error) {
@@ -148,20 +149,25 @@ const TeamPage = () => {
 
   return (
     <DashboardLayout>
-      <div>
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-primary mb-2">Team Management</h1>
-            <p className="text-secondary">Manage your team members and permissions</p>
+      <div className="space-y-6">
+        {/* Header Section - Fully Responsive */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-primary mb-1 sm:mb-2">
+              Team Management
+            </h1>
+            <p className="text-sm sm:text-base text-secondary">
+              Manage your team members and permissions
+            </p>
           </div>
           <button
             onClick={() => {
               setShowInviteModal(true);
               setError('');
             }}
-            className="gradient-btn text-white px-6 py-3 rounded-lg font-semibold flex items-center gap-2 hover:shadow-lg transition-all"
+            className="gradient-btn text-white px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:shadow-lg transition-all text-sm sm:text-base whitespace-nowrap"
           >
-            <UserPlus size={20} />
+            <UserPlus size={18} className="sm:w-5 sm:h-5" />
             Invite Contributor
           </button>
         </div>
@@ -174,12 +180,12 @@ const TeamPage = () => {
         )}
 
         {teamMembers.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-lg p-12 text-center border border-gray-100">
-            <div className="w-20 h-20 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center mx-auto mb-6">
-              <UserPlus size={40} className="text-white" />
+          <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-6 sm:p-8 md:p-12 text-center border border-gray-100">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
+              <UserPlus size={32} className="text-white sm:w-10 sm:h-10" />
             </div>
-            <h3 className="text-2xl font-bold text-primary mb-3">No Team Members Yet</h3>
-            <p className="text-secondary mb-6">
+            <h3 className="text-xl sm:text-2xl font-bold text-primary mb-2 sm:mb-3">No Team Members Yet</h3>
+            <p className="text-sm sm:text-base text-secondary mb-4 sm:mb-6">
               Invite contributor to collaborate on your content.
             </p>
             <button
@@ -187,77 +193,78 @@ const TeamPage = () => {
                 setShowInviteModal(true);
                 setError('');
               }}
-              className="gradient-btn text-white px-6 py-3 rounded-lg font-semibold inline-flex items-center gap-2 hover:shadow-lg transition-all"
+              className="gradient-btn text-white px-5 py-2.5 sm:px-6 sm:py-3 rounded-lg font-semibold inline-flex items-center gap-2 hover:shadow-lg transition-all text-sm sm:text-base"
             >
-              <UserPlus size={20} />
+              <UserPlus size={18} className="sm:w-5 sm:h-5" />
               Invite Your First Contributor
             </button>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
-            <div className="overflow-x-auto">
+          <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg overflow-hidden border border-gray-100">
+            {/* Desktop Table View - Hidden on Mobile */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Member</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Role</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Invited</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Actions</th>
+                    <th className="px-4 lg:px-6 py-3 lg:py-4 text-left text-xs lg:text-sm font-semibold text-gray-700">Member</th>
+                    <th className="px-4 lg:px-6 py-3 lg:py-4 text-left text-xs lg:text-sm font-semibold text-gray-700">Role</th>
+                    <th className="px-4 lg:px-6 py-3 lg:py-4 text-left text-xs lg:text-sm font-semibold text-gray-700">Status</th>
+                    <th className="px-4 lg:px-6 py-3 lg:py-4 text-left text-xs lg:text-sm font-semibold text-gray-700">Invited</th>
+                    <th className="px-4 lg:px-6 py-3 lg:py-4 text-left text-xs lg:text-sm font-semibold text-gray-700">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {teamMembers.map((member) => (
                     <tr key={member.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center text-white font-bold">
+                      <td className="px-4 lg:px-6 py-3 lg:py-4">
+                        <div className="flex items-center gap-2 lg:gap-3">
+                          <div className="w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center text-white font-bold text-sm lg:text-base flex-shrink-0">
                             {member.email[0].toUpperCase()}
                           </div>
-                          <div>
-                            <p className="font-medium text-gray-900">{member.email}</p>
+                          <div className="min-w-0">
+                            <p className="font-medium text-gray-900 text-sm lg:text-base truncate">{member.email}</p>
                             <p className="text-xs text-gray-500">Team Member</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className="px-3 py-1 bg-purple-100 text-primary rounded-full text-sm font-medium">
+                      <td className="px-4 lg:px-6 py-3 lg:py-4">
+                        <span className="px-2 lg:px-3 py-1 bg-purple-100 text-primary rounded-full text-xs lg:text-sm font-medium whitespace-nowrap">
                           {member.role}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 lg:px-6 py-3 lg:py-4">
                         {getStatusBadge(member.status)}
                       </td>
-                      <td className="px-6 py-4 text-gray-600 text-sm">
+                      <td className="px-4 lg:px-6 py-3 lg:py-4 text-gray-600 text-xs lg:text-sm">
                         {new Date(member.createdAt).toLocaleDateString('en-US', {
                           year: 'numeric',
                           month: 'short',
                           day: 'numeric'
                         })}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 lg:px-6 py-3 lg:py-4">
                         <div className="flex items-center gap-2">
                           {member.status === 'PENDING' && (
                             <button
                               onClick={() => handleResend(member.id)}
                               disabled={resendingId === member.id}
-                              className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition-colors text-sm disabled:opacity-50"
+                              className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition-colors text-xs lg:text-sm disabled:opacity-50"
                               title="Resend invitation"
                             >
                               {resendingId === member.id ? (
-                                <Loader2 className="animate-spin" size={16} />
+                                <Loader2 className="animate-spin" size={14} />
                               ) : (
-                                <RefreshCw size={16} />
+                                <RefreshCw size={14} />
                               )}
-                              Resend
+                              <span className="hidden lg:inline">Resend</span>
                             </button>
                           )}
                           <button
                             onClick={() => handleRemove(member.id)}
-                            className="text-red-600 hover:text-red-700 font-medium flex items-center gap-1 transition-colors text-sm"
+                            className="text-red-600 hover:text-red-700 font-medium flex items-center gap-1 transition-colors text-xs lg:text-sm"
                           >
-                            <Trash2 size={16} />
-                            Remove
+                            <Trash2 size={14} />
+                            <span className="hidden lg:inline">Remove</span>
                           </button>
                         </div>
                       </td>
@@ -265,6 +272,83 @@ const TeamPage = () => {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Card View - Hidden on Desktop */}
+            <div className="md:hidden divide-y divide-gray-200">
+              {teamMembers.map((member) => (
+                <div key={member.id} className="p-4 hover:bg-gray-50 transition-colors">
+                  {/* Member Info */}
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                      {member.email[0].toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 text-sm break-all">{member.email}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Team Member</p>
+                    </div>
+                  </div>
+
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    {/* Role */}
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-1">Role</p>
+                      <span className="inline-block px-2.5 py-1 bg-purple-100 text-primary rounded-full text-xs font-medium">
+                        {member.role}
+                      </span>
+                    </div>
+
+                    {/* Status */}
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-1">Status</p>
+                      {getStatusBadge(member.status)}
+                    </div>
+                  </div>
+
+                  {/* Invited Date */}
+                  <div className="mb-3">
+                    <p className="text-xs font-medium text-gray-500 mb-1">Invited</p>
+                    <p className="text-sm text-gray-600">
+                      {new Date(member.createdAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      })}
+                    </p>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-3 border-t border-gray-100">
+                    {member.status === 'PENDING' && (
+                      <button
+                        onClick={() => handleResend(member.id)}
+                        disabled={resendingId === member.id}
+                        className="flex-1 px-3 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg font-medium flex items-center justify-center gap-1.5 transition-colors text-sm disabled:opacity-50"
+                      >
+                        {resendingId === member.id ? (
+                          <>
+                            <Loader2 className="animate-spin" size={16} />
+                            <span>Sending...</span>
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw size={16} />
+                            <span>Resend</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleRemove(member.id)}
+                      className="flex-1 px-3 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg font-medium flex items-center justify-center gap-1.5 transition-colors text-sm"
+                    >
+                      <Trash2 size={16} />
+                      <span>Remove</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -302,17 +386,17 @@ const TeamPage = () => {
           </div>
         )}
 
-        {/* Invite Modal */}
+        {/* Invite Modal - Mobile Responsive */}
         {showInviteModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl p-8 max-w-md w-full">
+            <div className="bg-white rounded-2xl p-4 sm:p-6 md:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center">
-                  <Mail size={24} className="text-white" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Mail size={20} className="text-white sm:w-6 sm:h-6" />
                 </div>
-                <h3 className="text-2xl font-bold text-primary">Invite Contributor</h3>
+                <h3 className="text-xl sm:text-2xl font-bold text-primary">Invite Contributor</h3>
               </div>
-              <p className="text-sm text-gray-600 mb-6 ml-15">
+              <p className="text-xs sm:text-sm text-gray-600 mb-4 sm:mb-6 ml-13 sm:ml-15">
                 Send a professional invitation email with a secure link
               </p>
               
@@ -324,7 +408,7 @@ const TeamPage = () => {
                   </div>
                 )}
 
-                <div className="space-y-4 mb-6">
+                <div className="space-y-3 sm:space-y-4 mb-4 sm:mb-6">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Email Address <span className="text-red-500">*</span>
@@ -333,7 +417,7 @@ const TeamPage = () => {
                       type="email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                      className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm sm:text-base"
                       placeholder="colleague@company.com"
                       required
                       disabled={inviting}
@@ -347,7 +431,7 @@ const TeamPage = () => {
                     <select
                       value={formData.role}
                       onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                      className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm sm:text-base"
                       disabled={inviting}
                     >
                       <option value="VIEWER">👁️ Viewer - Can view content</option>
@@ -356,29 +440,42 @@ const TeamPage = () => {
                     </select>
                   </div>
 
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="text-xs text-blue-800">
-                      <strong>📧 Email will include:</strong> Professional invitation with your logo, role details, and a secure acceptance link that expires in 7 days.
+                  {/* ✨ Personal Message Field - Mobile Optimized */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Personal Message (Optional)
+                    </label>
+                    <textarea
+                      value={formData.message}
+                      onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                      className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none text-sm sm:text-base"
+                      placeholder="e.g., Would love you to add content and stories about nan as we are putting together a memorial for her..."
+                      rows={3}
+                      disabled={inviting}
+                      maxLength={500}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {formData.message.length}/500 characters • Explain why you're inviting this person
                     </p>
                   </div>
                 </div>
 
-                <div className="flex gap-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4 border-t border-gray-200">
                   <button
                     type="button"
                     onClick={() => {
                       setShowInviteModal(false);
-                      setFormData({ email: '', role: 'VIEWER' });
+                      setFormData({ email: '', role: 'VIEWER', message: '' });
                       setError('');
                     }}
-                    className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-all"
+                    className="flex-1 px-4 py-2.5 sm:px-6 sm:py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-all text-sm sm:text-base"
                     disabled={inviting}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 gradient-btn text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="flex-1 gradient-btn text-white px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm sm:text-base"
                     disabled={inviting}
                   >
                     {inviting ? (

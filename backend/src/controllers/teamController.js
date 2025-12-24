@@ -46,7 +46,7 @@ const getTeamMembers = async (req, res) => {
 const inviteTeamMember = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { email, role } = req.body;
+    const { email, role, message } = req.body; // ✨ Added message field
 
     if (!email || !role) {
       return res.status(400).json({
@@ -147,6 +147,7 @@ const inviteTeamMember = async (req, res) => {
         role,
         status: 'PENDING',
         token,
+        message: message || null, // ✨ Save custom message
       },
     });
 
@@ -163,6 +164,7 @@ const inviteTeamMember = async (req, res) => {
         inviterEmail: user.email,
         role: role,
         invitationLink: invitationLink,
+        message: message || null, // ✨ Include custom message
       });
 
       emailSent = emailResult.success;
@@ -245,6 +247,7 @@ const resendInvitation = async (req, res) => {
         inviterEmail: user.email,
         role: teamMember.role,
         invitationLink: invitationLink,
+        message: teamMember.message || null, // ✨ Include original message
       });
       emailSent = emailResult.success;
     } catch (emailError) {
