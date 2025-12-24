@@ -63,6 +63,7 @@ const UploadPage = () => {
 
   // Fetch campaigns on mount
   useEffect(() => {
+    document.title = 'Upload | Outbound Impact';
     fetchCampaigns();
   }, []);
 

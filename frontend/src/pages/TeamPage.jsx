@@ -34,6 +34,7 @@ const TeamPage = () => {
   };
 
   useEffect(() => {
+    document.title = 'Contributors Management | Outbound Impact';
     fetchInitialData();
   }, []);
 

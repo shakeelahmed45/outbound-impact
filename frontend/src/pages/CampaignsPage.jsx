@@ -71,6 +71,7 @@ const CampaignsPage = () => {
   };
 
   useEffect(() => {
+    document.title = 'Campaigns | Outbound Impact';
     fetchData();
   }, []);
 

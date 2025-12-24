@@ -12,6 +12,7 @@ const AnalyticsPage = () => {
   const [exportingPDF, setExportingPDF] = useState(false);
 
   useEffect(() => {
+    document.title = 'Analytics | Outbound Impact';
     fetchAnalytics();
     fetchHourlyData();
   }, []);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
@@ -14,6 +14,10 @@ const SignUp = () => {
   const [isOver18, setIsOver18] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    document.title = 'Sign Up | Outbound Impact';
+  }, []);
 
   const handleChange = (e) => {
     setFormData({

@@ -16,6 +16,7 @@ const ItemsPage = () => {
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
+    document.title = 'Messages | Outbound Impact';
     fetchData();
   }, []);
 

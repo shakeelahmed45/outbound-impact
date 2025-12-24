@@ -32,6 +32,10 @@ const SettingsPage = () => {
   const [newEmail, setNewEmail] = useState('');
   const [changingEmail, setChangingEmail] = useState(false);
 
+  useEffect(() => {
+    document.title = 'Settings | Outbound Impact';
+  }, []);
+
   const handleLogout = () => {
     logout();
     window.location.href = '/signin';

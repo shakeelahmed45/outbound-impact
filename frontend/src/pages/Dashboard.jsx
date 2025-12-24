@@ -20,6 +20,7 @@ const Dashboard = () => {
   const effectiveRole = effectiveUser?.role;
 
   useEffect(() => {
+    document.title = 'Dashboard | Outbound Impact';
     fetchData();
   }, []);
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import api from '../services/api';
@@ -13,6 +13,10 @@ const SignIn = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    document.title = 'Sign In | Outbound Impact';
+  }, []);
 
   const handleChange = (e) => {
     setFormData({
