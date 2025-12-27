@@ -42,24 +42,16 @@ const CampaignsPage = () => {
     logoUrl: '',
   });
   
-  // ✅ NEW: Logo upload state
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   
-  // NFC State
   const [showNFCModal, setShowNFCModal] = useState(false);
   const [nfcCampaign, setNfcCampaign] = useState(null);
-
-  // Share State
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareSelectedCampaign, setShareSelectedCampaign] = useState(null);
-
-  // Edit Item State
   const [showEditItemModal, setShowEditItemModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
-
-  // Toast State
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   const showToast = (message, type = 'success') => {
@@ -88,7 +80,12 @@ const CampaignsPage = () => {
       
       if (itemsRes.data.status === 'success') {
         setItems(itemsRes.data.items);
-        await fetchAnalyticsForItems(itemsRes.data.items);
+        // ✅ OPTIMIZED: Use views from items data directly instead of fetching analytics
+        const analyticsData = {};
+        itemsRes.data.items.forEach(item => {
+          analyticsData[item.id] = item.views || 0;
+        });
+        setAnalytics(analyticsData);
       }
     } catch (error) {
       console.error('Failed to fetch data:', error);
@@ -97,26 +94,9 @@ const CampaignsPage = () => {
     }
   };
 
-  const fetchAnalyticsForItems = async (itemsList) => {
-    try {
-      const analyticsData = {};
-      for (const item of itemsList) {
-        try {
-          const response = await api.get(`/analytics/item/${item.id}`);
-          if (response.data.status === 'success') {
-            analyticsData[item.id] = response.data.analytics.totalViews || 0;
-          }
-        } catch (error) {
-          analyticsData[item.id] = 0;
-        }
-      }
-      setAnalytics(analyticsData);
-    } catch (error) {
-      console.error('Failed to fetch analytics:', error);
-    }
-  };
+  // ✅ REMOVED: fetchAnalyticsForItems function - no longer needed!
+  // The items endpoint already returns view counts
 
-  // ✅ NEW: Handle logo file selection
   const handleLogoSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -132,7 +112,6 @@ const CampaignsPage = () => {
       
       setLogoFile(file);
       
-      // Create preview
       const reader = new FileReader();
       reader.onloadend = () => {
         setLogoPreview(reader.result);
@@ -141,14 +120,11 @@ const CampaignsPage = () => {
     }
   };
 
-  // ✅ NEW: Upload logo to server
-  // ✅ FIXED: Upload logo to server (base64 format for your backend)
   const uploadLogo = async () => {
     if (!logoFile) return null;
 
     setUploadingLogo(true);
     try {
-      // Convert file to base64 (your backend expects this format)
       const base64Data = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
@@ -156,7 +132,6 @@ const CampaignsPage = () => {
         reader.readAsDataURL(logoFile);
       });
 
-      // Prepare data in the format your backend expects
       const uploadData = {
         title: `Campaign Logo - ${Date.now()}`,
         description: 'Campaign logo image',
@@ -173,7 +148,6 @@ const CampaignsPage = () => {
       });
 
       if (response.data.status === 'success') {
-        // Your backend returns the mediaUrl in item.thumbnailUrl
         return response.data.item?.thumbnailUrl || response.data.mediaUrl;
       }
       return null;
@@ -186,8 +160,6 @@ const CampaignsPage = () => {
     }
   };
 
-
-  // ✅ NEW: Clear logo
   const clearLogo = () => {
     setLogoFile(null);
     setLogoPreview('');
@@ -200,7 +172,6 @@ const CampaignsPage = () => {
     try {
       let logoUrl = formData.logoUrl;
       
-      // Upload logo if selected
       if (logoFile) {
         logoUrl = await uploadLogo();
         if (!logoUrl) {
@@ -233,7 +204,6 @@ const CampaignsPage = () => {
     try {
       let logoUrl = formData.logoUrl;
       
-      // Upload new logo if selected
       if (logoFile) {
         logoUrl = await uploadLogo();
         if (!logoUrl) {
@@ -316,7 +286,6 @@ const CampaignsPage = () => {
       logoUrl: campaign.logoUrl || '',
     });
     
-    // Set logo preview if exists
     if (campaign.logoUrl) {
       setLogoPreview(campaign.logoUrl);
     }
@@ -452,9 +421,7 @@ const CampaignsPage = () => {
     setShareSelectedCampaign(null);
   };
 
-  // ✅ UPDATED: Navigate to campaign with preview mode (not new tab)
   const openPublicCampaign = (campaign) => {
-    // Navigate in same window with preview=true parameter
     window.location.href = `/c/${campaign.slug}?preview=true`;
   };
 
@@ -480,7 +447,6 @@ const CampaignsPage = () => {
 
   return (
     <DashboardLayout>
-      {/* Toast Notification */}
       {toast.show && (
         <Toast
           message={toast.message}
@@ -527,10 +493,8 @@ const CampaignsPage = () => {
                   key={campaign.id}
                   className="bg-white rounded-xl shadow-lg p-6 border-2 border-gray-100 hover:border-primary transition-all"
                 >
-                  {/* Campaign Header */}
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
-                      {/* ✅ NEW: Show logo if exists */}
                       {campaign.logoUrl && (
                         <div className="mb-3">
                           <img 
@@ -663,13 +627,14 @@ const CampaignsPage = () => {
           </div>
         )}
 
-        {/* Create Campaign Modal */}
+        {/* All your modals remain the same - keeping them exactly as they are */}
+        {/* I'm keeping all modal code identical to avoid any issues */}
+        
         {showCreateModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
               <h2 className="text-2xl font-bold text-primary mb-6">Create Campaign</h2>
               <form onSubmit={handleCreate} className="space-y-6">
-                {/* ✅ NEW: Logo Upload Section */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Campaign Logo (Optional)
@@ -779,13 +744,13 @@ const CampaignsPage = () => {
           </div>
         )}
 
-        {/* Edit Campaign Modal */}
+        {/* Keeping all other modals exactly as they are */}
         {showEditModal && selectedCampaign && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            {/* Full edit modal code - keeping it identical */}
             <div className="bg-white rounded-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
               <h2 className="text-2xl font-bold text-primary mb-6">Edit Campaign</h2>
               <form onSubmit={handleEdit} className="space-y-6">
-                {/* ✅ NEW: Logo Upload Section */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Campaign Logo (Optional)
@@ -894,7 +859,7 @@ const CampaignsPage = () => {
           </div>
         )}
 
-        {/* VIEW Campaign Items Modal */}
+        {/* Continuing with VIEW and MANAGE modals - keeping them identical */}
         {showViewItemsModal && selectedCampaign && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl p-8 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
@@ -996,7 +961,6 @@ const CampaignsPage = () => {
           </div>
         )}
 
-        {/* Manage Items Modal */}
         {showAddItemsModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
@@ -1064,8 +1028,6 @@ const CampaignsPage = () => {
           </div>
         )}
 
-
-        {/* NFC Writer Modal - Only render when campaign exists */}
         {nfcCampaign && (
           <NFCWriter 
             campaign={nfcCampaign} 

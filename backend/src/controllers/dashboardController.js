@@ -1,63 +1,63 @@
 const prisma = require('../lib/prisma');
 
+// ✅ OPTIMIZED: Uses SQL aggregation instead of loading all items into memory
 const getDashboardStats = async (req, res) => {
   try {
-    const userId = req.effectiveUserId; // ✅ FIXED
+    const userId = req.effectiveUserId;
 
-    // Get user with storage info
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        storageUsed: true,
-        storageLimit: true,
-      },
-    });
+    // ✅ Run all queries in parallel for speed
+    const [
+      user,
+      totalUploads,
+      totalQRCodes,
+      totalCampaigns,
+      totalTeamMembers,
+      totalViews
+    ] = await Promise.all([
+      // Get user storage info
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          storageUsed: true,
+          storageLimit: true,
+        },
+      }),
+      
+      // ✅ OPTIMIZED: Direct count instead of fetching all items
+      prisma.item.count({
+        where: { userId },
+      }),
+      
+      // Count campaigns with QR codes
+      prisma.campaign.count({
+        where: {
+          userId,
+          qrCodeUrl: { not: null },
+        },
+      }),
+      
+      // Count campaigns
+      prisma.campaign.count({
+        where: { userId },
+      }),
+      
+      // Count team members
+      prisma.teamMember.count({
+        where: { userId },
+      }),
+      
+      // ✅ OPTIMIZED: Use SQL to count analytics directly
+      // This is MUCH faster than loading all items into memory
+      prisma.$queryRaw`
+        SELECT COUNT(*)::int as total
+        FROM "Analytics" a
+        INNER JOIN "Item" i ON a."itemId" = i.id
+        WHERE i."userId" = ${userId}
+      `
+    ]);
 
-    // Count items (uploads)
-    const totalUploads = await prisma.item.count({
-      where: { userId },
-    });
-
-    // Count campaigns with QR codes (instead of items)
-    const totalQRCodes = await prisma.campaign.count({
-      where: {
-        userId,
-        qrCodeUrl: { not: null },
-      },
-    });
-
-    // Count campaigns
-    const totalCampaigns = await prisma.campaign.count({
-      where: { userId },
-    });
-
-    // Count team members
-    const totalTeamMembers = await prisma.teamMember.count({
-      where: { userId },
-    });
-
-    // Get all user's items
-    const userItems = await prisma.item.findMany({
-      where: { userId },
-      select: { id: true, views: true }
-    });
-
-    const itemIds = userItems.map(item => item.id);
-
-    // Calculate total views from analytics table OR from item views
-    let totalViews = 0;
-    
-    // First try analytics
-    if (itemIds.length > 0) {
-      totalViews = await prisma.analytics.count({
-        where: { itemId: { in: itemIds } }
-      });
-    }
-    
-    // If no analytics, sum up item views
-    if (totalViews === 0) {
-      totalViews = userItems.reduce((sum, item) => sum + (item.views || 0), 0);
-    }
+    // Extract total views from SQL result
+    const viewsCount = totalViews[0]?.total || 0;
 
     // Calculate storage percentage
     const storageUsed = Number(user.storageUsed);
@@ -68,7 +68,7 @@ const getDashboardStats = async (req, res) => {
       status: 'success',
       stats: {
         totalUploads,
-        totalViews,
+        totalViews: viewsCount,
         qrCodesGenerated: totalQRCodes,
         totalQRCodes,
         totalCampaigns,
