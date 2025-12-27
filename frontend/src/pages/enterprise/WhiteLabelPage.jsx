@@ -1,69 +1,110 @@
+/* 
+ * ===================================================================
+ * COPY EVERYTHING FROM THIS LINE DOWN AND PASTE INTO WhiteLabelPage.jsx
+ * ===================================================================
+ */
+
 import { useState, useEffect } from 'react';
-import { Palette, Check, Globe, Mail } from 'lucide-react';
+import { Palette, Check, Globe, Mail, Loader2, RefreshCw } from 'lucide-react';
 import DashboardLayout from '../../components/dashboard/DashboardLayout';
+import Toast from '../../components/common/Toast';
 import useAuthStore from '../../store/authStore';
+import api from '../../services/api';
 
 const WhiteLabelPage = () => {
   const { user } = useAuthStore();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
   
-  // Load saved settings from localStorage
-  const loadSettings = () => {
-    const savedSettings = localStorage.getItem('whiteLabelSettings');
-    if (savedSettings) {
-      return JSON.parse(savedSettings);
-    }
-    return {
-      primaryColor: '#800080',
-      secondaryColor: '#EE82EE',
-      accentColor: '#9333ea',
-      customDomain: '',
-      emailFromName: '',
-      emailReplyTo: '',
-      footerText: 'Powered by Outbound Impact'
-    };
+  const [settings, setSettings] = useState({
+    primaryColor: '#800080',
+    secondaryColor: '#EE82EE',
+    accentColor: '#9333ea',
+    customDomain: '',
+    emailFromName: '',
+    emailReplyTo: '',
+    footerText: 'Powered by Outbound Impact'
+  });
+
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
   };
 
-  const [settings, setSettings] = useState(loadSettings());
+  useEffect(() => {
+    document.title = 'White Label Settings | Outbound Impact';
+    loadSettings();
+  }, []);
 
-  // Apply theme colors on load and when settings change
   useEffect(() => {
     applyTheme();
   }, [settings.primaryColor, settings.secondaryColor, settings.accentColor]);
 
-  const applyTheme = () => {
-    // Apply CSS variables for theme
-    document.documentElement.style.setProperty('--primary-color', settings.primaryColor);
-    document.documentElement.style.setProperty('--secondary-color', settings.secondaryColor);
-    document.documentElement.style.setProperty('--accent-color', settings.accentColor);
+  const loadSettings = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/white-label/branding');
+      
+      if (response.data.status === 'success' && response.data.branding) {
+        const loadedSettings = response.data.branding;
+        setSettings({
+          primaryColor: loadedSettings.primaryColor || '#800080',
+          secondaryColor: loadedSettings.secondaryColor || '#EE82EE',
+          accentColor: loadedSettings.accentColor || '#9333ea',
+          customDomain: loadedSettings.customDomain || '',
+          emailFromName: loadedSettings.emailFromName || '',
+          emailReplyTo: loadedSettings.emailReplyTo || '',
+          footerText: loadedSettings.footerText || 'Powered by Outbound Impact'
+        });
+        applyTheme(loadedSettings);
+      }
+    } catch (error) {
+      console.error('Failed to load settings:', error);
+      if (error.response?.status !== 404) {
+        showToast('Failed to load white label settings', 'error');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const applyTheme = (customSettings = settings) => {
+    document.documentElement.style.setProperty('--brand-primary', customSettings.primaryColor);
+    document.documentElement.style.setProperty('--brand-secondary', customSettings.secondaryColor);
+    document.documentElement.style.setProperty('--accent-color', customSettings.accentColor);
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Save to localStorage
-      localStorage.setItem('whiteLabelSettings', JSON.stringify(settings));
+      const response = await api.put('/white-label/branding', settings);
       
-      // Apply theme immediately
-      applyTheme();
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-      alert('White-label settings saved successfully! Colors have been applied throughout the dashboard.');
+      if (response.data.status === 'success') {
+        applyTheme();
+        
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+        showToast('White-label settings saved successfully!', 'success');
+      }
     } catch (error) {
       console.error('Failed to save settings:', error);
-      alert('Failed to save settings');
+      showToast(error.response?.data?.message || 'Failed to save settings', 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  const resetToDefault = () => {
-    if (confirm('Are you sure you want to reset all white-label settings to default?')) {
+  const resetToDefault = async () => {
+    if (!confirm('Are you sure you want to reset all white-label settings to default?')) {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await api.delete('/white-label/branding');
+      
       const defaultSettings = {
         primaryColor: '#800080',
         secondaryColor: '#EE82EE',
@@ -75,21 +116,37 @@ const WhiteLabelPage = () => {
       };
       
       setSettings(defaultSettings);
-      localStorage.removeItem('whiteLabelSettings');
-      
-      // Reset CSS variables
-      document.documentElement.style.setProperty('--primary-color', '#800080');
-      document.documentElement.style.setProperty('--secondary-color', '#EE82EE');
-      document.documentElement.style.setProperty('--accent-color', '#9333ea');
-      
-      alert('Settings reset to default!');
+      applyTheme(defaultSettings);
+      showToast('Settings reset to default!', 'success');
+    } catch (error) {
+      console.error('Failed to reset settings:', error);
+      showToast('Failed to reset settings', 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="animate-spin text-primary" size={48} />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
+      {toast.show && (
+        <Toast 
+          message={toast.message} 
+          type={toast.type} 
+          onClose={() => setToast({ ...toast, show: false })} 
+        />
+      )}
+
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-primary mb-2 flex items-center gap-3">
@@ -100,32 +157,23 @@ const WhiteLabelPage = () => {
           </div>
           <button
             onClick={resetToDefault}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold hover:bg-gray-50"
+            disabled={saving}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 disabled:opacity-50 flex items-center gap-2"
           >
+            <RefreshCw size={16} />
             Reset to Default
           </button>
         </div>
 
-        {/* Info Notice */}
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-          <p className="text-blue-900 font-semibold mb-1">💡 Logo & Profile Settings</p>
-          <p className="text-blue-800 text-sm">Company name, logo, and profile picture can be changed in <button onClick={() => window.location.href = '/dashboard/settings'} className="text-primary font-semibold underline">Settings</button>.</p>
-        </div>
-
-        {/* Preview Notice */}
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
-          <p className="text-green-900 font-semibold mb-1">✨ Live Preview Enabled</p>
-          <p className="text-green-800 text-sm">Color changes will be visible throughout the dashboard in real-time. Save to make them permanent.</p>
-        </div>
-
-        {/* Color Scheme */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">Brand Color Scheme</h2>
+        <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <Palette className="text-primary" size={24} />
+            <h2 className="text-xl font-bold text-gray-900">Brand Colors</h2>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Primary Color */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Primary Color
               </label>
               <div className="flex gap-3 items-center">
@@ -133,23 +181,21 @@ const WhiteLabelPage = () => {
                   type="color"
                   value={settings.primaryColor}
                   onChange={(e) => setSettings({ ...settings, primaryColor: e.target.value })}
-                  className="w-16 h-16 rounded-lg cursor-pointer border-2 border-gray-300"
+                  className="h-12 w-20 rounded-lg border border-gray-300 cursor-pointer"
                 />
-                <div>
-                  <input
-                    type="text"
-                    value={settings.primaryColor}
-                    onChange={(e) => setSettings({ ...settings, primaryColor: e.target.value })}
-                    className="px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm w-28"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Main brand color</p>
-                </div>
+                <input
+                  type="text"
+                  value={settings.primaryColor}
+                  onChange={(e) => setSettings({ ...settings, primaryColor: e.target.value })}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono uppercase"
+                  placeholder="#800080"
+                />
               </div>
+              <p className="text-xs text-gray-500 mt-1">Main brand color used throughout the platform</p>
             </div>
 
-            {/* Secondary Color */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Secondary Color
               </label>
               <div className="flex gap-3 items-center">
@@ -157,23 +203,21 @@ const WhiteLabelPage = () => {
                   type="color"
                   value={settings.secondaryColor}
                   onChange={(e) => setSettings({ ...settings, secondaryColor: e.target.value })}
-                  className="w-16 h-16 rounded-lg cursor-pointer border-2 border-gray-300"
+                  className="h-12 w-20 rounded-lg border border-gray-300 cursor-pointer"
                 />
-                <div>
-                  <input
-                    type="text"
-                    value={settings.secondaryColor}
-                    onChange={(e) => setSettings({ ...settings, secondaryColor: e.target.value })}
-                    className="px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm w-28"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Accent highlights</p>
-                </div>
+                <input
+                  type="text"
+                  value={settings.secondaryColor}
+                  onChange={(e) => setSettings({ ...settings, secondaryColor: e.target.value })}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono uppercase"
+                  placeholder="#EE82EE"
+                />
               </div>
+              <p className="text-xs text-gray-500 mt-1">Used for gradients and accents</p>
             </div>
 
-            {/* Accent Color */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Accent Color
               </label>
               <div className="flex gap-3 items-center">
@@ -181,66 +225,71 @@ const WhiteLabelPage = () => {
                   type="color"
                   value={settings.accentColor}
                   onChange={(e) => setSettings({ ...settings, accentColor: e.target.value })}
-                  className="w-16 h-16 rounded-lg cursor-pointer border-2 border-gray-300"
+                  className="h-12 w-20 rounded-lg border border-gray-300 cursor-pointer"
                 />
-                <div>
-                  <input
-                    type="text"
-                    value={settings.accentColor}
-                    onChange={(e) => setSettings({ ...settings, accentColor: e.target.value })}
-                    className="px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm w-28"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Buttons & CTAs</p>
-                </div>
+                <input
+                  type="text"
+                  value={settings.accentColor}
+                  onChange={(e) => setSettings({ ...settings, accentColor: e.target.value })}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono uppercase"
+                  placeholder="#9333ea"
+                />
               </div>
+              <p className="text-xs text-gray-500 mt-1">Highlight and interactive elements</p>
             </div>
           </div>
 
-          {/* Color Preview */}
-          <div className="mt-6 p-6 rounded-lg" style={{ backgroundColor: settings.primaryColor }}>
-            <h3 className="text-white font-bold text-xl mb-2">Live Color Preview</h3>
-            <p className="text-white opacity-90 mb-4">This is how your primary color will look across the platform</p>
-            <button 
-              className="px-6 py-3 rounded-lg font-semibold"
-              style={{ backgroundColor: settings.accentColor, color: 'white' }}
-            >
-              Sample Button
-            </button>
+          <div className="mt-6 p-6 bg-gradient-to-r rounded-lg" style={{ 
+            background: `linear-gradient(to right, ${settings.primaryColor}, ${settings.secondaryColor})`
+          }}>
+            <div className="text-white">
+              <h3 className="text-xl font-bold mb-2">Preview</h3>
+              <p className="text-white/90 mb-4">This is how your brand colors will look</p>
+              <button 
+                className="px-6 py-2 rounded-lg font-semibold"
+                style={{ backgroundColor: settings.accentColor }}
+              >
+                Sample Button
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Custom Domain */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 mb-6">
+        <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 mb-8">
           <div className="flex items-center gap-3 mb-6">
             <Globe className="text-primary" size={24} />
             <h2 className="text-xl font-bold text-gray-900">Custom Domain</h2>
           </div>
 
-          <div className="mb-4">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Your Custom Domain
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Domain Name
             </label>
             <input
               type="text"
               value={settings.customDomain}
               onChange={(e) => setSettings({ ...settings, customDomain: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              placeholder="share.yourcompany.com"
+              placeholder="e.g., share.yourcompany.com"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
             />
-            <p className="text-xs text-gray-500 mt-2">
-              Configure your DNS to point to our servers. Contact support for setup instructions.
+            <p className="text-xs text-gray-500 mt-1">
+              Use your own domain for shared links. You'll need to configure DNS settings.
             </p>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-blue-800 text-sm">
-              <strong>DNS Configuration:</strong> Add a CNAME record pointing to <code className="bg-blue-100 px-2 py-1 rounded">proxy.outboundimpact.com</code>
-            </p>
-          </div>
+          {settings.customDomain && (
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h4 className="font-semibold text-blue-900 mb-2">DNS Configuration:</h4>
+              <div className="text-sm text-blue-800 space-y-1 font-mono">
+                <p>Type: CNAME</p>
+                <p>Name: {settings.customDomain}</p>
+                <p>Value: outbound.im</p>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Email Branding */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 mb-6">
+        <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 mb-8">
           <div className="flex items-center gap-3 mb-6">
             <Mail className="text-primary" size={24} />
             <h2 className="text-xl font-bold text-gray-900">Email Branding</h2>
@@ -248,70 +297,76 @@ const WhiteLabelPage = () => {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 From Name
               </label>
               <input
                 type="text"
                 value={settings.emailFromName}
                 onChange={(e) => setSettings({ ...settings, emailFromName: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                placeholder="Your Company Name"
+                placeholder="e.g., Your Company Name"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               />
-              <p className="text-xs text-gray-500 mt-1">This name will appear in email notifications sent to users</p>
+              <p className="text-xs text-gray-500 mt-1">Name that appears in the 'From' field of emails</p>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Reply-To Email
               </label>
               <input
                 type="email"
                 value={settings.emailReplyTo}
                 onChange={(e) => setSettings({ ...settings, emailReplyTo: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                placeholder="support@yourcompany.com"
+                placeholder="e.g., support@yourcompany.com"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               />
-              <p className="text-xs text-gray-500 mt-1">Users will reply to this email address</p>
+              <p className="text-xs text-gray-500 mt-1">Email address for recipients to reply to</p>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Email Footer Text
               </label>
-              <input
-                type="text"
+              <textarea
                 value={settings.footerText}
                 onChange={(e) => setSettings({ ...settings, footerText: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                rows={3}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="Powered by Your Company"
               />
-              <p className="text-xs text-gray-500 mt-1">This text appears at the bottom of the dashboard</p>
+              <p className="text-xs text-gray-500 mt-1">Text shown at the bottom of notification emails</p>
             </div>
           </div>
         </div>
 
-        {/* Save Button */}
-        <div className="flex justify-end gap-4">
+        <div className="flex items-center justify-between bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+          <div>
+            {saved && (
+              <div className="flex items-center gap-2 text-green-600">
+                <Check size={20} />
+                <span className="font-semibold">Settings saved successfully!</span>
+              </div>
+            )}
+          </div>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="bg-gradient-to-r from-primary to-secondary text-white px-8 py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
+            className="px-8 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
           >
-            {saving ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                Saving...
-              </>
-            ) : saved ? (
-              <>
-                <Check size={20} />
-                Saved!
-              </>
-            ) : (
-              'Save Changes'
-            )}
+            {saving && <Loader2 size={16} className="animate-spin" />}
+            {saving ? 'Saving...' : 'Save Settings'}
           </button>
+        </div>
+
+        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-6">
+          <h3 className="font-semibold text-blue-900 mb-2">Note:</h3>
+          <ul className="text-blue-800 text-sm space-y-1 list-disc list-inside">
+            <li>Brand colors are applied across the entire platform</li>
+            <li>Custom domain requires DNS configuration on your domain provider</li>
+            <li>Email settings affect all outgoing notifications</li>
+            <li>Changes take effect immediately after saving</li>
+          </ul>
         </div>
       </div>
     </DashboardLayout>

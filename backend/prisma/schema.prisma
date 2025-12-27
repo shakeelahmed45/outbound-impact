@@ -25,9 +25,12 @@ model User {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  // ✅ ADD THESE TWO LINES:
   resetToken         String?
   resetTokenExpiry   DateTime?
+
+  // Enterprise features fields
+  twoFactorEnabled   Boolean   @default(false)
+  twoFactorSecret    String?
 
   items             Item[]
   campaigns         Campaign[]
@@ -36,9 +39,15 @@ model User {
   feedback          Feedback[]
   chatConversations ChatConversation[]
 
-  @@index([email])
-  @@index([resetToken])  // ✅ ADD THIS LINE TOO
+  // Enterprise features relations
+  apiKeys              ApiKey[]
+  whiteLabelSettings   WhiteLabelSettings?
+  webhooks             Webhook[]
+  integrations         Integration[]
+  auditLogs            AuditLog[]
 
+  @@index([email])
+  @@index([resetToken])
 }
 
 enum Role {
@@ -98,7 +107,7 @@ model Campaign {
   name        String
   description String?
   category    String?
-  logoUrl     String?  // ✅ ADD THIS LINE
+  logoUrl     String?
   qrCodeUrl   String?
   userId      String
   createdAt   DateTime @default(now())
@@ -120,7 +129,7 @@ model TeamMember {
   memberUserId String?
   status       String   @default("PENDING")
   token        String?  @unique
-  message      String?  // ✨ Custom invitation message
+  message      String?
   createdAt    DateTime @default(now())
 
   user       User  @relation(fields: [userId], references: [id], onDelete: Cascade, name: "OrganizationMembers")
@@ -210,4 +219,83 @@ model ChatMessage {
 enum SenderType {
   USER
   ADMIN
+}
+
+// ========================================
+// ENTERPRISE FEATURES MODELS
+// ========================================
+
+model ApiKey {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  key         String   @unique
+  lastUsed    DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([key])
+}
+
+model WhiteLabelSettings {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  primaryColor    String   @default("#800080")
+  secondaryColor  String   @default("#EE82EE")
+  accentColor     String   @default("#9333ea")
+  customDomain    String?
+  emailFromName   String?
+  emailReplyTo    String?
+  footerText      String   @default("Powered by Outbound Impact")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Webhook {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  url       String
+  events    String[]
+  active    Boolean  @default(true)
+  secret    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([userId])
+}
+
+model Integration {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type          String
+  name          String
+  config        Json
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([type])
+  @@unique([userId, type])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  ipAddress String?
+  location  String?
+  device    String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([createdAt])
 }

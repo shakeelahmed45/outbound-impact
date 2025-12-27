@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ExternalLink, Paperclip, X, Download } from 'lucide-react';
 import axios from 'axios';
+import useBrandColors from '../hooks/useBrandColors';
 
 const PublicViewer = () => {
   const { slug } = useParams();
@@ -14,6 +15,9 @@ const PublicViewer = () => {
   const [selectedDocument, setSelectedDocument] = useState(null);
   const hasTracked = useRef(false);
   const overlayTimeout = useRef(null);
+
+  // ✅ Apply brand colors for the item's owner
+  useBrandColors(item?.userId);
 
   useEffect(() => {
     const fetchItem = async () => {
@@ -69,7 +73,6 @@ const PublicViewer = () => {
     const isPreview = searchParams.get('preview');
     
     if (fromCampaign) {
-      // Preserve preview parameter when navigating back to campaign
       const targetUrl = isPreview === 'true' 
         ? `/c/${fromCampaign}?preview=true`
         : `/c/${fromCampaign}`;
@@ -96,11 +99,9 @@ const PublicViewer = () => {
     setSelectedDocument(null);
   };
 
-  // Convert URLs to proper embed format
   const convertToEmbedUrl = (url) => {
     if (!url) return url;
 
-    // YouTube Shorts: https://youtube.com/shorts/VIDEO_ID → https://www.youtube.com/embed/VIDEO_ID
     if (url.includes('youtube.com/shorts/') || url.includes('youtu.be/shorts/')) {
       const videoId = url.split('/shorts/')[1]?.split('?')[0]?.split('&')[0];
       if (videoId) {
@@ -108,7 +109,6 @@ const PublicViewer = () => {
       }
     }
 
-    // YouTube short URL: https://youtu.be/VIDEO_ID
     if (url.includes('youtu.be/') && !url.includes('/shorts/')) {
       const videoId = url.split('youtu.be/')[1]?.split('?')[0]?.split('&')[0];
       if (videoId) {
@@ -116,7 +116,6 @@ const PublicViewer = () => {
       }
     }
 
-    // YouTube watch URL: https://www.youtube.com/watch?v=VIDEO_ID
     if (url.includes('youtube.com/watch')) {
       const urlParams = new URLSearchParams(url.split('?')[1]);
       const videoId = urlParams.get('v');
@@ -125,12 +124,10 @@ const PublicViewer = () => {
       }
     }
 
-    // YouTube embed URL (already correct)
     if (url.includes('youtube.com/embed/')) {
       return url;
     }
 
-    // Vimeo: https://vimeo.com/VIDEO_ID → https://player.vimeo.com/video/VIDEO_ID
     if (url.includes('vimeo.com/') && !url.includes('player.vimeo.com')) {
       const videoId = url.split('vimeo.com/')[1]?.split('?')[0]?.split('/')[0];
       if (videoId) {
@@ -138,7 +135,6 @@ const PublicViewer = () => {
       }
     }
 
-    // Google Drive: Convert to preview format
     if (url.includes('drive.google.com/file/d/')) {
       const fileId = url.split('/d/')[1]?.split('/')[0];
       if (fileId) {
@@ -146,7 +142,6 @@ const PublicViewer = () => {
       }
     }
 
-    // Google Docs: Add /preview if not present
     if (url.includes('docs.google.com/document/d/') && !url.includes('/preview')) {
       const docId = url.split('/d/')[1]?.split('/')[0];
       if (docId) {
@@ -154,7 +149,6 @@ const PublicViewer = () => {
       }
     }
 
-    // Google Sheets: Add /preview if not present
     if (url.includes('docs.google.com/spreadsheets/d/') && !url.includes('/preview')) {
       const sheetId = url.split('/d/')[1]?.split('/')[0];
       if (sheetId) {
@@ -162,7 +156,6 @@ const PublicViewer = () => {
       }
     }
 
-    // Return original URL if no conversion needed
     return url;
   };
 
@@ -222,14 +215,12 @@ const PublicViewer = () => {
               className="max-w-full max-h-[70vh] object-contain"
             />
             
-            {/* ✅ NEW: Button and Attachments for IMAGE */}
             {(item.buttonText || item.attachments) && (
               <div className="mt-8 bg-white bg-opacity-95 p-6 rounded-2xl shadow-2xl max-w-4xl w-full">
-                {/* Documents Section */}
                 {item.attachments && item.attachments.length > 0 && (
                   <div className="mb-6">
                     <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                      <Paperclip size={20} className="text-purple-600" />
+                      <Paperclip size={20} style={{ color: 'var(--brand-primary)' }} />
                       Attached Documents
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -242,25 +233,24 @@ const PublicViewer = () => {
                           }}
                           className="flex items-center gap-3 p-4 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-all group text-left"
                         >
-                          <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-purple-500 to-violet-500 rounded-lg flex items-center justify-center">
+                          <div className="flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center" style={{ background: `linear-gradient(to bottom right, var(--brand-primary), var(--brand-secondary))` }}>
                             <Paperclip size={20} className="text-white" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-gray-900 truncate group-hover:text-purple-600">
+                            <p className="font-semibold text-gray-900 truncate" style={{ color: 'var(--brand-primary)' }}>
                               {doc.name}
                             </p>
                             <p className="text-sm text-gray-500">
                               {(doc.size / 1024).toFixed(1)} KB
                             </p>
                           </div>
-                          <ExternalLink size={18} className="text-gray-400 group-hover:text-purple-600 flex-shrink-0" />
+                          <ExternalLink size={18} className="text-gray-400 flex-shrink-0" style={{ color: 'var(--brand-primary)' }} />
                         </button>
                       ))}
                     </div>
                   </div>
                 )}
                 
-                {/* Custom Link Button */}
                 {item.buttonText && item.buttonUrl && (
                   <div className={item.attachments && item.attachments.length > 0 ? "pt-6 border-t border-gray-200" : ""}>
                     <a
@@ -268,8 +258,11 @@ const PublicViewer = () => {
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-6 sm:px-8 py-4 sm:py-5 bg-gradient-to-r from-primary to-secondary text-white rounded-xl font-bold text-base sm:text-lg shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 active:scale-95"
-                      style={{ minHeight: '56px' }}
+                      className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-6 sm:px-8 py-4 sm:py-5 text-white rounded-xl font-bold text-base sm:text-lg shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 active:scale-95"
+                      style={{ 
+                        minHeight: '56px',
+                        background: `linear-gradient(to right, var(--brand-primary), var(--brand-secondary))`
+                      }}
                     >
                       <ExternalLink size={24} />
                       {item.buttonText}
@@ -292,14 +285,12 @@ const PublicViewer = () => {
               <source src={item.mediaUrl} />
             </video>
             
-            {/* ✅ NEW: Button and Attachments for VIDEO */}
             {(item.buttonText || item.attachments) && (
               <div className="mt-8 bg-white bg-opacity-95 p-6 rounded-2xl shadow-2xl max-w-4xl w-full">
-                {/* Documents Section */}
                 {item.attachments && item.attachments.length > 0 && (
                   <div className="mb-6">
                     <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                      <Paperclip size={20} className="text-purple-600" />
+                      <Paperclip size={20} style={{ color: 'var(--brand-primary)' }} />
                       Attached Documents
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -312,25 +303,24 @@ const PublicViewer = () => {
                           }}
                           className="flex items-center gap-3 p-4 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-all group text-left"
                         >
-                          <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-purple-500 to-violet-500 rounded-lg flex items-center justify-center">
+                          <div className="flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center" style={{ background: `linear-gradient(to bottom right, var(--brand-primary), var(--brand-secondary))` }}>
                             <Paperclip size={20} className="text-white" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-gray-900 truncate group-hover:text-purple-600">
+                            <p className="font-semibold text-gray-900 truncate" style={{ color: 'var(--brand-primary)' }}>
                               {doc.name}
                             </p>
                             <p className="text-sm text-gray-500">
                               {(doc.size / 1024).toFixed(1)} KB
                             </p>
                           </div>
-                          <ExternalLink size={18} className="text-gray-400 group-hover:text-purple-600 flex-shrink-0" />
+                          <ExternalLink size={18} className="text-gray-400 flex-shrink-0" style={{ color: 'var(--brand-primary)' }} />
                         </button>
                       ))}
                     </div>
                   </div>
                 )}
                 
-                {/* Custom Link Button */}
                 {item.buttonText && item.buttonUrl && (
                   <div className={item.attachments && item.attachments.length > 0 ? "pt-6 border-t border-gray-200" : ""}>
                     <a
@@ -338,8 +328,11 @@ const PublicViewer = () => {
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-6 sm:px-8 py-4 sm:py-5 bg-gradient-to-r from-primary to-secondary text-white rounded-xl font-bold text-base sm:text-lg shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 active:scale-95"
-                      style={{ minHeight: '56px' }}
+                      className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-6 sm:px-8 py-4 sm:py-5 text-white rounded-xl font-bold text-base sm:text-lg shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 active:scale-95"
+                      style={{ 
+                        minHeight: '56px',
+                        background: `linear-gradient(to right, var(--brand-primary), var(--brand-secondary))`
+                      }}
                     >
                       <ExternalLink size={24} />
                       {item.buttonText}
@@ -354,7 +347,7 @@ const PublicViewer = () => {
         {/* AUDIO */}
         {item.type === 'AUDIO' && (
           <div className="w-full max-w-2xl px-8">
-            <div className="bg-gradient-to-br from-purple-900 to-violet-900 p-12 rounded-3xl">
+            <div className="p-12 rounded-3xl" style={{ background: `linear-gradient(to bottom right, var(--brand-primary), var(--brand-secondary))` }}>
               <div className="text-center mb-8">
                 <div className="w-32 h-32 bg-white bg-opacity-10 rounded-full flex items-center justify-center mx-auto mb-6">
                   <span className="text-7xl">🎵</span>
@@ -366,14 +359,12 @@ const PublicViewer = () => {
               </audio>
             </div>
             
-            {/* ✅ NEW: Button and Attachments for AUDIO */}
             {(item.buttonText || item.attachments) && (
               <div className="mt-8 bg-white bg-opacity-95 p-6 rounded-2xl shadow-2xl">
-                {/* Documents Section */}
                 {item.attachments && item.attachments.length > 0 && (
                   <div className="mb-6">
                     <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                      <Paperclip size={20} className="text-purple-600" />
+                      <Paperclip size={20} style={{ color: 'var(--brand-primary)' }} />
                       Attached Documents
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -386,25 +377,24 @@ const PublicViewer = () => {
                           }}
                           className="flex items-center gap-3 p-4 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-all group text-left"
                         >
-                          <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-purple-500 to-violet-500 rounded-lg flex items-center justify-center">
+                          <div className="flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center" style={{ background: `linear-gradient(to bottom right, var(--brand-primary), var(--brand-secondary))` }}>
                             <Paperclip size={20} className="text-white" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-gray-900 truncate group-hover:text-purple-600">
+                            <p className="font-semibold text-gray-900 truncate" style={{ color: 'var(--brand-primary)' }}>
                               {doc.name}
                             </p>
                             <p className="text-sm text-gray-500">
                               {(doc.size / 1024).toFixed(1)} KB
                             </p>
                           </div>
-                          <ExternalLink size={18} className="text-gray-400 group-hover:text-purple-600 flex-shrink-0" />
+                          <ExternalLink size={18} className="text-gray-400 flex-shrink-0" style={{ color: 'var(--brand-primary)' }} />
                         </button>
                       ))}
                     </div>
                   </div>
                 )}
                 
-                {/* Custom Link Button */}
                 {item.buttonText && item.buttonUrl && (
                   <div className={item.attachments && item.attachments.length > 0 ? "pt-6 border-t border-gray-200" : ""}>
                     <a
@@ -412,8 +402,11 @@ const PublicViewer = () => {
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-6 sm:px-8 py-4 sm:py-5 bg-gradient-to-r from-primary to-secondary text-white rounded-xl font-bold text-base sm:text-lg shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 active:scale-95"
-                      style={{ minHeight: '56px' }}
+                      className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-6 sm:px-8 py-4 sm:py-5 text-white rounded-xl font-bold text-base sm:text-lg shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 active:scale-95"
+                      style={{ 
+                        minHeight: '56px',
+                        background: `linear-gradient(to right, var(--brand-primary), var(--brand-secondary))`
+                      }}
                     >
                       <ExternalLink size={24} />
                       {item.buttonText}
@@ -425,22 +418,20 @@ const PublicViewer = () => {
           </div>
         )}
 
-        {/* TEXT - FIXED FOR MOBILE */}
+        {/* TEXT */}
         {item.type === 'TEXT' && (
           <div className="w-full max-w-4xl max-h-screen overflow-y-auto px-4 sm:px-8 py-12">
             <div className="bg-white bg-opacity-95 p-6 sm:p-12 rounded-3xl">
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">{item.title}</h2>
+              <h2 className="text-2xl sm:text-3xl font-bold mb-6" style={{ color: 'var(--brand-primary)' }}>{item.title}</h2>
               
-              {/* Text Content */}
               <div className="text-gray-800 text-base sm:text-lg whitespace-pre-wrap leading-relaxed mb-8">
                 {item.mediaUrl || 'No content available'}
               </div>
               
-              {/* Documents Section - NEW */}
               {item.attachments && item.attachments.length > 0 && (
                 <div className="mt-6 pt-6 border-t border-gray-200">
                   <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    <Paperclip size={20} className="text-purple-600" />
+                    <Paperclip size={20} style={{ color: 'var(--brand-primary)' }} />
                     Attached Documents
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -453,25 +444,24 @@ const PublicViewer = () => {
                         }}
                         className="flex items-center gap-3 p-4 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-all group text-left"
                       >
-                        <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-purple-500 to-violet-500 rounded-lg flex items-center justify-center">
+                        <div className="flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center" style={{ background: `linear-gradient(to bottom right, var(--brand-primary), var(--brand-secondary))` }}>
                           <Paperclip size={20} className="text-white" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-gray-900 truncate group-hover:text-purple-600">
+                          <p className="font-semibold text-gray-900 truncate" style={{ color: 'var(--brand-primary)' }}>
                             {doc.name}
                           </p>
                           <p className="text-sm text-gray-500">
                             {(doc.size / 1024).toFixed(1)} KB
                           </p>
                         </div>
-                        <ExternalLink size={18} className="text-gray-400 group-hover:text-purple-600 flex-shrink-0" />
+                        <ExternalLink size={18} className="text-gray-400 flex-shrink-0" style={{ color: 'var(--brand-primary)' }} />
                       </button>
                     ))}
                   </div>
                 </div>
               )}
               
-              {/* Custom Link Button - FIXED FOR MOBILE */}
               {item.buttonText && item.buttonUrl && (
                 <div className="mt-8 pt-6 border-t border-gray-200">
                   <a
@@ -479,8 +469,11 @@ const PublicViewer = () => {
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-6 sm:px-8 py-4 sm:py-5 bg-gradient-to-r from-primary to-secondary text-white rounded-xl font-bold text-base sm:text-lg shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 active:scale-95"
-                    style={{ minHeight: '56px' }}
+                    className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-6 sm:px-8 py-4 sm:py-5 text-white rounded-xl font-bold text-base sm:text-lg shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 active:scale-95"
+                    style={{ 
+                      minHeight: '56px',
+                      background: `linear-gradient(to right, var(--brand-primary), var(--brand-secondary))`
+                    }}
                   >
                     <ExternalLink size={24} />
                     {item.buttonText}
@@ -491,11 +484,11 @@ const PublicViewer = () => {
           </div>
         )}
 
-        {/* EMBED - External Content */}
+        {/* EMBED */}
         {item.type === 'EMBED' && (
           <div className="w-full max-w-6xl px-4 sm:px-6 md:px-8 py-8 sm:py-12">
             <div className="bg-white bg-opacity-95 p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl shadow-2xl max-h-[85vh] overflow-y-auto">
-              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-4 sm:mb-6" style={{ color: 'var(--brand-primary)' }}>
                 {item.title}
               </h2>
               {item.description && (
@@ -504,7 +497,6 @@ const PublicViewer = () => {
                 </p>
               )}
               
-              {/* Embed Container */}
               <div className="relative w-full bg-gray-100 rounded-xl sm:rounded-2xl overflow-hidden mb-4 sm:mb-6" 
                    style={{ paddingBottom: '56.25%' }}>
                 <iframe
@@ -517,27 +509,18 @@ const PublicViewer = () => {
                 />
               </div>
 
-              {/* Open in New Tab Button */}
               <div className="flex justify-center pt-2">
                 <a
                   href={item.mediaUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2.5 sm:px-6 sm:py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg sm:rounded-xl font-semibold shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 text-sm sm:text-base"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 sm:px-6 sm:py-3 text-white rounded-lg sm:rounded-xl font-semibold shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 text-sm sm:text-base"
+                  style={{ background: `linear-gradient(to right, var(--brand-primary), var(--brand-secondary))` }}
                 >
                   <ExternalLink size={18} className="sm:w-5 sm:h-5" />
                   Open in New Tab
                 </a>
               </div>
-
-              {/* Debug Info (Remove after testing) */}
-              {import.meta.env.DEV && (
-                <div className="mt-4 p-3 bg-gray-100 rounded-lg text-xs">
-                  <p className="font-semibold mb-1">Debug Info:</p>
-                  <p className="text-gray-600 break-all">Original URL: {item.mediaUrl}</p>
-                  <p className="text-gray-600 break-all">Converted URL: {convertToEmbedUrl(item.mediaUrl)}</p>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -545,17 +528,18 @@ const PublicViewer = () => {
         {/* OTHER FILE TYPES */}
         {item.type !== 'IMAGE' && item.type !== 'VIDEO' && item.type !== 'AUDIO' && item.type !== 'TEXT' && item.type !== 'EMBED' && (
           <div className="bg-white bg-opacity-95 p-12 rounded-3xl text-center max-w-md">
-            <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-violet-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6" style={{ background: `linear-gradient(to bottom right, var(--brand-primary), var(--brand-secondary))` }}>
               <span className="text-5xl">📄</span>
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">{item.title}</h3>
+            <h3 className="text-2xl font-bold mb-4" style={{ color: 'var(--brand-primary)' }}>{item.title}</h3>
             {item.description && (
               <p className="text-gray-600 mb-6">{item.description}</p>
             )}
             <a 
               href={item.mediaUrl} 
               download 
-              className="inline-block bg-gradient-to-r from-purple-600 to-violet-600 text-white px-8 py-4 rounded-lg font-semibold hover:opacity-90 transition"
+              className="inline-block text-white px-8 py-4 rounded-lg font-semibold hover:opacity-90 transition"
+              style={{ background: `linear-gradient(to right, var(--brand-primary), var(--brand-secondary))` }}
             >
               Download File
             </a>
@@ -563,7 +547,7 @@ const PublicViewer = () => {
         )}
       </div>
 
-      {/* Text Overlay (Bottom) - Title & Description */}
+      {/* Text Overlay (Bottom) */}
       {(item.title || item.description) && (
         <div 
           className={`fixed bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-black via-black to-transparent p-0 pb-8 transition-all duration-500 ${
@@ -585,7 +569,7 @@ const PublicViewer = () => {
         </div>
       )}
 
-      {/* Document Viewer Modal - NEW */}
+      {/* Document Viewer Modal */}
       {showDocumentModal && selectedDocument && (
         <div 
           className="fixed inset-0 z-[100] bg-black bg-opacity-90 flex items-center justify-center p-4"
@@ -595,15 +579,14 @@ const PublicViewer = () => {
             className="relative bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-violet-600 text-white p-4 sm:p-6 flex items-center justify-between">
+            <div className="sticky top-0 text-white p-4 sm:p-6 flex items-center justify-between" style={{ background: `linear-gradient(to right, var(--brand-primary), var(--brand-secondary))` }}>
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <div className="flex-shrink-0 w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
                   <Paperclip size={24} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="text-xl font-bold truncate">{selectedDocument.name}</h3>
-                  <p className="text-sm text-purple-100">
+                  <p className="text-sm opacity-80">
                     {(selectedDocument.size / 1024).toFixed(1)} KB
                   </p>
                 </div>
@@ -616,7 +599,6 @@ const PublicViewer = () => {
               </button>
             </div>
 
-            {/* Document Preview */}
             <div className="overflow-auto" style={{ maxHeight: 'calc(90vh - 140px)' }}>
               {selectedDocument.type?.includes('image') ? (
                 <img 
@@ -633,10 +615,10 @@ const PublicViewer = () => {
                 />
               ) : (
                 <div className="p-12 text-center">
-                  <div className="w-32 h-32 bg-gradient-to-br from-purple-500 to-violet-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <div className="w-32 h-32 rounded-full flex items-center justify-center mx-auto mb-6" style={{ background: `linear-gradient(to bottom right, var(--brand-primary), var(--brand-secondary))` }}>
                     <Paperclip size={64} className="text-white" />
                   </div>
-                  <h4 className="text-2xl font-bold text-gray-900 mb-2">
+                  <h4 className="text-2xl font-bold mb-2" style={{ color: 'var(--brand-primary)' }}>
                     {selectedDocument.name}
                   </h4>
                   <p className="text-gray-600 mb-6">
@@ -647,7 +629,8 @@ const PublicViewer = () => {
                     download
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
+                    className="inline-flex items-center gap-2 px-6 py-3 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
+                    style={{ background: `linear-gradient(to right, var(--brand-primary), var(--brand-secondary))` }}
                   >
                     <Download size={20} />
                     Download File
@@ -656,7 +639,6 @@ const PublicViewer = () => {
               )}
             </div>
 
-            {/* Footer */}
             <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-4 flex items-center justify-between gap-4">
               <button
                 onClick={handleCloseDocumentModal}
@@ -669,7 +651,8 @@ const PublicViewer = () => {
                 download
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
+                className="inline-flex items-center gap-2 px-6 py-3 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
+                style={{ background: `linear-gradient(to right, var(--brand-primary), var(--brand-secondary))` }}
               >
                 <Download size={20} />
                 Download

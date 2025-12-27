@@ -13,6 +13,13 @@ const analyticsRoutes = require('./routes/analyticsRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const advancedAnalyticsRoutes = require('./routes/advancedAnalyticsRoutes');
 
+// ✨ Enterprise feature routes
+const apiKeyRoutes = require('./routes/apiKeyRoutes');
+const securityRoutes = require('./routes/securityRoutes');
+const whiteLabelRoutes = require('./routes/whiteLabelRoutes');
+const integrationsRoutes = require('./routes/integrationsRoutes');
+const platformRoutes = require('./routes/platformIntegrationRoutes');
+
 dotenv.config();
 
 const app = express();
@@ -79,6 +86,13 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/advanced-analytics', advancedAnalyticsRoutes);
 
+// ✨ Enterprise feature routes
+app.use('/api/api-keys', apiKeyRoutes);
+app.use('/api/security', securityRoutes);
+app.use('/api/white-label', whiteLabelRoutes);
+app.use('/api/integrations', integrationsRoutes);
+app.use('/api/platforms', platformRoutes);
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ 
@@ -107,5 +121,7 @@ if (process.env.VERCEL) {
     console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL}`);
     console.log(`📱 Allowed Origins: ${allowedOrigins.join(', ')}`);
     console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`✨ Enterprise features enabled!`);
+    console.log(`🛍️ Multi-platform e-commerce integration ready!`);
   });
 }

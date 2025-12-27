@@ -58,18 +58,28 @@ const generateCampaignQRCode = async (slug) => {
   }
 };
 
+// ✅ OPTIMIZED: Only select needed fields
 const getUserCampaigns = async (req, res) => {
   try {
     const userId = req.effectiveUserId;
 
     const campaigns = await prisma.campaign.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' },
-      include: {
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        description: true,
+        category: true,
+        logoUrl: true,
+        qrCodeUrl: true,
+        createdAt: true,
+        updatedAt: true,
         _count: {
           select: { items: true },
         },
       },
+      orderBy: { createdAt: 'desc' },
     });
 
     const campaignsWithCounts = campaigns.map((campaign) => ({
@@ -289,6 +299,7 @@ const assignItemToCampaign = async (req, res) => {
   }
 };
 
+// ✅ OPTIMIZED: Only select needed fields for items
 const getPublicCampaign = async (req, res) => {
   try {
     const { slug } = req.params;
@@ -297,8 +308,31 @@ const getPublicCampaign = async (req, res) => {
 
     const campaign = await prisma.campaign.findUnique({
       where: { slug },
-      include: {
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        description: true,
+        category: true,
+        logoUrl: true,
+        qrCodeUrl: true,
+        userId: true,
+        createdAt: true,
         items: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            type: true,
+            slug: true,
+            mediaUrl: true,
+            thumbnailUrl: true,
+            qrCodeUrl: true,
+            fileSize: true,
+            buttonText: true,
+            buttonUrl: true,
+            createdAt: true,
+          },
           orderBy: { createdAt: 'desc' },
         },
       },

@@ -4,15 +4,79 @@ const crypto = require('crypto');
 const { generateAccessToken, generateRefreshToken } = require('../utils/jwt');
 const { createCheckoutSession, getCheckoutSession, upgradePlan } = require('../services/stripeService');
 
+// Helper function to send 2FA login email
+const send2FALoginEmail = async (userEmail, userName, code) => {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.log('⚠️ Resend not configured - skipping 2FA email');
+      return { success: false };
+    }
+
+    const { Resend } = require('resend');
+    const resend = new Resend(process.env.RESEND_API_KEY);
+
+    const { data, error } = await resend.emails.send({
+      from: 'Outbound Impact <noreply@outboundimpact.org>',
+      to: [userEmail],
+      subject: '🔒 Your Login Verification Code',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; }
+            .header { background: linear-gradient(135deg, #800080 0%, #EE82EE 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #ffffff; padding: 40px 30px; border: 1px solid #e0e0e0; }
+            .code-box { background: #f0f0ff; border: 3px dashed #800080; border-radius: 12px; padding: 30px; text-align: center; margin: 30px 0; }
+            .code { font-size: 48px; font-weight: bold; letter-spacing: 8px; color: #800080; font-family: 'Courier New', monospace; }
+            .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px; color: #856404; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1 style="margin: 0;">🔒 Login Verification</h1>
+            </div>
+            <div class="content">
+              <h2 style="color: #800080;">Hi ${userName}! 👋</h2>
+              <p>Someone just tried to sign in to your <strong>Outbound Impact</strong> account. Here's your verification code:</p>
+              <div class="code-box">
+                <div class="code">${code}</div>
+                <p style="margin: 10px 0 0 0; color: #666;">Enter this code to complete sign in</p>
+              </div>
+              <div class="warning">
+                <p style="margin: 0;"><strong>⚠️ Security Notice:</strong></p>
+                <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+                  <li>This code expires in <strong>10 minutes</strong></li>
+                  <li>Never share this code with anyone</li>
+                  <li>If you didn't try to sign in, please ignore this email</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Failed to send 2FA login email:', error);
+      return { success: false };
+    }
+
+    console.log('✅ 2FA login email sent to:', userEmail);
+    return { success: true };
+  } catch (error) {
+    console.error('❌ Email error:', error);
+    return { success: false };
+  }
+};
+
 // Create checkout session
 const createCheckout = async (req, res) => {
   try {
     const { email, name, password, plan, enterpriseConfig } = req.body;
-
-    console.log('=== CHECKOUT REQUEST DEBUG ===');
-    console.log('Received plan:', plan);
-    console.log('Enterprise config:', enterpriseConfig);
-    console.log('==============================');
 
     if (!email || !name || !password || !plan) {
       return res.status(400).json({
@@ -21,11 +85,10 @@ const createCheckout = async (req, res) => {
       });
     }
 
-    // ✅ NORMALIZE EMAIL TO LOWERCASE
     const normalizedEmail = email.toLowerCase().trim();
 
     const existingUser = await prisma.user.findUnique({
-      where: { email: normalizedEmail } // ✅ Use normalized email
+      where: { email: normalizedEmail }
     });
 
     if (existingUser) {
@@ -70,11 +133,11 @@ const createCheckout = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const session = await createCheckoutSession(normalizedEmail, priceId, plan); // ✅ Use normalized email
+    const session = await createCheckoutSession(normalizedEmail, priceId, plan);
 
     global.pendingSignups = global.pendingSignups || {};
     global.pendingSignups[session.id] = {
-      email: normalizedEmail, // ✅ Store normalized email
+      email: normalizedEmail,
       name,
       password: hashedPassword,
       role,
@@ -127,7 +190,6 @@ const completeSignup = async (req, res) => {
       });
     }
 
-    // ✅ Email is already normalized from createCheckout
     const normalizedEmail = signupData.email.toLowerCase().trim();
 
     let subscriptionData = {};
@@ -144,7 +206,7 @@ const completeSignup = async (req, res) => {
 
     const user = await prisma.user.create({
       data: {
-        email: normalizedEmail, // ✅ Store normalized email
+        email: normalizedEmail,
         name: signupData.name,
         password: signupData.password,
         role: signupData.role,
@@ -213,9 +275,10 @@ const completeSignup = async (req, res) => {
   }
 };
 
+// ✅ SIGN IN WITH 2FA ENFORCEMENT
 const signIn = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, twoFactorCode } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({
@@ -224,11 +287,10 @@ const signIn = async (req, res) => {
       });
     }
 
-    // ✅ NORMALIZE EMAIL TO LOWERCASE
     const normalizedEmail = email.toLowerCase().trim();
 
     const user = await prisma.user.findUnique({
-      where: { email: normalizedEmail } // ✅ Use normalized email
+      where: { email: normalizedEmail }
     });
 
     if (!user) {
@@ -247,6 +309,59 @@ const signIn = async (req, res) => {
       });
     }
 
+    // ✅ CHECK IF 2FA IS ENABLED
+    if (user.twoFactorEnabled) {
+      // If no 2FA code provided, send one
+      if (!twoFactorCode) {
+        // Generate 6-digit code
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        
+        // Save code to user (expires in 10 minutes)
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            twoFactorSecret: code,
+            resetTokenExpiry: new Date(Date.now() + 10 * 60 * 1000)
+          }
+        });
+
+        // Send email
+        await send2FALoginEmail(user.email, user.name, code);
+
+        return res.status(200).json({
+          status: 'success',
+          message: '2FA code sent to your email',
+          requires2FA: true
+        });
+      }
+
+      // If code provided, verify it
+      if (user.twoFactorSecret !== twoFactorCode) {
+        return res.status(401).json({
+          status: 'error',
+          message: 'Invalid 2FA code'
+        });
+      }
+
+      // Check if code expired
+      if (user.resetTokenExpiry && new Date() > user.resetTokenExpiry) {
+        return res.status(401).json({
+          status: 'error',
+          message: '2FA code expired. Please sign in again.'
+        });
+      }
+
+      // Clear 2FA code after successful verification
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          twoFactorSecret: null,
+          resetTokenExpiry: null
+        }
+      });
+    }
+
+    // Continue with normal sign in (after 2FA verification if enabled)
     const teamMembership = await prisma.teamMember.findFirst({
       where: {
         memberUserId: user.id,
@@ -521,7 +636,6 @@ const handleUpgradePlan = async (req, res) => {
   }
 };
 
-// ✨ NEW: Forgot Password - Send reset email
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -533,10 +647,8 @@ const forgotPassword = async (req, res) => {
       });
     }
 
-    // Normalize email
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Check if user exists
     const user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
       select: {
@@ -546,7 +658,6 @@ const forgotPassword = async (req, res) => {
       }
     });
 
-    // Always return success even if user doesn't exist (security best practice)
     if (!user) {
       console.log(`⚠️ Password reset requested for non-existent email: ${normalizedEmail}`);
       return res.json({
@@ -555,12 +666,10 @@ const forgotPassword = async (req, res) => {
       });
     }
 
-    // Generate reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+    const resetTokenExpiry = new Date(Date.now() + 3600000);
 
-    // Save hashed token to database
     await prisma.user.update({
       where: { id: user.id },
       data: {
@@ -569,7 +678,6 @@ const forgotPassword = async (req, res) => {
       }
     });
 
-    // Send reset email
     const { sendPasswordResetEmail } = require('../services/emailService');
     const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
     
@@ -714,7 +822,7 @@ module.exports = {
   signIn,
   getCurrentUser,
   handleUpgradePlan,
-  forgotPassword,       // ✨ NEW
+  forgotPassword,
   verifyResetToken,
   resetPassword,
 };

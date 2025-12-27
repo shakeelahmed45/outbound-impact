@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Key, Copy, Check, RefreshCw, Code, BookOpen, Terminal, AlertCircle } from 'lucide-react';
+import { Key, Copy, Check, RefreshCw, Code, BookOpen, Terminal, AlertCircle, Loader2 } from 'lucide-react';
 import DashboardLayout from '../../components/dashboard/DashboardLayout';
+import Toast from '../../components/common/Toast';
 import useAuthStore from '../../store/authStore';
 import api from '../../services/api';
 
@@ -11,26 +12,36 @@ const ApiAccessPage = () => {
   const [copied, setCopied] = useState('');
   const [showNewKeyForm, setShowNewKeyForm] = useState(false);
   const [keyName, setKeyName] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [revoking, setRevoking] = useState(null);
+  
+  // Toast state
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+  };
+  
+  const closeToast = () => {
+    setToast({ show: false, message: '', type: 'success' });
+  };
 
   useEffect(() => {
+    document.title = 'API Access | Outbound Impact';
     fetchApiKeys();
   }, []);
 
   const fetchApiKeys = async () => {
     try {
-      // TODO: Implement actual API endpoint
-      // Mock data for now
-      setApiKeys([
-        {
-          id: 1,
-          name: 'Production API',
-          key: 'ent_live_' + Math.random().toString(36).substring(2, 20),
-          created: new Date().toISOString(),
-          lastUsed: new Date().toISOString()
-        }
-      ]);
+      setLoading(true);
+      const response = await api.get('/api-keys');
+      
+      if (response.data.status === 'success') {
+        setApiKeys(response.data.apiKeys);
+      }
     } catch (error) {
       console.error('Failed to fetch API keys:', error);
+      showToast('Failed to load API keys', 'error');
     } finally {
       setLoading(false);
     }
@@ -38,46 +49,53 @@ const ApiAccessPage = () => {
 
   const generateNewKey = async () => {
     if (!keyName.trim()) {
-      alert('Please enter a name for the API key');
+      showToast('Please enter a name for the API key', 'error');
       return;
     }
 
+    setGenerating(true);
     try {
-      const newKey = {
-        id: Date.now(),
-        name: keyName,
-        key: 'ent_live_' + Math.random().toString(36).substring(2, 20),
-        created: new Date().toISOString(),
-        lastUsed: null
-      };
+      const response = await api.post('/api-keys/generate', { name: keyName });
       
-      setApiKeys([...apiKeys, newKey]);
-      setKeyName('');
-      setShowNewKeyForm(false);
-      alert('New API key generated! Make sure to copy it now - you won\'t be able to see it again.');
+      if (response.data.status === 'success') {
+        setApiKeys([response.data.apiKey, ...apiKeys]);
+        setKeyName('');
+        setShowNewKeyForm(false);
+        showToast('API key generated! Copy it now - you won\'t see it again.', 'success');
+      }
     } catch (error) {
       console.error('Failed to generate API key:', error);
-      alert('Failed to generate API key');
+      showToast(error.response?.data?.message || 'Failed to generate API key', 'error');
+    } finally {
+      setGenerating(false);
     }
   };
 
   const copyToClipboard = (text, id) => {
     navigator.clipboard.writeText(text);
     setCopied(id);
+    showToast('API key copied to clipboard!', 'success');
     setTimeout(() => setCopied(''), 2000);
   };
 
-  const revokeKey = async (keyId) => {
-    if (!confirm('Are you sure you want to revoke this API key? This action cannot be undone.')) {
+  const revokeKey = async (keyId, keyName) => {
+    if (!confirm(`Are you sure you want to revoke "${keyName}"? This action cannot be undone.`)) {
       return;
     }
 
+    setRevoking(keyId);
     try {
-      setApiKeys(apiKeys.filter(k => k.id !== keyId));
-      alert('API key revoked successfully');
+      const response = await api.delete(`/api-keys/${keyId}`);
+      
+      if (response.data.status === 'success') {
+        setApiKeys(apiKeys.filter(k => k.id !== keyId));
+        showToast('API key revoked successfully', 'success');
+      }
     } catch (error) {
       console.error('Failed to revoke API key:', error);
-      alert('Failed to revoke API key');
+      showToast(error.response?.data?.message || 'Failed to revoke API key', 'error');
+    } finally {
+      setRevoking(null);
     }
   };
 
@@ -85,7 +103,7 @@ const ApiAccessPage = () => {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <Loader2 className="animate-spin text-primary" size={48} />
         </div>
       </DashboardLayout>
     );
@@ -93,6 +111,10 @@ const ApiAccessPage = () => {
 
   return (
     <DashboardLayout>
+      {toast.show && (
+        <Toast message={toast.message} type={toast.type} onClose={closeToast} />
+      )}
+
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -119,6 +141,7 @@ const ApiAccessPage = () => {
             <button
               onClick={() => setShowNewKeyForm(!showNewKeyForm)}
               className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-2 rounded-lg font-semibold hover:shadow-lg transition-all"
+              disabled={generating}
             >
               + Generate New Key
             </button>
@@ -135,16 +158,30 @@ const ApiAccessPage = () => {
                   onChange={(e) => setKeyName(e.target.value)}
                   placeholder="e.g., Production API, Development, Mobile App"
                   className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  disabled={generating}
+                  onKeyPress={(e) => e.key === 'Enter' && generateNewKey()}
                 />
                 <button
                   onClick={generateNewKey}
-                  className="bg-primary text-white px-6 py-2 rounded-lg font-semibold hover:bg-opacity-90"
+                  className="bg-primary text-white px-6 py-2 rounded-lg font-semibold hover:bg-opacity-90 disabled:opacity-50 flex items-center gap-2"
+                  disabled={generating}
                 >
-                  Generate
+                  {generating ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    'Generate'
+                  )}
                 </button>
                 <button
-                  onClick={() => setShowNewKeyForm(false)}
+                  onClick={() => {
+                    setShowNewKeyForm(false);
+                    setKeyName('');
+                  }}
                   className="px-6 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50"
+                  disabled={generating}
                 >
                   Cancel
                 </button>
@@ -153,37 +190,64 @@ const ApiAccessPage = () => {
           )}
 
           {/* API Keys List */}
-          <div className="space-y-4">
-            {apiKeys.map((key) => (
-              <div key={key.id} className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{key.name}</h3>
-                    <p className="text-xs text-gray-500">Created: {new Date(key.created).toLocaleDateString()}</p>
+          {apiKeys.length === 0 ? (
+            <div className="text-center py-12">
+              <Key className="mx-auto text-gray-400 mb-4" size={48} />
+              <p className="text-gray-600 mb-4">No API keys yet</p>
+              <button
+                onClick={() => setShowNewKeyForm(true)}
+                className="text-primary font-semibold hover:underline"
+              >
+                Generate your first API key
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {apiKeys.map((key) => (
+                <div key={key.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{key.name}</h3>
+                      <div className="flex items-center gap-4 text-xs text-gray-500 mt-1">
+                        <span>Created: {new Date(key.createdAt).toLocaleDateString()}</span>
+                        {key.lastUsed && (
+                          <span>Last used: {new Date(key.lastUsed).toLocaleDateString()}</span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => revokeKey(key.id, key.name)}
+                      className="text-red-600 hover:text-red-700 font-semibold text-sm flex items-center gap-1 disabled:opacity-50"
+                      disabled={revoking === key.id}
+                    >
+                      {revoking === key.id ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          Revoking...
+                        </>
+                      ) : (
+                        'Revoke'
+                      )}
+                    </button>
                   </div>
-                  <button
-                    onClick={() => revokeKey(key.id)}
-                    className="text-red-600 hover:text-red-700 font-semibold text-sm"
-                  >
-                    Revoke
-                  </button>
+                  <div className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
+                    <code className="text-sm font-mono text-gray-700">{key.key}</code>
+                    <button
+                      onClick={() => copyToClipboard(key.key, key.id)}
+                      className="p-2 hover:bg-gray-200 rounded-lg transition-all"
+                      title="Copy to clipboard"
+                    >
+                      {copied === key.id ? (
+                        <Check size={18} className="text-green-600" />
+                      ) : (
+                        <Copy size={18} className="text-gray-600" />
+                      )}
+                    </button>
+                  </div>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
-                  <code className="text-sm font-mono text-gray-700">{key.key}</code>
-                  <button
-                    onClick={() => copyToClipboard(key.key, key.id)}
-                    className="p-2 hover:bg-gray-200 rounded-lg transition-all"
-                  >
-                    {copied === key.id ? (
-                      <Check size={18} className="text-green-600" />
-                    ) : (
-                      <Copy size={18} className="text-gray-600" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* API Documentation */}
@@ -197,7 +261,7 @@ const ApiAccessPage = () => {
           <div className="mb-6">
             <h3 className="font-semibold text-gray-900 mb-2">Base URL</h3>
             <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-              <code className="text-sm font-mono text-gray-700">https://api.outboundimpact.com/v1</code>
+              <code className="text-sm font-mono text-gray-700">https://api.outboundimpact.net/v1</code>
             </div>
           </div>
 
@@ -271,7 +335,7 @@ const uploadMedia = async () => {
   formData.append('file', fileBlob);
   
   const response = await axios.post(
-    'https://api.outboundimpact.com/v1/items',
+    'https://api.outboundimpact.net/v1/items',
     formData,
     {
       headers: {
@@ -295,7 +359,7 @@ const uploadMedia = async () => {
 {`import requests
 
 def upload_media():
-    url = "https://api.outboundimpact.com/v1/items"
+    url = "https://api.outboundimpact.net/v1/items"
     headers = {
         "Authorization": "Bearer YOUR_API_KEY"
     }
@@ -319,7 +383,7 @@ def upload_media():
             <h3 className="font-semibold text-gray-900 mb-2">cURL</h3>
             <div className="bg-gray-900 rounded-lg p-4 overflow-x-auto">
               <pre className="text-green-400 text-sm font-mono">
-{`curl -X POST https://api.outboundimpact.com/v1/items \\
+{`curl -X POST https://api.outboundimpact.net/v1/items \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -F "title=Product Demo" \\
   -F "type=VIDEO" \\
