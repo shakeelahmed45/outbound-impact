@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, Mail, Trash2, AlertCircle, Loader2, RefreshCw, Clock, CheckCircle, XCircle, X } from 'lucide-react';
+import { UserPlus, Mail, Trash2, AlertCircle, Loader2, RefreshCw, Clock, CheckCircle, XCircle, X, Edit2 } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import Toast from '../components/common/Toast';
 import useAuthStore from '../store/authStore';
@@ -12,10 +12,11 @@ const TeamPage = () => {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [resendingId, setResendingId] = useState(null);
+  const [updatingRoleId, setUpdatingRoleId] = useState(null); // ✅ NEW: Track which member's role is being updated
   const [formData, setFormData] = useState({
     email: '',
     role: 'VIEWER',
-    message: '', // ✨ NEW: Custom invitation message
+    message: '',
   });
   const [error, setError] = useState('');
   const [showWarningPopup, setShowWarningPopup] = useState(false);
@@ -43,7 +44,6 @@ const TeamPage = () => {
       const userRes = await api.get('/auth/me');
       if (userRes.data.status === 'success') {
         setUser(userRes.data.user);
-        // ✅ REMOVED RESTRICTION - Load team members for ALL users including INDIVIDUAL
         await fetchTeamMembers();
       }
     } catch (error) {
@@ -83,13 +83,46 @@ const TeamPage = () => {
       
       const errorData = error.response?.data;
       if (errorData?.code === 'EMAIL_ALREADY_REGISTERED') {
-        // Show simple warning popup
         setShowWarningPopup(true);
       } else {
         setError(errorData?.message || 'Failed to invite contributor');
       }
     } finally {
       setInviting(false);
+    }
+  };
+
+  // ✅ NEW: Handle role change
+  const handleRoleChange = async (memberId, newRole, currentRole) => {
+    // Don't update if role hasn't changed
+    if (newRole === currentRole) return;
+
+    setUpdatingRoleId(memberId);
+    
+    try {
+      const response = await api.put(`/team/${memberId}/role`, { role: newRole });
+      
+      if (response.data.status === 'success') {
+        // Update local state
+        setTeamMembers(teamMembers.map(member => 
+          member.id === memberId 
+            ? { ...member, role: newRole }
+            : member
+        ));
+        
+        showToast(`Role updated to ${newRole} successfully!`, 'success');
+      }
+    } catch (error) {
+      console.error('Failed to update role:', error);
+      showToast(
+        error.response?.data?.message || 'Failed to update role. Please try again.', 
+        'error'
+      );
+      
+      // Revert the change in UI by re-fetching
+      fetchTeamMembers();
+    } finally {
+      setUpdatingRoleId(null);
     }
   };
 
@@ -162,6 +195,16 @@ const TeamPage = () => {
         {badge.text}
       </span>
     );
+  };
+
+  // ✅ NEW: Get role icon
+  const getRoleIcon = (role) => {
+    const icons = {
+      VIEWER: '👁️',
+      EDITOR: '✏️',
+      ADMIN: '👑'
+    };
+    return icons[role] || '👤';
   };
 
   if (loading) {
@@ -265,9 +308,35 @@ const TeamPage = () => {
                         </div>
                       </td>
                       <td className="px-4 lg:px-6 py-3 lg:py-4">
-                        <span className="px-2 lg:px-3 py-1 bg-purple-100 text-primary rounded-full text-xs lg:text-sm font-medium whitespace-nowrap">
-                          {member.role}
-                        </span>
+                        {/* ✅ NEW: Editable Role Dropdown */}
+                        <div className="relative">
+                          <select
+                            value={member.role}
+                            onChange={(e) => handleRoleChange(member.id, e.target.value, member.role)}
+                            disabled={updatingRoleId === member.id}
+                            className={`
+                              px-3 py-1.5 pr-8 bg-purple-50 text-primary rounded-lg text-xs lg:text-sm font-medium 
+                              border-2 border-transparent hover:border-primary focus:border-primary focus:outline-none 
+                              cursor-pointer transition-all appearance-none
+                              ${updatingRoleId === member.id ? 'opacity-50 cursor-not-allowed' : ''}
+                            `}
+                            style={{
+                              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23800080'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                              backgroundRepeat: 'no-repeat',
+                              backgroundPosition: 'right 0.5rem center',
+                              backgroundSize: '1rem'
+                            }}
+                          >
+                            <option value="VIEWER">👁️ Viewer</option>
+                            <option value="EDITOR">✏️ Editor</option>
+                            <option value="ADMIN">👑 Admin</option>
+                          </select>
+                          {updatingRoleId === member.id && (
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                              <Loader2 className="animate-spin text-primary" size={14} />
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 lg:px-6 py-3 lg:py-4">
                         {getStatusBadge(member.status)}
@@ -328,12 +397,37 @@ const TeamPage = () => {
 
                   {/* Details Grid */}
                   <div className="grid grid-cols-2 gap-3 mb-3">
-                    {/* Role */}
+                    {/* Role - Editable */}
                     <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">Role</p>
-                      <span className="inline-block px-2.5 py-1 bg-purple-100 text-primary rounded-full text-xs font-medium">
-                        {member.role}
-                      </span>
+                      <p className="text-xs font-medium text-gray-500 mb-2">Role</p>
+                      <div className="relative">
+                        <select
+                          value={member.role}
+                          onChange={(e) => handleRoleChange(member.id, e.target.value, member.role)}
+                          disabled={updatingRoleId === member.id}
+                          className={`
+                            w-full px-3 py-1.5 pr-8 bg-purple-50 text-primary rounded-lg text-sm font-medium
+                            border-2 border-transparent hover:border-primary focus:border-primary focus:outline-none
+                            cursor-pointer transition-all appearance-none
+                            ${updatingRoleId === member.id ? 'opacity-50 cursor-not-allowed' : ''}
+                          `}
+                          style={{
+                            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23800080'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                            backgroundRepeat: 'no-repeat',
+                            backgroundPosition: 'right 0.5rem center',
+                            backgroundSize: '1rem'
+                          }}
+                        >
+                          <option value="VIEWER">👁️ Viewer</option>
+                          <option value="EDITOR">✏️ Editor</option>
+                          <option value="ADMIN">👑 Admin</option>
+                        </select>
+                        {updatingRoleId === member.id && (
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                            <Loader2 className="animate-spin text-primary" size={14} />
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Status */}

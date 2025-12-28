@@ -605,6 +605,87 @@ const updateTeamMember = async (req, res) => {
   }
 };
 
+// ✅ NEW: Update team member role (for role editor dropdown)
+const updateTeamMemberRole = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+    const userId = req.user.userId;
+
+    console.log('🔄 UPDATE ROLE REQUEST:', {
+      teamMemberId: id,
+      newRole: role,
+      requestedBy: userId
+    });
+
+    // Validate role
+    const validRoles = ['VIEWER', 'EDITOR', 'ADMIN'];
+    if (!role || !validRoles.includes(role)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid role. Must be VIEWER, EDITOR, or ADMIN'
+      });
+    }
+
+    // Get the team member
+    const teamMember = await prisma.teamMember.findFirst({
+      where: { 
+        id,
+        userId // Ensure user owns this team member
+      }
+    });
+
+    if (!teamMember) {
+      console.log('❌ Team member not found or no permission:', id);
+      return res.status(404).json({
+        status: 'error',
+        message: 'Team member not found'
+      });
+    }
+
+    // Check if the current user is the owner
+    if (teamMember.userId !== userId) {
+      console.log('❌ Permission denied:', {
+        teamMemberUserId: teamMember.userId,
+        requestUserId: userId
+      });
+      return res.status(403).json({
+        status: 'error',
+        message: 'You do not have permission to update this team member'
+      });
+    }
+
+    // Store old role for logging
+    const oldRole = teamMember.role;
+
+    // Update the role
+    const updatedMember = await prisma.teamMember.update({
+      where: { id },
+      data: { role }
+    });
+
+    console.log('✅ Role updated successfully:', {
+      teamMemberId: id,
+      email: updatedMember.email,
+      oldRole: oldRole,
+      newRole: role
+    });
+
+    res.json({
+      status: 'success',
+      message: 'Team member role updated successfully',
+      teamMember: updatedMember
+    });
+
+  } catch (error) {
+    console.error('❌ Update role error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to update team member role'
+    });
+  }
+};
+
 module.exports = {
   getTeamMembers,
   inviteTeamMember,
@@ -614,4 +695,5 @@ module.exports = {
   getInvitationDetails,
   removeTeamMember,
   updateTeamMember,
+  updateTeamMemberRole, // ✅ NEW: Export the new function
 };
