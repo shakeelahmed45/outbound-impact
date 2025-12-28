@@ -618,12 +618,12 @@ const PublicCampaignViewer = () => {
             {campaign.items.map((item) => (
               <div
                 key={item.id}
-                className="bg-white rounded-2xl shadow-lg overflow-hidden transform transition hover:scale-105 hover:shadow-2xl group relative"
+                className="bg-white rounded-2xl shadow-lg overflow-hidden transform transition hover:scale-105 hover:shadow-2xl relative"
               >
-                {/* ✅ NEW: Share Button Overlay */}
+                {/* ✅ NEW: Share Button Overlay - Always Visible */}
                 <button
                   onClick={(e) => handleShareClick(e, item)}
-                  className="absolute top-3 right-3 z-10 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white hover:scale-110 transition-all opacity-0 group-hover:opacity-100"
+                  className="absolute top-3 right-3 z-10 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white hover:scale-110 transition-all"
                   title="Share this content"
                 >
                   <Share2 size={20} className="text-primary" />
