@@ -623,7 +623,7 @@ const PublicCampaignViewer = () => {
                 {/* ✅ NEW: Share Button Overlay - Always Visible */}
                 <button
                   onClick={(e) => handleShareClick(e, item)}
-                  className="absolute top-3 right-3 z-10 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white hover:scale-110 transition-all"
+                  className="absolute top-3 right-3 z-50 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white hover:scale-110 transition-all pointer-events-auto"
                   title="Share this content"
                 >
                   <Share2 size={20} className="text-primary" />
