@@ -20,6 +20,9 @@ const whiteLabelRoutes = require('./routes/whiteLabelRoutes');
 const integrationsRoutes = require('./routes/integrationsRoutes');
 const platformRoutes = require('./routes/platformIntegrationRoutes');
 
+// 🔍 DEBUG ROUTES - NEW!
+const debugRoutes = require('./routes/debugRoutes');
+
 dotenv.config();
 
 const app = express();
@@ -93,6 +96,9 @@ app.use('/api/white-label', whiteLabelRoutes);
 app.use('/api/integrations', integrationsRoutes);
 app.use('/api/platforms', platformRoutes);
 
+// 🔍 DEBUG ROUTES - NEW!
+app.use('/api/debug', debugRoutes);
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ 
@@ -123,5 +129,6 @@ if (process.env.VERCEL) {
     console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`✨ Enterprise features enabled!`);
     console.log(`🛍️ Multi-platform e-commerce integration ready!`);
+    console.log(`🔍 Debug routes active at /api/debug`); // NEW!
   });
 }
