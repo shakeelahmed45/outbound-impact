@@ -20,7 +20,7 @@ const whiteLabelRoutes = require('./routes/whiteLabelRoutes');
 const integrationsRoutes = require('./routes/integrationsRoutes');
 const platformRoutes = require('./routes/platformIntegrationRoutes');
 
-// 🔍 DEBUG ROUTES - NEW!
+// 🔍 DEBUG ROUTES
 const debugRoutes = require('./routes/debugRoutes');
 
 dotenv.config();
@@ -67,11 +67,41 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check endpoint
+// Health check endpoint with memory validation
+// CRITICAL: This is checked by Railway to determine instance health
 app.get('/api/health', (req, res) => {
+  // Check heap size
+  const mem = process.memoryUsage();
+  const heapTotalMB = Math.round(mem.heapTotal / 1024 / 1024);
+  const heapUsedMB = Math.round(mem.heapUsed / 1024 / 1024);
+  
+  // CRITICAL: Fail health check if heap is too small
+  // This makes Railway automatically terminate and restart instances with insufficient memory
+  if (heapTotalMB < 100) {
+    console.error('🚨 HEALTH CHECK FAILED: Heap too small!', {
+      heapTotal: `${heapTotalMB}MB`,
+      heapUsed: `${heapUsedMB}MB`,
+      minimum: '100MB',
+      serverUptime: `${Math.floor(process.uptime())}s`,
+      timestamp: new Date().toISOString()
+    });
+    
+    return res.status(503).json({
+      status: 'unhealthy',
+      reason: 'Insufficient heap memory',
+      heapTotal: `${heapTotalMB}MB`,
+      heapUsed: `${heapUsedMB}MB`,
+      requiredMinimum: '100MB',
+      message: 'Instance will be terminated and restarted by Railway'
+    });
+  }
+  
+  // Heap is good, return healthy
   res.json({ 
     status: 'success', 
     message: 'Outbound Impact API is running',
+    heapTotal: `${heapTotalMB}MB`,
+    heapUsed: `${heapUsedMB}MB`,
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   });
@@ -96,7 +126,7 @@ app.use('/api/white-label', whiteLabelRoutes);
 app.use('/api/integrations', integrationsRoutes);
 app.use('/api/platforms', platformRoutes);
 
-// 🔍 DEBUG ROUTES - NEW!
+// 🔍 DEBUG ROUTES
 app.use('/api/debug', debugRoutes);
 
 // 404 handler
@@ -129,6 +159,7 @@ if (process.env.VERCEL) {
     console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`✨ Enterprise features enabled!`);
     console.log(`🛍️ Multi-platform e-commerce integration ready!`);
-    console.log(`🔍 Debug routes active at /api/debug`); // NEW!
+    console.log(`🔍 Debug routes active at /api/debug`);
+    console.log(`🛡️ Health check with memory validation active`);
   });
 }
