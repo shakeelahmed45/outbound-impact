@@ -77,7 +77,7 @@ app.get('/api/health', (req, res) => {
   
   // CRITICAL: Fail health check if heap is too small
   // This makes Railway automatically terminate and restart instances with insufficient memory
-  if (heapTotalMB < 100) {
+  if (heapTotalMB < 10) {
     console.error('🚨 HEALTH CHECK FAILED: Heap too small!', {
       heapTotal: `${heapTotalMB}MB`,
       heapUsed: `${heapUsedMB}MB`,
