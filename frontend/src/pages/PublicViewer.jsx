@@ -215,7 +215,6 @@ const PublicViewer = () => {
               className="max-w-full max-h-[70vh] object-contain"
             />
             
-            {/* ✅ ONLY 2 CHANGES: Added "relative z-50" and "max-h-[25vh] overflow-y-auto" */}
             {(item.buttonText || item.attachments) && (
               <div className="relative z-50 mt-8 bg-white bg-opacity-95 p-6 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[25vh] overflow-y-auto">
                 {item.attachments && item.attachments.length > 0 && (
@@ -286,7 +285,6 @@ const PublicViewer = () => {
               <source src={item.mediaUrl} />
             </video>
             
-            {/* ✅ ONLY 2 CHANGES: Added "relative z-50" and "max-h-[25vh] overflow-y-auto" */}
             {(item.buttonText || item.attachments) && (
               <div className="relative z-50 mt-8 bg-white bg-opacity-95 p-6 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[25vh] overflow-y-auto">
                 {item.attachments && item.attachments.length > 0 && (
@@ -361,7 +359,6 @@ const PublicViewer = () => {
               </audio>
             </div>
             
-            {/* ✅ ONLY 2 CHANGES: Added "relative z-50" and "max-h-[25vh] overflow-y-auto" */}
             {(item.buttonText || item.attachments) && (
               <div className="relative z-50 mt-8 bg-white bg-opacity-95 p-6 rounded-2xl shadow-2xl max-h-[25vh] overflow-y-auto">
                 {item.attachments && item.attachments.length > 0 && (
