@@ -324,13 +324,46 @@ const PublicCampaignViewer = () => {
   };
 
   const getThumbnail = (item) => {
+    // ✅ IMAGE with blowing eye icon effect (NEW!)
     if (item.type === 'IMAGE') {
       return (
-        <img
-          src={item.mediaUrl}
-          alt={item.title}
-          className="w-full h-full object-cover"
-        />
+        <div className="relative w-full h-full">
+          {/* Background image */}
+          <img
+            src={item.mediaUrl}
+            alt={item.title}
+            className="w-full h-full object-cover"
+          />
+          
+          {/* Dark overlay with gradient */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+          
+          {/* ✅ Eye icon with pulsing waves - Bottom positioning */}
+          <div className="absolute bottom-0 left-0 right-0 p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Eye icon with animated pulsing waves */}
+              <div className="relative flex-shrink-0">
+                {/* Animated pulsing waves */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-white/10 animate-ping"></div>
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center animation-delay-150">
+                  <div className="w-8 h-8 rounded-full bg-white/20 animate-ping"></div>
+                </div>
+                
+                {/* Eye icon */}
+                <div className="relative z-10 w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/30">
+                  <Eye className="w-4 h-4 text-white" />
+                </div>
+              </div>
+              
+              {/* Text */}
+              <span className="text-white text-xs sm:text-sm font-bold drop-shadow-lg">
+                Click here to view image
+              </span>
+            </div>
+          </div>
+        </div>
       );
     }
 
@@ -575,31 +608,31 @@ const PublicCampaignViewer = () => {
           </button>
         )}
         
-        <div className="bg-white rounded-3xl shadow-2xl p-8 mb-8">
+        <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-8 mb-8">
           <div className="flex-1">
-            {/* ✅ Display campaign logo BEFORE title */}
+            {/* ✅ Larger responsive campaign logo */}
             {campaign.logoUrl && (
               <div className="mb-6">
                 <img 
                   src={campaign.logoUrl} 
                   alt={`${campaign.name} logo`}
-                  className="h-20 w-auto object-contain"
+                  className="h-24 sm:h-32 md:h-40 lg:h-48 w-auto object-contain max-w-full"
                 />
               </div>
             )}
             
             <div className="flex items-center gap-3 mb-4">
-              <Folder className="text-primary" size={32} />
-              <h1 className="text-4xl font-bold text-primary">{campaign.name}</h1>
+              <Folder className="text-primary flex-shrink-0" size={32} />
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary break-words">{campaign.name}</h1>
             </div>
             
             {campaign.description && (
-              <p className="text-secondary text-lg mb-4">{campaign.description}</p>
+              <p className="text-secondary text-base sm:text-lg mb-4">{campaign.description}</p>
             )}
             
-            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-600">
               <div className="flex items-center gap-2">
-                <Calendar size={16} />
+                <Calendar size={16} className="flex-shrink-0" />
                 <span>{new Date(campaign.createdAt).toLocaleDateString()}</span>
               </div>
               {campaign.category && (
@@ -608,7 +641,7 @@ const PublicCampaignViewer = () => {
                 </span>
               )}
               <span>{campaign.items.length} {campaign.items.length === 1 ? 'item' : 'items'}</span>
-              <span>Created by {campaign.user.name}</span>
+              <span className="hidden sm:inline">Created by {campaign.user.name}</span>
             </div>
           </div>
         </div>
