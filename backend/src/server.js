@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const prisma = require('./lib/prisma');
+
 const authRoutes = require('./routes/authRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -28,6 +30,93 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// ═══════════════════════════════════════════════
+// 🛡️ PROTECTION SYSTEMS - PREVENTS 24-HOUR TIMEOUT
+// ═══════════════════════════════════════════════
+
+// 1. Database Connection Refresh (Every 2 hours)
+// Prevents stale connections from causing timeouts
+setInterval(async () => {
+  try {
+    console.log('🔄 Refreshing database connection...');
+    await prisma.$disconnect();
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    await prisma.$connect();
+    console.log('✅ Database connection refreshed successfully');
+  } catch (error) {
+    console.error('❌ Database refresh error:', error.message);
+  }
+}, 2 * 60 * 60 * 1000); // Every 2 hours
+
+// 2. Connection Pool Cleanup (Every 3 hours)
+// Clears stuck/idle connections
+setInterval(async () => {
+  try {
+    console.log('🧹 Cleaning up stuck database connections...');
+    await prisma.$executeRaw`
+      SELECT pg_terminate_backend(pid)
+      FROM pg_stat_activity
+      WHERE datname = current_database()
+        AND state = 'idle'
+        AND state_change < NOW() - INTERVAL '10 minutes'
+        AND pid <> pg_backend_pid();
+    `;
+    console.log('✅ Connection cleanup completed');
+  } catch (error) {
+    console.error('⚠️ Connection cleanup error:', error.message);
+  }
+}, 3 * 60 * 60 * 1000); // Every 3 hours
+
+// 3. Daily Restart (3 AM)
+// Full application restart for maximum freshness
+const scheduleRestart = () => {
+  const now = new Date();
+  const restartTime = new Date(now);
+  restartTime.setHours(3, 0, 0, 0);
+  
+  // If 3 AM already passed today, schedule for tomorrow
+  if (restartTime <= now) {
+    restartTime.setDate(restartTime.getDate() + 1);
+  }
+  
+  const timeUntilRestart = restartTime.getTime() - now.getTime();
+  
+  setTimeout(async () => {
+    console.log('🌙 Daily restart initiated (3 AM)');
+    try {
+      await prisma.$disconnect();
+      console.log('✅ Database disconnected for restart');
+    } catch (error) {
+      console.error('⚠️ Disconnect error during restart:', error);
+    }
+    process.exit(0); // Railway will automatically restart
+  }, timeUntilRestart);
+  
+  const hours = Math.floor(timeUntilRestart / (1000 * 60 * 60));
+  console.log(`⏰ Daily restart in ${hours}h at 3:00:00 AM`);
+};
+
+// 4. Graceful Shutdown
+// Proper cleanup on termination
+const gracefulShutdown = async (signal) => {
+  console.log(`\n🛑 ${signal} received, shutting down gracefully...`);
+  try {
+    await prisma.$disconnect();
+    console.log('✅ Database disconnected successfully');
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Error during shutdown:', error);
+    process.exit(1);
+  }
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// ═══════════════════════════════════════════════
+// 📡 EXPRESS CONFIGURATION
+// ═══════════════════════════════════════════════
+
 // CORS configuration - Allow web app AND mobile app
 const allowedOrigins = [
   process.env.FRONTEND_URL,      // Web app (https://outboundimpact.net)
@@ -35,7 +124,7 @@ const allowedOrigins = [
   'capacitor://localhost',        // Capacitor alternative format
   'http://localhost:5173',        // Local development
   'http://localhost:5000'         // Local backend testing
-].filter(Boolean); // Remove any undefined values
+].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -45,7 +134,6 @@ app.use(cors({
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      // For development: log blocked origins to help debug
       console.log('Blocked by CORS:', origin);
       callback(new Error('Not allowed by CORS'));
     }
@@ -59,7 +147,6 @@ app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 // Set timeout for all routes (especially for file uploads)
 app.use((req, res, next) => {
-  // Set timeout to 5 minutes for upload routes
   if (req.path.includes('/upload')) {
     req.setTimeout(300000); // 5 minutes
     res.setTimeout(300000);
@@ -67,8 +154,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check endpoint
-// Reports memory stats for monitoring but always returns healthy
+// ═══════════════════════════════════════════════
+// 🏥 HEALTH CHECK ENDPOINT
+// ═══════════════════════════════════════════════
+
 app.get('/api/health', (req, res) => {
   const mem = process.memoryUsage();
   const heapTotalMB = Math.round(mem.heapTotal / 1024 / 1024);
@@ -82,12 +171,16 @@ app.get('/api/health', (req, res) => {
       heapUsed: `${heapUsedMB}MB`,
       usage: `${Math.round((heapUsedMB / heapTotalMB) * 100)}%`
     },
+    uptime: `${Math.floor(process.uptime())}s`,
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   });
 });
 
-// API Routes
+// ═══════════════════════════════════════════════
+// 🛣️ API ROUTES
+// ═══════════════════════════════════════════════
+
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/user', userRoutes);
@@ -127,18 +220,34 @@ app.use((err, req, res, next) => {
   });
 });
 
+// ═══════════════════════════════════════════════
+// 🚀 SERVER STARTUP
+// ═══════════════════════════════════════════════
+
 // Export for Vercel serverless function
 if (process.env.VERCEL) {
   module.exports = app;
 } else {
   // Start server for local development
   app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL}`);
-    console.log(`📱 Allowed Origins: ${allowedOrigins.join(', ')}`);
+    console.log('\n═══════════════════════════════════════════════');
+    console.log('🚀 Outbound Impact Server');
+    console.log('═══════════════════════════════════════════════');
+    console.log(`📡 Port: ${PORT}`);
+    console.log(`🌐 Frontend: ${process.env.FRONTEND_URL}`);
     console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`✨ Enterprise features enabled!`);
-    console.log(`🛍️ Multi-platform e-commerce integration ready!`);
-    console.log(`🔍 Debug routes active at /api/debug`);
+    console.log('───────────────────────────────────────────────');
+    console.log('🛡️ Protection Active:');
+    console.log('  ✅ Database refresh (2h)');
+    console.log('  ✅ Connection cleanup (3h)');
+    console.log('  ✅ Daily restart (3 AM)');
+    console.log('───────────────────────────────────────────────');
+    console.log('✨ Enterprise features enabled!');
+    console.log('🛍️ Multi-platform e-commerce integration ready!');
+    console.log('🔍 Debug routes active at /api/debug');
+    console.log('═══════════════════════════════════════════════\n');
+    
+    // Schedule the daily restart
+    scheduleRestart();
   });
 }
