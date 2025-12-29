@@ -47,7 +47,7 @@ const PublicViewer = () => {
     if (item && showOverlay) {
       overlayTimeout.current = setTimeout(() => {
         setShowOverlay(false);
-      }, 3000);
+      }, 2000);
     }
 
     return () => {
@@ -64,7 +64,7 @@ const PublicViewer = () => {
     }
     overlayTimeout.current = setTimeout(() => {
       setShowOverlay(false);
-    }, 3000);
+    }, 2000);
   };
 
   const handleBack = () => {
