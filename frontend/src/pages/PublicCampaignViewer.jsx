@@ -583,7 +583,7 @@ const PublicCampaignViewer = () => {
                 <img 
                   src={campaign.logoUrl} 
                   alt={`${campaign.name} logo`}
-                  className="h-25 w-auto object-contain"
+                  className="h-22 w-auto object-contain"
                 />
               </div>
             )}
