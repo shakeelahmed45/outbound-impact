@@ -216,7 +216,7 @@ const PublicViewer = () => {
             />
             
             {(item.buttonText || item.attachments) && (
-              <div className="relative z-50 mt-8 bg-white bg-opacity-95 p-6 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[25vh] overflow-y-auto">
+              <div className="relative z-[45] mt-8 bg-white bg-opacity-95 p-6 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[25vh] overflow-y-auto">
                 {item.attachments && item.attachments.length > 0 && (
                   <div className="mb-6">
                     <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -286,7 +286,7 @@ const PublicViewer = () => {
             </video>
             
             {(item.buttonText || item.attachments) && (
-              <div className="relative z-50 mt-8 bg-white bg-opacity-95 p-6 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[25vh] overflow-y-auto">
+              <div className="relative z-[45] mt-8 bg-white bg-opacity-95 p-6 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[25vh] overflow-y-auto">
                 {item.attachments && item.attachments.length > 0 && (
                   <div className="mb-6">
                     <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -360,7 +360,7 @@ const PublicViewer = () => {
             </div>
             
             {(item.buttonText || item.attachments) && (
-              <div className="relative z-50 mt-8 bg-white bg-opacity-95 p-6 rounded-2xl shadow-2xl max-h-[25vh] overflow-y-auto">
+              <div className="relative z-[45] mt-8 bg-white bg-opacity-95 p-6 rounded-2xl shadow-2xl max-h-[25vh] overflow-y-auto">
                 {item.attachments && item.attachments.length > 0 && (
                   <div className="mb-6">
                     <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -547,10 +547,10 @@ const PublicViewer = () => {
         )}
       </div>
 
-      {/* Text Overlay (Bottom) */}
+      {/* Text Overlay (Bottom) - INCREASED Z-INDEX TO 50 */}
       {(item.title || item.description) && (
         <div 
-          className={`fixed bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-black via-black to-transparent p-0 pb-8 transition-all duration-500 ${
+          className={`fixed bottom-0 left-0 right-0 z-50 bg-gradient-to-t from-black via-black to-transparent p-0 pb-8 transition-all duration-500 pointer-events-none ${
             showOverlay ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
           }`}
         >
