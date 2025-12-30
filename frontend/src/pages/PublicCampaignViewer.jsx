@@ -241,15 +241,21 @@ const PublicCampaignViewer = () => {
       setLoading(true);
       setError(null);
       
-      // ✅ NEW: Check if password is stored
+      // ✅ NEW: Check if password is stored (check BOTH storages)
+      console.log('🔍 Checking for stored password...');
       const storedPassword = getStoredPassword(slug);
       
       if (storedPassword) {
+        console.log('🔑 Found stored password, attempting auto-unlock...');
         const success = await verifyPassword(storedPassword, true);
         if (success) {
+          console.log('✅ Auto-unlock successful!');
           return;
         }
+        console.log('❌ Stored password is invalid, clearing...');
         clearStoredPassword(slug);
+      } else {
+        console.log('ℹ️ No stored password found');
       }
 
       const response = await axios.get(`${import.meta.env.VITE_API_URL}/campaigns/public/${slug}`);
@@ -292,7 +298,8 @@ const PublicCampaignViewer = () => {
       if (response.data.status === 'success') {
         console.log('✅ Password verified successfully');
         
-        if (rememberPassword || isSilent) {
+        // ✅ Store password only if manually entered (not auto-unlock)
+        if (!isSilent) {
           storePassword(slug, passwordToVerify);
         }
         
@@ -337,17 +344,26 @@ const PublicCampaignViewer = () => {
 
   // ✅ NEW: PASSWORD STORAGE HELPERS
   const getStoredPassword = (campaignSlug) => {
-    const storage = rememberPassword ? localStorage : sessionStorage;
-    const stored = storage.getItem(`campaign_password_${campaignSlug}`);
+    // ✅ FIX: Check BOTH localStorage and sessionStorage
+    // Try localStorage first (for "remember me" passwords)
+    let stored = localStorage.getItem(`campaign_password_${campaignSlug}`);
+    
+    // If not in localStorage, try sessionStorage
+    if (!stored) {
+      stored = sessionStorage.getItem(`campaign_password_${campaignSlug}`);
+    }
     
     if (stored) {
       try {
         const data = JSON.parse(stored);
         const expiryTime = new Date(data.expiry);
         
+        // Check if password hasn't expired
         if (new Date() < expiryTime) {
+          console.log('✅ Found valid stored password');
           return data.password;
         } else {
+          console.log('⏰ Stored password expired');
           clearStoredPassword(campaignSlug);
         }
       } catch (e) {
@@ -361,7 +377,10 @@ const PublicCampaignViewer = () => {
   const storePassword = (campaignSlug, pwd) => {
     const storage = rememberPassword ? localStorage : sessionStorage;
     const expiry = new Date();
-    expiry.setHours(expiry.getHours() + 24);
+    expiry.setHours(expiry.getHours() + 24); // 24 hours from now
+    
+    const storageType = rememberPassword ? 'localStorage (24h)' : 'sessionStorage (session only)';
+    console.log(`💾 Storing password in ${storageType}`);
     
     storage.setItem(`campaign_password_${campaignSlug}`, JSON.stringify({
       password: pwd,
