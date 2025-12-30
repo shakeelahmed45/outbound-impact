@@ -5,7 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",
-    "start": "node comprehensive-debug.js",
+    "start": "node src/server.js",
     "build": "prisma generate",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
