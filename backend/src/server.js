@@ -31,7 +31,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ═══════════════════════════════════════════════
-// 🛡️ PROTECTION SYSTEMS - PREVENTS 24-HOUR TIMEOUT
+// 🛡️ PROTECTION SYSTEM - PREVENTS 24-HOUR TIMEOUT
 // ═══════════════════════════════════════════════
 
 // 1. Database Connection Refresh (Every 2 hours)
@@ -48,26 +48,7 @@ setInterval(async () => {
   }
 }, 2 * 60 * 60 * 1000); // Every 2 hours
 
-// 2. Connection Pool Cleanup (Every 3 hours)
-// Clears stuck/idle connections
-setInterval(async () => {
-  try {
-    console.log('🧹 Cleaning up stuck database connections...');
-    await prisma.$executeRaw`
-      SELECT pg_terminate_backend(pid)
-      FROM pg_stat_activity
-      WHERE datname = current_database()
-        AND state = 'idle'
-        AND state_change < NOW() - INTERVAL '10 minutes'
-        AND pid <> pg_backend_pid();
-    `;
-    console.log('✅ Connection cleanup completed');
-  } catch (error) {
-    console.error('⚠️ Connection cleanup error:', error.message);
-  }
-}, 3 * 60 * 60 * 1000); // Every 3 hours
-
-// 3. Graceful Shutdown
+// 2. Graceful Shutdown
 // Proper cleanup on termination
 const gracefulShutdown = async (signal) => {
   console.log(`\n🛑 ${signal} received, shutting down gracefully...`);
@@ -210,7 +191,6 @@ if (process.env.VERCEL) {
     console.log('───────────────────────────────────────────────');
     console.log('🛡️ Protection Active:');
     console.log('  ✅ Database refresh (2h)');
-    console.log('  ✅ Connection cleanup (3h)');
     console.log('───────────────────────────────────────────────');
     console.log('✨ Enterprise features enabled!');
     console.log('🛍️ Multi-platform e-commerce integration ready!');
