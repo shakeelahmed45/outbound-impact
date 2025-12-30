@@ -154,6 +154,19 @@ app.use('/api/platforms', platformRoutes);
 // 🔍 DEBUG ROUTES
 app.use('/api/debug', debugRoutes);
 
+// ═══════════════════════════════════════════════
+// 🏠 ROOT ENDPOINT (FOR RAILWAY HEALTH CHECK)
+// ═══════════════════════════════════════════════
+
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'success',
+    message: 'Outbound Impact API is running',
+    version: '1.0.0',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ 
