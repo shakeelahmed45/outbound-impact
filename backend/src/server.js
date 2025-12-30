@@ -67,36 +67,7 @@ setInterval(async () => {
   }
 }, 3 * 60 * 60 * 1000); // Every 3 hours
 
-// 3. Daily Restart (3 AM)
-// Full application restart for maximum freshness
-const scheduleRestart = () => {
-  const now = new Date();
-  const restartTime = new Date(now);
-  restartTime.setHours(3, 0, 0, 0);
-  
-  // If 3 AM already passed today, schedule for tomorrow
-  if (restartTime <= now) {
-    restartTime.setDate(restartTime.getDate() + 1);
-  }
-  
-  const timeUntilRestart = restartTime.getTime() - now.getTime();
-  
-  setTimeout(async () => {
-    console.log('🌙 Daily restart initiated (3 AM)');
-    try {
-      await prisma.$disconnect();
-      console.log('✅ Database disconnected for restart');
-    } catch (error) {
-      console.error('⚠️ Disconnect error during restart:', error);
-    }
-    process.exit(0); // Railway will automatically restart
-  }, timeUntilRestart);
-  
-  const hours = Math.floor(timeUntilRestart / (1000 * 60 * 60));
-  console.log(`⏰ Daily restart in ${hours}h at 3:00:00 AM`);
-};
-
-// 4. Graceful Shutdown
+// 3. Graceful Shutdown
 // Proper cleanup on termination
 const gracefulShutdown = async (signal) => {
   console.log(`\n🛑 ${signal} received, shutting down gracefully...`);
@@ -240,14 +211,10 @@ if (process.env.VERCEL) {
     console.log('🛡️ Protection Active:');
     console.log('  ✅ Database refresh (2h)');
     console.log('  ✅ Connection cleanup (3h)');
-    console.log('  ✅ Daily restart (3 AM)');
     console.log('───────────────────────────────────────────────');
     console.log('✨ Enterprise features enabled!');
     console.log('🛍️ Multi-platform e-commerce integration ready!');
     console.log('🔍 Debug routes active at /api/debug');
     console.log('═══════════════════════════════════════════════\n');
-    
-    // Schedule the daily restart
-    scheduleRestart();
   });
 }

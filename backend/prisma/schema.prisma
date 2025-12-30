@@ -110,6 +110,11 @@ model Campaign {
   logoUrl     String?
   qrCodeUrl   String?
   userId      String
+  
+  // 🔒 PASSWORD PROTECTION FIELDS - NEW
+  passwordProtected Boolean  @default(false)
+  passwordHash      String?
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -119,6 +124,7 @@ model Campaign {
   @@index([userId])
   @@index([slug])
   @@index([category])
+  @@index([passwordProtected])
 }
 
 model TeamMember {

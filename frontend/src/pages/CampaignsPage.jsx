@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Folder, Trash2, Edit2, FileText, Tag, Eye, TrendingUp, Download, Share2, ExternalLink, Wifi, Upload as UploadIcon, X, Image as ImageIcon } from 'lucide-react';
+import { Plus, Folder, Trash2, Edit2, FileText, Tag, Eye, TrendingUp, Download, Share2, ExternalLink, Wifi, Upload as UploadIcon, X, Image as ImageIcon, Lock, Unlock } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import NFCWriter from '../components/NFCWriter';
 import ShareModal from '../components/share/ShareModal';
@@ -40,6 +40,8 @@ const CampaignsPage = () => {
     description: '',
     category: '',
     logoUrl: '',
+    passwordProtected: false, // ✅ NEW
+    password: '', // ✅ NEW
   });
   
   const [logoFile, setLogoFile] = useState(null);
@@ -80,7 +82,6 @@ const CampaignsPage = () => {
       
       if (itemsRes.data.status === 'success') {
         setItems(itemsRes.data.items);
-        // ✅ OPTIMIZED: Use views from items data directly instead of fetching analytics
         const analyticsData = {};
         itemsRes.data.items.forEach(item => {
           analyticsData[item.id] = item.views || 0;
@@ -93,9 +94,6 @@ const CampaignsPage = () => {
       setLoading(false);
     }
   };
-
-  // ✅ REMOVED: fetchAnalyticsForItems function - no longer needed!
-  // The items endpoint already returns view counts
 
   const handleLogoSelect = (e) => {
     const file = e.target.files[0];
@@ -169,6 +167,17 @@ const CampaignsPage = () => {
   const handleCreate = async (e) => {
     e.preventDefault();
     
+    // ✅ NEW: Validate password if protection is enabled
+    if (formData.passwordProtected && !formData.password) {
+      showToast('Please enter a password for protected campaign', 'error');
+      return;
+    }
+
+    if (formData.passwordProtected && formData.password.length < 4) {
+      showToast('Password must be at least 4 characters', 'error');
+      return;
+    }
+    
     try {
       let logoUrl = formData.logoUrl;
       
@@ -181,14 +190,18 @@ const CampaignsPage = () => {
       }
       
       const response = await api.post('/campaigns', {
-        ...formData,
+        name: formData.name,
+        description: formData.description,
+        category: formData.category,
         logoUrl,
+        passwordProtected: formData.passwordProtected, // ✅ NEW
+        password: formData.passwordProtected ? formData.password : null, // ✅ NEW
       });
       
       if (response.data.status === 'success') {
         setCampaigns([response.data.campaign, ...campaigns]);
         setShowCreateModal(false);
-        setFormData({ name: '', description: '', category: '', logoUrl: '' });
+        setFormData({ name: '', description: '', category: '', logoUrl: '', passwordProtected: false, password: '' });
         clearLogo();
         showToast('Campaign created successfully!', 'success');
       }
@@ -200,6 +213,17 @@ const CampaignsPage = () => {
 
   const handleEdit = async (e) => {
     e.preventDefault();
+    
+    // ✅ NEW: Validate password if protection is enabled
+    if (formData.passwordProtected && !formData.password && !selectedCampaign.passwordProtected) {
+      showToast('Please enter a password for protected campaign', 'error');
+      return;
+    }
+
+    if (formData.passwordProtected && formData.password && formData.password.length < 4) {
+      showToast('Password must be at least 4 characters', 'error');
+      return;
+    }
     
     try {
       let logoUrl = formData.logoUrl;
@@ -213,15 +237,19 @@ const CampaignsPage = () => {
       }
       
       const response = await api.put('/campaigns/' + selectedCampaign.id, {
-        ...formData,
+        name: formData.name,
+        description: formData.description,
+        category: formData.category,
         logoUrl,
+        passwordProtected: formData.passwordProtected, // ✅ NEW
+        password: formData.password || null, // ✅ NEW: Only send if changed
       });
       
       if (response.data.status === 'success') {
         setCampaigns(campaigns.map(c => c.id === selectedCampaign.id ? response.data.campaign : c));
         setShowEditModal(false);
         setSelectedCampaign(null);
-        setFormData({ name: '', description: '', category: '', logoUrl: '' });
+        setFormData({ name: '', description: '', category: '', logoUrl: '', passwordProtected: false, password: '' });
         clearLogo();
         showToast('Campaign updated successfully!', 'success');
       }
@@ -284,6 +312,8 @@ const CampaignsPage = () => {
       description: campaign.description || '',
       category: campaign.category || '',
       logoUrl: campaign.logoUrl || '',
+      passwordProtected: campaign.passwordProtected || false, // ✅ NEW
+      password: '', // ✅ NEW: Don't show existing password
     });
     
     if (campaign.logoUrl) {
@@ -493,6 +523,15 @@ const CampaignsPage = () => {
                   key={campaign.id}
                   className="bg-white rounded-xl shadow-lg p-6 border-2 border-gray-100 hover:border-primary transition-all"
                 >
+                  {/* ✅ NEW: PASSWORD PROTECTION BADGE */}
+                  {campaign.passwordProtected && (
+                    <div className="mb-3 inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-yellow-100 to-amber-100 border border-yellow-300 rounded-full">
+                      <Lock size={14} className="text-yellow-700" />
+                      <span className="text-xs font-bold text-yellow-800">Password Protected</span>
+                      <Tooltip content="This campaign requires a password to view" />
+                    </div>
+                  )}
+
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       {campaign.logoUrl && (
@@ -627,9 +666,8 @@ const CampaignsPage = () => {
           </div>
         )}
 
-        {/* All your modals remain the same - keeping them exactly as they are */}
-        {/* I'm keeping all modal code identical to avoid any issues */}
-        
+
+        {/* ✅ CREATE CAMPAIGN MODAL WITH PASSWORD PROTECTION */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
@@ -718,12 +756,74 @@ const CampaignsPage = () => {
                   />
                 </div>
 
+                {/* ✅ NEW: PASSWORD PROTECTION SECTION */}
+                <div className="border-t border-gray-200 pt-6">
+                  <div className="bg-gradient-to-br from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-5">
+                    <div className="flex items-start gap-3 mb-4">
+                      <div className="flex-shrink-0">
+                        <div className="w-10 h-10 bg-gradient-to-br from-yellow-500 to-amber-600 rounded-xl flex items-center justify-center shadow-lg">
+                          <Lock size={20} className="text-white" />
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-bold text-yellow-900 mb-1">
+                          🔒 Password Protection (Optional)
+                        </h4>
+                        <p className="text-xs text-gray-600">
+                          Require a password to view this campaign's content. Perfect for keeping content private to your community.
+                        </p>
+                      </div>
+                    </div>
+
+                    <label className="flex items-center gap-3 cursor-pointer mb-4">
+                      <input
+                        type="checkbox"
+                        checked={formData.passwordProtected}
+                        onChange={(e) => setFormData({ ...formData, passwordProtected: e.target.checked, password: e.target.checked ? formData.password : '' })}
+                        className="w-5 h-5 text-yellow-600 focus:ring-yellow-500 border-gray-300 rounded"
+                      />
+                      <span className="text-sm font-semibold text-gray-800">
+                        Enable password protection
+                      </span>
+                    </label>
+
+                    {formData.passwordProtected && (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Campaign Password *
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.password}
+                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                            placeholder="Enter password (min 4 characters)"
+                            required={formData.passwordProtected}
+                            minLength={4}
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Share this password with people you want to give access to
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <p className="text-xs text-blue-800">
+                            <strong>💡 Tip:</strong> Choose a simple password that's easy to share (like "family2024" or "members"). 
+                            You can share it verbally, via email, or announce it to your group.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <div className="flex gap-3 pt-4">
                   <button
                     type="button"
                     onClick={() => {
                       setShowCreateModal(false);
-                      setFormData({ name: '', description: '', category: '', logoUrl: '' });
+                      setFormData({ name: '', description: '', category: '', logoUrl: '', passwordProtected: false, password: '' });
                       clearLogo();
                     }}
                     className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-all"
@@ -744,10 +844,9 @@ const CampaignsPage = () => {
           </div>
         )}
 
-        {/* Keeping all other modals exactly as they are */}
+        {/* ✅ EDIT CAMPAIGN MODAL WITH PASSWORD PROTECTION */}
         {showEditModal && selectedCampaign && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            {/* Full edit modal code - keeping it identical */}
             <div className="bg-white rounded-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
               <h2 className="text-2xl font-bold text-primary mb-6">Edit Campaign</h2>
               <form onSubmit={handleEdit} className="space-y-6">
@@ -832,13 +931,86 @@ const CampaignsPage = () => {
                   />
                 </div>
 
+                {/* ✅ NEW: PASSWORD PROTECTION SECTION FOR EDIT */}
+                <div className="border-t border-gray-200 pt-6">
+                  <div className="bg-gradient-to-br from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-5">
+                    <div className="flex items-start gap-3 mb-4">
+                      <div className="flex-shrink-0">
+                        <div className="w-10 h-10 bg-gradient-to-br from-yellow-500 to-amber-600 rounded-xl flex items-center justify-center shadow-lg">
+                          {formData.passwordProtected ? <Lock size={20} className="text-white" /> : <Unlock size={20} className="text-white" />}
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-bold text-yellow-900 mb-1">
+                          🔒 Password Protection (Optional)
+                        </h4>
+                        <p className="text-xs text-gray-600">
+                          {selectedCampaign.passwordProtected 
+                            ? 'This campaign is currently password protected' 
+                            : 'Add password protection to restrict access'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <label className="flex items-center gap-3 cursor-pointer mb-4">
+                      <input
+                        type="checkbox"
+                        checked={formData.passwordProtected}
+                        onChange={(e) => setFormData({ ...formData, passwordProtected: e.target.checked, password: e.target.checked ? formData.password : '' })}
+                        className="w-5 h-5 text-yellow-600 focus:ring-yellow-500 border-gray-300 rounded"
+                      />
+                      <span className="text-sm font-semibold text-gray-800">
+                        Enable password protection
+                      </span>
+                    </label>
+
+                    {formData.passwordProtected && (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            {selectedCampaign.passwordProtected ? 'New Password (leave blank to keep current)' : 'Campaign Password *'}
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.password}
+                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                            placeholder={selectedCampaign.passwordProtected ? "Leave blank to keep current password" : "Enter password (min 4 characters)"}
+                            required={formData.passwordProtected && !selectedCampaign.passwordProtected}
+                            minLength={formData.password ? 4 : 0}
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            {selectedCampaign.passwordProtected 
+                              ? 'Only enter a password if you want to change it' 
+                              : 'Share this password with people you want to give access to'}
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <p className="text-xs text-blue-800">
+                            <strong>💡 Tip:</strong> Choose a simple password that's easy to share (like "family2024" or "members").
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {!formData.passwordProtected && selectedCampaign.passwordProtected && (
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-xs text-red-800">
+                          <strong>⚠️ Warning:</strong> Disabling password protection will make this campaign publicly accessible to anyone with the QR code or link.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <div className="flex gap-3 pt-4">
                   <button
                     type="button"
                     onClick={() => {
                       setShowEditModal(false);
                       setSelectedCampaign(null);
-                      setFormData({ name: '', description: '', category: '', logoUrl: '' });
+                      setFormData({ name: '', description: '', category: '', logoUrl: '', passwordProtected: false, password: '' });
                       clearLogo();
                     }}
                     className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-all"
@@ -859,7 +1031,8 @@ const CampaignsPage = () => {
           </div>
         )}
 
-        {/* Continuing with VIEW and MANAGE modals - keeping them identical */}
+
+        {/* VIEW ITEMS MODAL */}
         {showViewItemsModal && selectedCampaign && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl p-8 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
@@ -961,6 +1134,7 @@ const CampaignsPage = () => {
           </div>
         )}
 
+        {/* MANAGE ITEMS MODAL */}
         {showAddItemsModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
@@ -1028,6 +1202,7 @@ const CampaignsPage = () => {
           </div>
         )}
 
+        {/* NFC WRITER MODAL */}
         {nfcCampaign && (
           <NFCWriter 
             campaign={nfcCampaign} 
@@ -1036,12 +1211,14 @@ const CampaignsPage = () => {
           />
         )}
 
+        {/* SHARE MODAL */}
         <ShareModal
           isOpen={showShareModal}
           onClose={closeShareModal}
           campaign={shareSelectedCampaign}
         />
 
+        {/* EDIT ITEM MODAL */}
         <EditItemModal
           item={editingItem}
           isOpen={showEditItemModal}
