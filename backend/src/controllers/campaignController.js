@@ -1,4 +1,5 @@
 const prisma = require('../lib/prisma');
+const bcrypt = require('bcryptjs');
 const QRCode = require('qrcode');
 const axios = require('axios');
 const { nanoid } = require('nanoid');
@@ -58,7 +59,7 @@ const generateCampaignQRCode = async (slug) => {
   }
 };
 
-// ✅ OPTIMIZED: Only select needed fields
+// ✅ Get all campaigns for authenticated user
 const getUserCampaigns = async (req, res) => {
   try {
     const userId = req.effectiveUserId;
@@ -73,6 +74,7 @@ const getUserCampaigns = async (req, res) => {
         category: true,
         logoUrl: true,
         qrCodeUrl: true,
+        passwordProtected: true, // ✅ NEW: Include password protection status
         createdAt: true,
         updatedAt: true,
         _count: {
@@ -100,6 +102,7 @@ const getUserCampaigns = async (req, res) => {
   }
 };
 
+// ✅ Create new campaign with optional password protection
 const createCampaign = async (req, res) => {
   try {
     if (req.teamRole === 'VIEWER') {
@@ -110,7 +113,7 @@ const createCampaign = async (req, res) => {
     }
 
     const userId = req.effectiveUserId;
-    const { name, description, category, logoUrl } = req.body;
+    const { name, description, category, logoUrl, passwordProtected, password } = req.body;
 
     if (!name) {
       return res.status(400).json({
@@ -119,8 +122,29 @@ const createCampaign = async (req, res) => {
       });
     }
 
+    // ✅ NEW: Validate password if protection is enabled
+    if (passwordProtected && !password) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Password is required when protection is enabled',
+      });
+    }
+
+    if (passwordProtected && password && password.length < 4) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Password must be at least 4 characters',
+      });
+    }
+
     const slug = await generateUniqueSlug();
     const qrCodeUrl = await generateCampaignQRCode(slug);
+
+    // ✅ NEW: Hash password if provided
+    let passwordHash = null;
+    if (passwordProtected && password) {
+      passwordHash = await bcrypt.hash(password, 10);
+    }
 
     const campaign = await prisma.campaign.create({
       data: {
@@ -131,10 +155,12 @@ const createCampaign = async (req, res) => {
         category: category || null,
         logoUrl: logoUrl || null,
         qrCodeUrl,
+        passwordProtected: passwordProtected || false, // ✅ NEW
+        passwordHash, // ✅ NEW
       },
     });
 
-    console.log(`✅ Campaign created: ${campaign.name}${logoUrl ? ' (with logo)' : ''}`);
+    console.log(`✅ Campaign created: ${campaign.name}${logoUrl ? ' (with logo)' : ''}${passwordProtected ? ' [PROTECTED]' : ''}`);
 
     res.status(201).json({
       status: 'success',
@@ -150,6 +176,7 @@ const createCampaign = async (req, res) => {
   }
 };
 
+// ✅ Update campaign with password protection support
 const updateCampaign = async (req, res) => {
   try {
     if (req.teamRole === 'VIEWER') {
@@ -161,7 +188,7 @@ const updateCampaign = async (req, res) => {
 
     const userId = req.effectiveUserId;
     const { id } = req.params;
-    const { name, description, category, logoUrl } = req.body;
+    const { name, description, category, logoUrl, passwordProtected, password } = req.body;
 
     const campaign = await prisma.campaign.findFirst({
       where: { id, userId },
@@ -174,6 +201,32 @@ const updateCampaign = async (req, res) => {
       });
     }
 
+    // ✅ NEW: Handle password updates
+    let passwordHash = campaign.passwordHash;
+    
+    if (passwordProtected) {
+      // If enabling protection or changing password
+      if (password) {
+        if (password.length < 4) {
+          return res.status(400).json({
+            status: 'error',
+            message: 'Password must be at least 4 characters',
+          });
+        }
+        passwordHash = await bcrypt.hash(password, 10);
+      } else if (!campaign.passwordProtected) {
+        // Enabling protection but no password provided and wasn't protected before
+        return res.status(400).json({
+          status: 'error',
+          message: 'Password is required when enabling protection',
+        });
+      }
+      // If password is empty and was already protected, keep existing hash
+    } else {
+      // Disabling protection
+      passwordHash = null;
+    }
+
     const updatedCampaign = await prisma.campaign.update({
       where: { id },
       data: {
@@ -181,10 +234,12 @@ const updateCampaign = async (req, res) => {
         description: description !== undefined ? description : campaign.description,
         category: category !== undefined ? category : campaign.category,
         logoUrl: logoUrl !== undefined ? logoUrl : campaign.logoUrl,
+        passwordProtected: passwordProtected || false, // ✅ NEW
+        passwordHash, // ✅ NEW
       },
     });
 
-    console.log(`✅ Campaign updated: ${updatedCampaign.name}${logoUrl ? ' (logo updated)' : ''}`);
+    console.log(`✅ Campaign updated: ${updatedCampaign.name}${logoUrl ? ' (logo updated)' : ''}${passwordProtected ? ' [PROTECTED]' : ''}`);
 
     res.json({
       status: 'success',
@@ -200,6 +255,7 @@ const updateCampaign = async (req, res) => {
   }
 };
 
+// ✅ Delete campaign
 const deleteCampaign = async (req, res) => {
   try {
     if (req.teamRole === 'VIEWER') {
@@ -245,6 +301,7 @@ const deleteCampaign = async (req, res) => {
   }
 };
 
+// ✅ Assign/remove item to/from campaign
 const assignItemToCampaign = async (req, res) => {
   try {
     if (req.teamRole === 'VIEWER') {
@@ -299,7 +356,7 @@ const assignItemToCampaign = async (req, res) => {
   }
 };
 
-// ✅ OPTIMIZED: Only select needed fields for items
+// ✅ Get public campaign (with password protection check)
 const getPublicCampaign = async (req, res) => {
   try {
     const { slug } = req.params;
@@ -318,6 +375,8 @@ const getPublicCampaign = async (req, res) => {
         qrCodeUrl: true,
         userId: true,
         createdAt: true,
+        passwordProtected: true, // ✅ NEW
+        passwordHash: true, // ✅ NEW (needed for verification)
         items: {
           select: {
             id: true,
@@ -346,6 +405,25 @@ const getPublicCampaign = async (req, res) => {
       });
     }
 
+    // ✅ NEW: Check if campaign is password protected
+    if (campaign.passwordProtected) {
+      console.log(`🔒 Campaign is password protected: ${campaign.name}`);
+      
+      // Return limited info indicating password is required
+      return res.json({
+        status: 'success',
+        campaign: {
+          id: campaign.id,
+          slug: campaign.slug,
+          name: campaign.name,
+          description: campaign.description,
+          logoUrl: campaign.logoUrl,
+          passwordProtected: true,
+          requiresPassword: true,
+        },
+      });
+    }
+
     console.log('✅ Campaign found:', campaign.name);
     console.log('📦 Items count:', campaign.items.length);
     if (campaign.logoUrl) {
@@ -365,8 +443,11 @@ const getPublicCampaign = async (req, res) => {
       console.error('⚠️ Could not fetch user name:', userError.message);
     }
 
+    // Remove passwordHash before sending
+    const { passwordHash, ...campaignWithoutHash } = campaign;
+
     const campaignData = {
-      ...campaign,
+      ...campaignWithoutHash,
       items: campaign.items.map(item => ({
         ...item,
         fileSize: item.fileSize ? item.fileSize.toString() : '0',
@@ -396,6 +477,118 @@ const getPublicCampaign = async (req, res) => {
   }
 };
 
+// ✅ NEW: Verify campaign password and return full campaign data
+const verifyCampaignPassword = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { password } = req.body;
+
+    console.log(`🔐 Password verification attempt for campaign: ${slug}`);
+
+    if (!password) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Password is required',
+      });
+    }
+
+    const campaign = await prisma.campaign.findUnique({
+      where: { slug },
+      include: {
+        items: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            slug: true,
+            title: true,
+            description: true,
+            type: true,
+            mediaUrl: true,
+            thumbnailUrl: true,
+            qrCodeUrl: true,
+            views: true,
+            buttonText: true,
+            buttonUrl: true,
+            attachments: true,
+            fileSize: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    if (!campaign) {
+      console.log(`❌ Campaign not found: ${slug}`);
+      return res.status(404).json({
+        status: 'error',
+        message: 'Campaign not found',
+      });
+    }
+
+    if (!campaign.passwordProtected || !campaign.passwordHash) {
+      console.log(`⚠️ Campaign is not password protected: ${campaign.name}`);
+      return res.status(400).json({
+        status: 'error',
+        message: 'This campaign is not password protected',
+      });
+    }
+
+    // ✅ Verify password
+    const isValidPassword = await bcrypt.compare(password, campaign.passwordHash);
+
+    if (!isValidPassword) {
+      console.log(`❌ Invalid password for campaign: ${campaign.name}`);
+      return res.status(401).json({
+        status: 'error',
+        message: 'Incorrect password',
+      });
+    }
+
+    // ✅ Password is correct - return full campaign data
+    console.log(`✅ Password verified for campaign: ${campaign.name}`);
+
+    // Get user name
+    let userName = 'Unknown';
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: campaign.userId },
+        select: { name: true },
+      });
+      if (user) {
+        userName = user.name;
+      }
+    } catch (userError) {
+      console.error('⚠️ Could not fetch user name:', userError.message);
+    }
+
+    // Remove sensitive data
+    const { passwordHash, userId, ...campaignWithoutHash } = campaign;
+
+    const campaignData = {
+      ...campaignWithoutHash,
+      items: campaign.items.map(item => ({
+        ...item,
+        fileSize: item.fileSize ? item.fileSize.toString() : '0',
+      })),
+      user: {
+        name: userName,
+      },
+    };
+
+    res.json({
+      status: 'success',
+      campaign: campaignData,
+      message: 'Access granted',
+    });
+  } catch (error) {
+    console.error('❌ Verify campaign password error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to verify password',
+    });
+  }
+};
+
 module.exports = {
   getUserCampaigns,
   createCampaign,
@@ -403,4 +596,5 @@ module.exports = {
   deleteCampaign,
   assignItemToCampaign,
   getPublicCampaign,
+  verifyCampaignPassword, // ✅ NEW
 };
