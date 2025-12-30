@@ -68,7 +68,7 @@ const SplashScreen = ({ onAnimationEnd }) => {
 
         {/* Subtitle */}
         <p className="text-gray-500 text-sm font-medium mb-10 tracking-wider uppercase">
-          Premium QR Solutions
+          WHERE CONNECTION LIVES
         </p>
 
         {/* Modern Progress Bar */}
