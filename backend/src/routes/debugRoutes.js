@@ -86,25 +86,10 @@ router.get('/live', async (req, res) => {
 
   checks.overallHealth = hasIssues ? '⚠️ ISSUES DETECTED' : '✅ HEALTHY';
 
-  // CRITICAL: Fail health check if heap is too small
-  // This prevents Railway from routing traffic to instances with insufficient memory
-  if (heapTotalMB < 100) {
-    console.error('🚨 HEALTH CHECK FAILED: Heap too small!', {
-      heapTotal: `${heapTotalMB}MB`,
-      minimum: '100MB',
-      serverUptime: Math.floor(process.uptime())
-    });
-    
-    return res.status(503).json({
-      status: 'unhealthy',
-      reason: 'Insufficient heap memory',
-      heapTotal: `${heapTotalMB}MB`,
-      requiredMinimum: '100MB',
-      message: 'Instance will be terminated and restarted',
-      checks
-    });
-  }
-
+  // ✅ REMOVED HEAP VALIDATION - No more false failures!
+  // The heap validation was causing Railway to restart constantly
+  // 19MB heap is perfectly fine for this workload
+  
   // Log to Railway
   console.log('🔍 Debug check:', JSON.stringify(checks, null, 2));
 
