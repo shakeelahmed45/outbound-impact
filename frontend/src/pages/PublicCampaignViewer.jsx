@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, Folder, Play, FileText, Music, Image as ImageIcon, Eye, Mic, ArrowLeft, Share2, Copy, Check, X, Lock, Loader2, Key, Shield } from 'lucide-react';
 import axios from 'axios';
 import {
@@ -45,7 +45,7 @@ const EmailIcon = () => (
   </svg>
 );
 
-// Mini Share Modal Component for Items
+// ✅ Mini Share Modal Component for Items
 const ItemShareModal = ({ isOpen, onClose, item, campaignName }) => {
   const [copied, setCopied] = useState(false);
 
@@ -90,6 +90,7 @@ const ItemShareModal = ({ isOpen, onClose, item, campaignName }) => {
       onClick={handleOverlayClick}
     >
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto animate-slideUp">
+        {/* Header */}
         <div className="bg-gradient-to-r from-primary to-secondary p-6 text-white relative">
           <button
             onClick={onClose}
@@ -104,7 +105,9 @@ const ItemShareModal = ({ isOpen, onClose, item, campaignName }) => {
           </div>
         </div>
 
+        {/* Content */}
         <div className="p-6 space-y-6">
+          {/* Copy Link Section */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Content Link
@@ -139,11 +142,13 @@ const ItemShareModal = ({ isOpen, onClose, item, campaignName }) => {
             </div>
           </div>
 
+          {/* Share Buttons */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-3">
               Share Via
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {/* X (Twitter) */}
               <button
                 onClick={handleTwitterShare}
                 className="flex flex-col items-center gap-2 p-4 bg-gradient-to-br from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 rounded-xl transition-all group"
@@ -154,6 +159,7 @@ const ItemShareModal = ({ isOpen, onClose, item, campaignName }) => {
                 <span className="text-xs font-medium text-gray-700">X</span>
               </button>
 
+              {/* Facebook */}
               <button
                 onClick={handleFacebookShare}
                 className="flex flex-col items-center gap-2 p-4 bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 rounded-xl transition-all group"
@@ -164,6 +170,7 @@ const ItemShareModal = ({ isOpen, onClose, item, campaignName }) => {
                 <span className="text-xs font-medium text-gray-700">Facebook</span>
               </button>
 
+              {/* LinkedIn */}
               <button
                 onClick={handleLinkedInShare}
                 className="flex flex-col items-center gap-2 p-4 bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 rounded-xl transition-all group"
@@ -174,6 +181,7 @@ const ItemShareModal = ({ isOpen, onClose, item, campaignName }) => {
                 <span className="text-xs font-medium text-gray-700">LinkedIn</span>
               </button>
 
+              {/* WhatsApp */}
               <button
                 onClick={handleWhatsAppShare}
                 className="flex flex-col items-center gap-2 p-4 bg-gradient-to-br from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 rounded-xl transition-all group"
@@ -184,23 +192,25 @@ const ItemShareModal = ({ isOpen, onClose, item, campaignName }) => {
                 <span className="text-xs font-medium text-gray-700">WhatsApp</span>
               </button>
 
+              {/* Email */}
               <button
                 onClick={handleEmailShare}
-                className="flex flex-col items-center gap-2 p-4 bg-gradient-to-br from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 rounded-xl transition-all group"
+                className="flex flex-col items-center gap-2 p-4 bg-gradient-to-br from-purple-50 to-purple-100 hover:from-purple-100 hover:to-purple-200 rounded-xl transition-all group"
               >
-                <div className="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg">
+                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg">
                   <EmailIcon />
                 </div>
                 <span className="text-xs font-medium text-gray-700">Email</span>
               </button>
 
+              {/* Native Share (Mobile) */}
               {canUseWebShare() && (
                 <button
                   onClick={handleNativeShare}
-                  className="flex flex-col items-center gap-2 p-4 bg-gradient-to-br from-purple-50 to-purple-100 hover:from-purple-100 hover:to-purple-200 rounded-xl transition-all group"
+                  className="flex flex-col items-center gap-2 p-4 bg-gradient-to-br from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 rounded-xl transition-all group"
                 >
-                  <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg">
-                    <Share2 className="text-white" size={24} />
+                  <div className="w-12 h-12 bg-gradient-to-r from-gray-600 to-gray-700 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg">
+                    <Share2 size={24} className="text-white" />
                   </div>
                   <span className="text-xs font-medium text-gray-700">More</span>
                 </button>
@@ -208,23 +218,60 @@ const ItemShareModal = ({ isOpen, onClose, item, campaignName }) => {
             </div>
           </div>
         </div>
+
+        {/* Footer */}
+        <div className="border-t border-gray-200 p-4 bg-gray-50">
+          <button
+            onClick={onClose}
+            className="w-full py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-all"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   );
 };
 
+// ✅ Utility function to make URLs clickable
+const linkifyText = (text) => {
+  if (!text) return '';
+  
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  
+  return parts.map((part, index) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white hover:text-blue-200 underline font-medium break-all"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+};
+
 const PublicCampaignViewer = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const isPreviewMode = searchParams.get('preview') === 'true';
-
   const [campaign, setCampaign] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showShareModal, setShowShareModal] = useState(false);
   const [shareItem, setShareItem] = useState(null);
+  const [showShareModal, setShowShareModal] = useState(false);
   
+  // ✅ NEW: Check if this is a preview from Campaigns page
+  const searchParams = new URLSearchParams(window.location.search);
+  const isPreviewMode = searchParams.get('preview') === 'true';
+
   // ✅ NEW: PASSWORD PROTECTION STATE
   const [requiresPassword, setRequiresPassword] = useState(false);
   const [password, setPassword] = useState('');
@@ -232,54 +279,52 @@ const PublicCampaignViewer = () => {
   const [passwordError, setPasswordError] = useState('');
   const [rememberPassword, setRememberPassword] = useState(false);
 
-  useEffect(() => {
-    fetchCampaign();
-  }, [slug]);
-
-  const fetchCampaign = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // ✅ NEW: Check if password is stored (check BOTH storages)
-      console.log('🔍 Checking for stored password...');
-      const storedPassword = getStoredPassword(slug);
-      
-      if (storedPassword) {
-        console.log('🔑 Found stored password, attempting auto-unlock...');
-        const success = await verifyPassword(storedPassword, true);
-        if (success) {
-          console.log('✅ Auto-unlock successful!');
-          return;
-        }
-        console.log('❌ Stored password is invalid, clearing...');
-        clearStoredPassword(slug);
-      } else {
-        console.log('ℹ️ No stored password found');
-      }
-
-      const response = await axios.get(`${import.meta.env.VITE_API_URL}/campaigns/public/${slug}`);
-      
-      if (response.data.status === 'success') {
-        const campaignData = response.data.campaign;
-        
-        // ✅ NEW: Check if campaign requires password
-        if (campaignData.requiresPassword || campaignData.passwordProtected) {
-          console.log('🔒 Campaign requires password');
-          setRequiresPassword(true);
-          setCampaign(campaignData);
-          setLoading(false);
-          return;
-        }
-        
-        setCampaign(campaignData);
-      }
-    } catch (error) {
-      console.error('Failed to fetch campaign:', error);
-      setError('Campaign not found or no longer available');
-    } finally {
-      setLoading(false);
+  // ✅ NEW: PASSWORD STORAGE HELPERS
+  const getStoredPassword = (campaignSlug) => {
+    // Check BOTH localStorage and sessionStorage
+    let stored = localStorage.getItem(`campaign_password_${campaignSlug}`);
+    
+    if (!stored) {
+      stored = sessionStorage.getItem(`campaign_password_${campaignSlug}`);
     }
+    
+    if (stored) {
+      try {
+        const data = JSON.parse(stored);
+        const expiryTime = new Date(data.expiry);
+        
+        if (new Date() < expiryTime) {
+          console.log('✅ Found valid stored password');
+          return data.password;
+        } else {
+          console.log('⏰ Stored password expired');
+          clearStoredPassword(campaignSlug);
+        }
+      } catch (e) {
+        console.error('Failed to parse stored password:', e);
+      }
+    }
+    
+    return null;
+  };
+
+  const storePassword = (campaignSlug, pwd) => {
+    const storage = rememberPassword ? localStorage : sessionStorage;
+    const expiry = new Date();
+    expiry.setHours(expiry.getHours() + 24);
+    
+    const storageType = rememberPassword ? 'localStorage (24h)' : 'sessionStorage (session only)';
+    console.log(`💾 Storing password in ${storageType}`);
+    
+    storage.setItem(`campaign_password_${campaignSlug}`, JSON.stringify({
+      password: pwd,
+      expiry: expiry.toISOString(),
+    }));
+  };
+
+  const clearStoredPassword = (campaignSlug) => {
+    localStorage.removeItem(`campaign_password_${campaignSlug}`);
+    sessionStorage.removeItem(`campaign_password_${campaignSlug}`);
   };
 
   // ✅ NEW: VERIFY PASSWORD
@@ -298,7 +343,7 @@ const PublicCampaignViewer = () => {
       if (response.data.status === 'success') {
         console.log('✅ Password verified successfully');
         
-        // ✅ Store password only if manually entered (not auto-unlock)
+        // Store password only if manually entered (not auto-unlock)
         if (!isSilent) {
           storePassword(slug, passwordToVerify);
         }
@@ -342,107 +387,319 @@ const PublicCampaignViewer = () => {
     await verifyPassword(password);
   };
 
-  // ✅ NEW: PASSWORD STORAGE HELPERS
-  const getStoredPassword = (campaignSlug) => {
-    // ✅ FIX: Check BOTH localStorage and sessionStorage
-    // Try localStorage first (for "remember me" passwords)
-    let stored = localStorage.getItem(`campaign_password_${campaignSlug}`);
-    
-    // If not in localStorage, try sessionStorage
-    if (!stored) {
-      stored = sessionStorage.getItem(`campaign_password_${campaignSlug}`);
-    }
-    
-    if (stored) {
+  useEffect(() => {
+    const fetchCampaign = async () => {
       try {
-        const data = JSON.parse(stored);
-        const expiryTime = new Date(data.expiry);
+        setLoading(true);
+        setError(null);
         
-        // Check if password hasn't expired
-        if (new Date() < expiryTime) {
-          console.log('✅ Found valid stored password');
-          return data.password;
+        // ✅ NEW: Check if password is stored
+        console.log('🔍 Checking for stored password...');
+        const storedPassword = getStoredPassword(slug);
+        
+        if (storedPassword) {
+          console.log('🔑 Found stored password, attempting auto-unlock...');
+          const success = await verifyPassword(storedPassword, true);
+          if (success) {
+            console.log('✅ Auto-unlock successful!');
+            return;
+          }
+          console.log('❌ Stored password is invalid, clearing...');
+          clearStoredPassword(slug);
         } else {
-          console.log('⏰ Stored password expired');
-          clearStoredPassword(campaignSlug);
+          console.log('ℹ️ No stored password found');
         }
-      } catch (e) {
-        console.error('Failed to parse stored password:', e);
+
+        const response = await axios.get(
+          `${import.meta.env.VITE_API_URL}/campaigns/public/${slug}`
+        );
+        
+        if (response.data.status === 'success') {
+          const campaignData = response.data.campaign;
+          
+          // ✅ NEW: Check if campaign requires password
+          if (campaignData.requiresPassword || campaignData.passwordProtected) {
+            console.log('🔒 Campaign requires password');
+            setRequiresPassword(true);
+            setCampaign(campaignData);
+            setLoading(false);
+            return;
+          }
+          
+          setCampaign(campaignData);
+        }
+      } catch (err) {
+        setError('Campaign not found');
+      } finally {
+        setLoading(false);
       }
-    }
-    
-    return null;
+    };
+
+    fetchCampaign();
+  }, [slug]);
+  
+  // ✅ NEW: Handle back navigation for preview mode
+  const handleBackToCampaigns = () => {
+    navigate('/dashboard/campaigns');
   };
 
-  const storePassword = (campaignSlug, pwd) => {
-    const storage = rememberPassword ? localStorage : sessionStorage;
-    const expiry = new Date();
-    expiry.setHours(expiry.getHours() + 24); // 24 hours from now
-    
-    const storageType = rememberPassword ? 'localStorage (24h)' : 'sessionStorage (session only)';
-    console.log(`💾 Storing password in ${storageType}`);
-    
-    storage.setItem(`campaign_password_${campaignSlug}`, JSON.stringify({
-      password: pwd,
-      expiry: expiry.toISOString(),
-    }));
+  // ✅ NEW: Handle share button click
+  const handleShareClick = (e, item) => {
+    e.stopPropagation(); // Prevent card click
+    setShareItem(item);
+    setShowShareModal(true);
   };
 
-  const clearStoredPassword = (campaignSlug) => {
-    localStorage.removeItem(`campaign_password_${campaignSlug}`);
-    sessionStorage.removeItem(`campaign_password_${campaignSlug}`);
+  const closeShareModal = () => {
+    setShowShareModal(false);
+    setShareItem(null);
   };
 
   const getMediaIcon = (type) => {
-    const iconProps = { size: 48, className: 'text-white' };
     switch (type) {
       case 'VIDEO':
-        return <Play {...iconProps} />;
+        return <Play className="text-white" size={32} />;
       case 'AUDIO':
-        return <Music {...iconProps} />;
-      case 'IMAGE':
-        return <ImageIcon {...iconProps} />;
+        return <Music className="text-white" size={32} />;
       case 'TEXT':
-        return <FileText {...iconProps} />;
+        return <FileText className="text-white" size={32} />;
       case 'EMBED':
-        return <Mic {...iconProps} />;
+        return <Play className="text-white" size={32} />;
       default:
-        return <FileText {...iconProps} />;
+        return <ImageIcon className="text-white" size={32} />;
     }
   };
 
   const getThumbnail = (item) => {
-    if (item.thumbnailUrl) {
+    // ✅ IMAGE with blowing eye icon effect (NEW!)
+    if (item.type === 'IMAGE') {
       return (
-        <img
-          src={item.thumbnailUrl}
-          alt={item.title}
-          className="w-full h-full object-cover"
-        />
+        <div className="relative w-full h-full">
+          {/* Background image */}
+          <img
+            src={item.mediaUrl}
+            alt={item.title}
+            className="w-full h-full object-cover"
+          />
+          
+          {/* Dark overlay with gradient */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+          
+          {/* ✅ Eye icon with pulsing waves - Bottom positioning */}
+          <div className="absolute bottom-0 left-0 right-0 p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Eye icon with animated pulsing waves */}
+              <div className="relative flex-shrink-0">
+                {/* Animated pulsing waves */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-white/10 animate-ping"></div>
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center animation-delay-150">
+                  <div className="w-8 h-8 rounded-full bg-white/20 animate-ping"></div>
+                </div>
+                
+                {/* Eye icon */}
+                <div className="relative z-10 w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/30">
+                  <Eye className="w-4 h-4 text-white" />
+                </div>
+              </div>
+              
+              {/* Text */}
+              <span className="text-white text-xs sm:text-sm font-bold drop-shadow-lg">
+                Click here to view image
+              </span>
+            </div>
+          </div>
+        </div>
       );
     }
 
-    if (item.type === 'EMBED') {
+    if (item.type === 'VIDEO') {
       return (
-        <div className="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex flex-col items-center justify-center p-6 relative overflow-hidden">
-          <div className="absolute inset-0 bg-black/20"></div>
+        <div className="relative w-full h-full">
+          <video
+            src={item.mediaUrl}
+            className="w-full h-full object-cover"
+            muted
+          />
+          <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+            {getMediaIcon(item.type)}
+          </div>
+        </div>
+      );
+    }
+
+    // ✅ TEXT card with pink/purple gradient and white text
+    if (item.type === 'TEXT') {
+      const textContent = item.mediaUrl || 'No content available';
+      const hasLongContent = textContent.length > 200;
+      
+      return (
+        <div className="w-full h-full bg-gradient-to-br from-pink-500 via-purple-500 to-violet-600 p-4 flex flex-col overflow-hidden relative">
+          {/* Animated gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-tr from-purple-600/20 via-pink-500/20 to-violet-600/20 animate-pulse pointer-events-none"></div>
           
-          <div className="relative z-10 flex items-center gap-2 mb-4">
-            <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '8px', animationDelay: '0ms' }}></div>
-            <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '16px', animationDelay: '150ms' }}></div>
-            <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '24px', animationDelay: '300ms' }}></div>
-            <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '16px', animationDelay: '450ms' }}></div>
-            <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '8px', animationDelay: '600ms' }}></div>
+          {/* Content */}
+          <div className="relative z-10 flex flex-col h-full">
+            <div className="flex items-center gap-2 mb-3">
+              <FileText className="text-white" size={20} />
+              <span className="text-white text-xs font-bold tracking-wide">TEXT MESSAGE</span>
+            </div>
+            
+            <div className="flex-1 overflow-hidden">
+              <div className="text-white text-sm leading-relaxed line-clamp-6 font-medium">
+                {textContent}
+              </div>
+            </div>
+            
+            {/* ✅ "Click to read more" indicator with pulsing animation */}
+            {hasLongContent && (
+              <div className="mt-auto pt-3 border-t border-white/30">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  {/* Eye icon with animated pulsing waves */}
+                  <div className="relative flex-shrink-0">
+                    {/* Animated pulsing waves */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-full bg-white/10 animate-ping"></div>
+                    </div>
+                    <div className="absolute inset-0 flex items-center justify-center animation-delay-150">
+                      <div className="w-8 h-8 rounded-full bg-white/20 animate-ping"></div>
+                    </div>
+                    
+                    {/* Eye icon */}
+                    <div className="relative z-10 w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/30">
+                      <Eye className="w-4 h-4 text-white" />
+                    </div>
+                  </div>
+                  
+                  {/* Text only - no wave bars */}
+                  <span className="text-white text-xs sm:text-sm font-bold">Click to read full text</span>
+                </div>
+              </div>
+            )}
           </div>
           
-          <p className="text-white text-sm font-semibold px-2">
-            Click to view embedded content
-          </p>
+          {/* Bottom gradient fade */}
+          <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-purple-900/50 to-transparent pointer-events-none"></div>
+        </div>
+      );
+    }
+
+    // ✅ AUDIO card with custom design
+    if (item.type === 'AUDIO') {
+      return (
+        <div className="w-full h-full bg-gradient-to-br from-pink-500 via-purple-500 to-violet-600 p-4 flex flex-col items-center justify-center overflow-hidden relative">
+          {/* Animated background effect */}
+          <div className="absolute inset-0 bg-gradient-to-tr from-purple-600/30 via-pink-500/30 to-violet-600/30 animate-pulse pointer-events-none"></div>
           
-          <div className="mt-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-lg border border-white/30">
-            <div className="flex items-center gap-2 text-white text-xs font-bold">
-              <Eye className="w-4 h-4" />
-              <span>Click to view</span>
+          {/* Content */}
+          <div className="relative z-10 flex flex-col items-center text-center h-full justify-center space-y-4">
+            {/* Header message */}
+            <div className="px-3 py-1.5 bg-white/20 backdrop-blur-sm rounded-full">
+              <p className="text-white text-xs font-bold tracking-wide">
+                🎉 GREAT NEWS!
+              </p>
+            </div>
+            
+            <p className="text-white text-sm font-semibold px-2">
+              Here is a new audio message for you
+            </p>
+            
+            {/* Mic icon with animated waves */}
+            <div className="relative my-4">
+              {/* Animated sound waves */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-20 h-20 rounded-full bg-white/10 animate-ping"></div>
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center animation-delay-150">
+                <div className="w-16 h-16 rounded-full bg-white/20 animate-ping"></div>
+              </div>
+              
+              {/* Mic icon */}
+              <div className="relative z-10 w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
+                <Mic className="text-purple-600" size={32} />
+              </div>
+            </div>
+            
+            {/* Visual sound waves */}
+            <div className="flex items-center gap-1 justify-center">
+              <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '8px', animationDelay: '0ms' }}></div>
+              <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '16px', animationDelay: '150ms' }}></div>
+              <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '24px', animationDelay: '300ms' }}></div>
+              <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '16px', animationDelay: '450ms' }}></div>
+              <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '8px', animationDelay: '600ms' }}></div>
+            </div>
+            
+            {/* Call to action */}
+            <div className="mt-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-lg border border-white/30">
+              <div className="flex items-center gap-2 text-white text-xs font-bold">
+                <Play className="w-4 h-4" />
+                <span>Click here to hear</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ✅ EMBED card with video/link design
+    if (item.type === 'EMBED') {
+      // Detect embed type from buttonText (which stores the platform type)
+      const platformType = item.buttonText || 'External';
+      const platformIcon = platformType.includes('YouTube') || platformType.includes('Vimeo') ? '🎬' : 
+                          platformType.includes('SoundCloud') || platformType.includes('Spotify') ? '🎵' :
+                          platformType.includes('Google') ? '📄' : '🔗';
+      
+      return (
+        <div className="w-full h-full bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 p-4 flex flex-col items-center justify-center overflow-hidden relative">
+          {/* Animated background */}
+          <div className="absolute inset-0 bg-gradient-to-tr from-indigo-600/30 via-blue-500/30 to-purple-600/30 animate-pulse pointer-events-none"></div>
+          
+          {/* Content */}
+          <div className="relative z-10 flex flex-col items-center text-center h-full justify-center space-y-4">
+            {/* Platform badge */}
+            <div className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full border border-white/30">
+              <p className="text-white text-xs font-bold tracking-wide">
+                {platformIcon} {platformType.toUpperCase()}
+              </p>
+            </div>
+            
+            {/* Play icon with animated waves (same as audio) */}
+            <div className="relative my-2">
+              {/* Animated pulsing waves */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-20 h-20 rounded-full bg-white/10 animate-ping"></div>
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center animation-delay-150">
+                <div className="w-16 h-16 rounded-full bg-white/20 animate-ping"></div>
+              </div>
+              
+              {/* Play icon */}
+              <div className="relative z-10 w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
+                <Play className="text-indigo-600" size={32} />
+              </div>
+            </div>
+            
+            {/* Visual wave bars (same as audio) */}
+            <div className="flex items-center gap-1 justify-center">
+              <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '8px', animationDelay: '0ms' }}></div>
+              <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '16px', animationDelay: '150ms' }}></div>
+              <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '24px', animationDelay: '300ms' }}></div>
+              <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '16px', animationDelay: '450ms' }}></div>
+              <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '8px', animationDelay: '600ms' }}></div>
+            </div>
+            
+            {/* Description */}
+            <p className="text-white text-sm font-semibold px-2">
+              Click to view embedded content
+            </p>
+            
+            {/* Call to action */}
+            <div className="mt-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-lg border border-white/30">
+              <div className="flex items-center gap-2 text-white text-xs font-bold">
+                <Eye className="w-4 h-4" />
+                <span>Click to view</span>
+              </div>
             </div>
           </div>
         </div>
@@ -456,27 +713,13 @@ const PublicCampaignViewer = () => {
     );
   };
 
-  const handleShareClick = (e, item) => {
-    e.stopPropagation();
-    setShareItem(item);
-    setShowShareModal(true);
-  };
-
-  const closeShareModal = () => {
-    setShowShareModal(false);
-    setShareItem(null);
-  };
-
   const openItem = (item) => {
+    // Preserve preview parameter when navigating to item
     const previewParam = isPreviewMode ? '&preview=true' : '';
     navigate(`/l/${item.slug}?from=${slug}${previewParam}`);
   };
 
-  const handleBackToCampaigns = () => {
-    navigate('/dashboard/campaigns');
-  };
-
-  // ✅ NEW: PASSWORD PROMPT UI
+  // ✅ NEW: PASSWORD PROMPT UI (before loading check)
   if (requiresPassword) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center p-4">
@@ -617,6 +860,7 @@ const PublicCampaignViewer = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-violet-50 py-12 px-4">
       <div className="max-w-7xl mx-auto">
+        {/* ✅ Back button for preview mode */}
         {isPreviewMode && (
           <button
             onClick={handleBackToCampaigns}
@@ -629,6 +873,7 @@ const PublicCampaignViewer = () => {
         
         <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-8 mb-8">
           <div className="flex-1">
+            {/* ✅ Larger responsive campaign logo */}
             {campaign.logoUrl && (
               <div className="mb-6">
                 <img 
@@ -671,6 +916,7 @@ const PublicCampaignViewer = () => {
                 key={item.id}
                 className="bg-white rounded-2xl shadow-lg overflow-hidden transform transition hover:scale-105 hover:shadow-2xl relative"
               >
+                {/* ✅ NEW: Share Button Overlay - Always Visible */}
                 <button
                   onClick={(e) => handleShareClick(e, item)}
                   className="absolute top-3 right-3 z-50 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white hover:scale-110 transition-all pointer-events-auto"
@@ -718,6 +964,7 @@ const PublicCampaignViewer = () => {
         )}
       </div>
 
+      {/* ✅ NEW: Share Modal for Items */}
       <ItemShareModal
         isOpen={showShareModal}
         onClose={closeShareModal}
