@@ -926,7 +926,7 @@ const PublicCampaignViewer = () => {
                   {campaign.items.length} {campaign.items.length === 1 ? 'item' : 'items'}
                 </span>
                 
-                <span className="hidden sm:inline px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full font-medium">
+                <span className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full font-medium">
                   Created by {campaign.user.name}
                 </span>
               </div>
