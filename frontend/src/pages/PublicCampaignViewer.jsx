@@ -871,7 +871,8 @@ const PublicCampaignViewer = () => {
           </button>
         )}
         
-        <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-8 mb-8">
+        {/* ✅ OPTION 3: Custom ultra-light pink background using inline style */}
+        <div className="rounded-3xl shadow-2xl p-6 sm:p-8 mb-8" style={{ backgroundColor: '#FFF5FB' }}>
           <div className="flex-1">
             {/* ✅ Larger responsive campaign logo */}
             {campaign.logoUrl && (
