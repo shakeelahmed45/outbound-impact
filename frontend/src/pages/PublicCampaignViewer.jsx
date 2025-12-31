@@ -871,43 +871,70 @@ const PublicCampaignViewer = () => {
           </button>
         )}
         
-        {/* ✅ OPTION 3: Custom ultra-light pink background using inline style */}
-        <div className="rounded-3xl shadow-2xl p-6 sm:p-8 mb-8" style={{ backgroundColor: '#FFF5FB' }}>
-          <div className="flex-1">
-            {/* ✅ Larger responsive campaign logo */}
+        {/* ✅ NEW DESIGN: Beautiful gradient campaign header with official colors */}
+        <div className="relative rounded-3xl shadow-2xl overflow-hidden mb-8">
+          {/* Gradient Background */}
+          <div className="absolute inset-0 bg-gradient-to-r from-primary to-secondary"></div>
+          
+          {/* Animated gradient overlay for depth */}
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 via-transparent to-violet-600/20 animate-pulse"></div>
+          
+          {/* Content Container */}
+          <div className="relative z-10 p-6 sm:p-8">
+            {/* Logo Section with white background card */}
             {campaign.logoUrl && (
-              <div className="mb-6">
+              <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 mb-6 shadow-lg inline-block">
                 <img 
                   src={campaign.logoUrl} 
                   alt={`${campaign.name} logo`}
-                  className="h-24 sm:h-32 md:h-40 lg:h-48 w-auto object-contain max-w-full"
+                  className="h-20 sm:h-24 md:h-32 lg:h-40 w-auto object-contain max-w-full"
                 />
               </div>
             )}
             
-            <div className="flex items-center gap-3 mb-4">
-              <Folder className="text-primary flex-shrink-0" size={32} />
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary break-words">{campaign.name}</h1>
-            </div>
-            
-            {campaign.description && (
-              <p className="text-secondary text-base sm:text-lg mb-4">{campaign.description}</p>
-            )}
-            
-            <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-600">
-              <div className="flex items-center gap-2">
-                <Calendar size={16} className="flex-shrink-0" />
-                <span>{new Date(campaign.createdAt).toLocaleDateString()}</span>
+            {/* Campaign Info */}
+            <div className="text-white">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
+                  <Folder className="text-white flex-shrink-0" size={32} />
+                </div>
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold break-words drop-shadow-lg">
+                  {campaign.name}
+                </h1>
               </div>
-              {campaign.category && (
-                <span className="px-3 py-1 bg-purple-100 text-primary rounded-full font-medium">
-                  {campaign.category}
-                </span>
+              
+              {campaign.description && (
+                <p className="text-white/95 text-base sm:text-lg mb-6 leading-relaxed drop-shadow-md">
+                  {campaign.description}
+                </p>
               )}
-              <span>{campaign.items.length} {campaign.items.length === 1 ? 'item' : 'items'}</span>
-              <span className="hidden sm:inline">Created by {campaign.user.name}</span>
+              
+              {/* Meta Information */}
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm">
+                <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-3 py-2 rounded-full">
+                  <Calendar size={16} className="flex-shrink-0" />
+                  <span className="font-medium">{new Date(campaign.createdAt).toLocaleDateString()}</span>
+                </div>
+                
+                {campaign.category && (
+                  <span className="px-4 py-2 bg-white/25 backdrop-blur-sm rounded-full font-semibold border border-white/30">
+                    {campaign.category}
+                  </span>
+                )}
+                
+                <span className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full font-medium">
+                  {campaign.items.length} {campaign.items.length === 1 ? 'item' : 'items'}
+                </span>
+                
+                <span className="hidden sm:inline px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full font-medium">
+                  Created by {campaign.user.name}
+                </span>
+              </div>
             </div>
           </div>
+          
+          {/* Decorative bottom wave */}
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-400 via-purple-400 to-pink-400"></div>
         </div>
 
         {campaign.items.length > 0 ? (
