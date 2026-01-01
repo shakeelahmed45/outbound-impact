@@ -80,6 +80,9 @@ model Item {
   buttonUrl   String?
   attachments Json?   @db.JsonB
 
+  // ✅ NEW: Sharing control field
+  sharingEnabled Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -90,6 +93,7 @@ model Item {
 
   @@index([userId])
   @@index([slug])
+  @@index([sharingEnabled])
 }
 
 enum MediaType {
@@ -111,7 +115,7 @@ model Campaign {
   qrCodeUrl   String?
   userId      String
   
-  // 🔒 PASSWORD PROTECTION FIELDS - NEW
+  // 🔒 PASSWORD PROTECTION FIELDS
   passwordProtected Boolean  @default(false)
   passwordHash      String?
   

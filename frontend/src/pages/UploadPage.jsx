@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Upload, Image, Video, Music, FileText, X, Loader2, Plus, Folder, Link, ExternalLink, Paperclip } from 'lucide-react';
+import { Upload, Image, Video, Music, FileText, X, Loader2, Plus, Folder, Link, ExternalLink, Paperclip, Share2, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import api from '../services/api';
@@ -36,6 +36,9 @@ const UploadPage = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [content, setContent] = useState('');
+
+  // ✅ NEW: Sharing toggle state (default: enabled)
+  const [sharingEnabled, setSharingEnabled] = useState(true);
 
   // Button fields for TEXT content
   const [buttonText, setButtonText] = useState('');
@@ -192,7 +195,6 @@ const UploadPage = () => {
       return;
     }
 
-    // ✅ NEW: Validate button fields
     if (buttonText && !buttonUrl) {
       showToast('Please enter button URL', 'error');
       return;
@@ -219,7 +221,7 @@ const UploadPage = () => {
 
         await simulateProgress(20, 40, 300);
 
-        // ✅ NEW: Include buttonText, buttonUrl, and attachments
+        // ✅ NEW: Include sharingEnabled
         const uploadPromise = api.post('/upload/file', {
           title,
           description,
@@ -230,6 +232,7 @@ const UploadPage = () => {
           buttonText: buttonText || null,
           buttonUrl: buttonUrl || null,
           attachments: attachments.length > 0 ? attachments : null,
+          sharingEnabled, // ✅ NEW
         });
 
         const progressPromise = simulateProgress(40, 95, 2000);
@@ -258,6 +261,7 @@ const UploadPage = () => {
             setButtonText('');
             setButtonUrl('');
             setAttachments([]);
+            setSharingEnabled(true); // ✅ Reset
             navigate('/dashboard/campaigns');
           }, 1000);
         }
@@ -280,7 +284,6 @@ const UploadPage = () => {
       return;
     }
 
-    // Validate button fields
     if (buttonText && !buttonUrl) {
       showToast('Please enter button URL', 'error');
       return;
@@ -301,7 +304,7 @@ const UploadPage = () => {
     try {
       await simulateProgress(0, 30, 300);
 
-      // Include button fields and attachments
+      // ✅ NEW: Include sharingEnabled
       const uploadPromise = api.post('/upload/text', {
         title,
         description,
@@ -309,6 +312,7 @@ const UploadPage = () => {
         buttonText: buttonText || null,
         buttonUrl: buttonUrl || null,
         attachments: attachments.length > 0 ? attachments : null,
+        sharingEnabled, // ✅ NEW
       });
 
       const progressPromise = simulateProgress(30, 95, 1000);
@@ -334,6 +338,7 @@ const UploadPage = () => {
           setButtonText('');
           setButtonUrl('');
           setAttachments([]);
+          setSharingEnabled(true); // ✅ Reset
           setUploadType(null);
           setUploadProgress(0);
           navigate('/dashboard/campaigns');
@@ -356,7 +361,6 @@ const UploadPage = () => {
       return;
     }
 
-    // Validate URL
     try {
       new URL(embedUrl);
     } catch (error) {
@@ -375,14 +379,15 @@ const UploadPage = () => {
     try {
       await simulateProgress(0, 30, 300);
 
-      // Convert URL to embed format
       const convertedEmbedUrl = convertToEmbedUrl(embedUrl);
 
+      // ✅ NEW: Include sharingEnabled
       const uploadPromise = api.post('/upload/embed', {
         title,
         description,
-        embedUrl: convertedEmbedUrl, // Use converted URL
+        embedUrl: convertedEmbedUrl,
         embedType,
+        sharingEnabled, // ✅ NEW
       });
 
       const progressPromise = simulateProgress(30, 95, 1000);
@@ -406,6 +411,7 @@ const UploadPage = () => {
           setDescription('');
           setEmbedUrl('');
           setEmbedType('');
+          setSharingEnabled(true); // ✅ Reset
           setUploadType(null);
           setUploadProgress(0);
           navigate('/dashboard/campaigns');
@@ -451,11 +457,9 @@ const UploadPage = () => {
     }
   };
 
-  // Convert YouTube URLs to embed format
   const convertToEmbedUrl = (url) => {
     if (!url) return url;
 
-    // YouTube Shorts: https://youtube.com/shorts/VIDEO_ID → https://www.youtube.com/embed/VIDEO_ID
     if (url.includes('youtube.com/shorts/') || url.includes('youtu.be/shorts/')) {
       const videoId = url.split('/shorts/')[1]?.split('?')[0]?.split('&')[0];
       if (videoId) {
@@ -463,7 +467,6 @@ const UploadPage = () => {
       }
     }
 
-    // YouTube short URL: https://youtu.be/VIDEO_ID
     if (url.includes('youtu.be/') && !url.includes('/shorts/')) {
       const videoId = url.split('youtu.be/')[1]?.split('?')[0]?.split('&')[0];
       if (videoId) {
@@ -471,7 +474,6 @@ const UploadPage = () => {
       }
     }
 
-    // YouTube watch URL: https://www.youtube.com/watch?v=VIDEO_ID
     if (url.includes('youtube.com/watch')) {
       const urlParams = new URLSearchParams(url.split('?')[1]);
       const videoId = urlParams.get('v');
@@ -480,12 +482,10 @@ const UploadPage = () => {
       }
     }
 
-    // YouTube embed URL (already correct)
     if (url.includes('youtube.com/embed/')) {
       return url;
     }
 
-    // Vimeo: https://vimeo.com/VIDEO_ID → https://player.vimeo.com/video/VIDEO_ID
     if (url.includes('vimeo.com/') && !url.includes('player.vimeo.com')) {
       const videoId = url.split('vimeo.com/')[1]?.split('?')[0]?.split('/')[0];
       if (videoId) {
@@ -493,7 +493,6 @@ const UploadPage = () => {
       }
     }
 
-    // Google Drive: Convert to preview format
     if (url.includes('drive.google.com/file/d/')) {
       const fileId = url.split('/d/')[1]?.split('/')[0];
       if (fileId) {
@@ -501,7 +500,6 @@ const UploadPage = () => {
       }
     }
 
-    // Google Docs: Add /preview if not present
     if (url.includes('docs.google.com/document/d/') && !url.includes('/preview')) {
       const docId = url.split('/d/')[1]?.split('/')[0];
       if (docId) {
@@ -509,7 +507,6 @@ const UploadPage = () => {
       }
     }
 
-    // Google Sheets: Add /preview if not present
     if (url.includes('docs.google.com/spreadsheets/d/') && !url.includes('/preview')) {
       const sheetId = url.split('/d/')[1]?.split('/')[0];
       if (sheetId) {
@@ -517,7 +514,6 @@ const UploadPage = () => {
       }
     }
 
-    // Return original URL if no conversion needed
     return url;
   };
 
@@ -526,8 +522,7 @@ const UploadPage = () => {
     
     if (files.length === 0) return;
 
-    // Validate file size (max 10MB per file)
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = 10 * 1024 * 1024;
     const oversizedFiles = files.filter(f => f.size > maxSize);
     
     if (oversizedFiles.length > 0) {
@@ -535,7 +530,6 @@ const UploadPage = () => {
       return;
     }
 
-    // Max 5 attachments
     if (attachments.length + files.length > 5) {
       showToast('Maximum 5 attachments allowed', 'error');
       return;
@@ -544,14 +538,13 @@ const UploadPage = () => {
     setUploadingAttachment(true);
 
     try {
-      // Convert files to base64 for storage
       const uploadPromises = files.map(async (file) => {
         return new Promise((resolve) => {
           const reader = new FileReader();
           reader.onload = (e) => {
             resolve({
               name: file.name,
-              url: e.target.result, // Base64 data
+              url: e.target.result,
               size: file.size,
               type: file.type,
             });
@@ -576,6 +569,100 @@ const UploadPage = () => {
     const newAttachments = attachments.filter((_, i) => i !== index);
     setAttachments(newAttachments);
   };
+
+  // ✅ NEW: Share Toggle Component (using client's suggested messaging)
+  const ShareToggleSection = () => (
+    <div className="border-t border-gray-200 pt-6">
+      <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-6">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="flex-shrink-0">
+            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+              {sharingEnabled ? (
+                <Share2 size={24} className="text-white" />
+              ) : (
+                <Lock size={24} className="text-white" />
+              )}
+            </div>
+          </div>
+          <div className="flex-1">
+            <h4 className="text-lg font-bold text-indigo-600 mb-2">
+              Sharing Control
+            </h4>
+            <p className="text-sm text-gray-600 mb-4">
+              Choose who can share this content. This gives you control over how your content spreads.
+            </p>
+          </div>
+        </div>
+
+        {/* Toggle Options - Human-friendly messaging from client */}
+        <div className="space-y-3">
+          {/* Option 1: Keep within community */}
+          <label 
+            className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+              !sharingEnabled 
+                ? 'border-indigo-500 bg-white shadow-md' 
+                : 'border-gray-200 bg-white hover:border-indigo-300'
+            }`}
+          >
+            <input
+              type="radio"
+              name="sharing"
+              checked={!sharingEnabled}
+              onChange={() => setSharingEnabled(false)}
+              className="mt-1 w-5 h-5 text-indigo-600 focus:ring-indigo-500"
+            />
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <Lock size={18} className="text-indigo-600" />
+                <span className="font-bold text-gray-900">🔒 Keep within our community</span>
+              </div>
+              <p className="text-sm text-gray-600">
+                Only people with the link can view this content. Share button will be hidden.
+              </p>
+            </div>
+          </label>
+
+          {/* Option 2: Allow sharing */}
+          <label 
+            className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+              sharingEnabled 
+                ? 'border-indigo-500 bg-white shadow-md' 
+                : 'border-gray-200 bg-white hover:border-indigo-300'
+            }`}
+          >
+            <input
+              type="radio"
+              name="sharing"
+              checked={sharingEnabled}
+              onChange={() => setSharingEnabled(true)}
+              className="mt-1 w-5 h-5 text-indigo-600 focus:ring-indigo-500"
+            />
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <Share2 size={18} className="text-indigo-600" />
+                <span className="font-bold text-gray-900">🔁 Allow others to share this</span>
+              </div>
+              <p className="text-sm text-gray-600">
+                Viewers can share this content via social media, WhatsApp, email, etc.
+              </p>
+            </div>
+          </label>
+        </div>
+
+        {/* Info box */}
+        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-xs text-blue-800 flex items-start gap-2">
+            <span className="font-bold">💡</span>
+            <span>
+              <strong>Pro Tip:</strong> Use "Keep within our community" for internal updates, 
+              sensitive information, or private content. Use "Allow others to share" for 
+              announcements, marketing content, or public stories.
+            </span>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 
   const CampaignSelector = () => (
     <div className="mb-6">
@@ -704,7 +791,7 @@ const UploadPage = () => {
           </>
         )}
 
-        {/* TEXT UPLOAD FORM WITH BUTTON FEATURE AND ATTACHMENTS */}
+        {/* TEXT UPLOAD FORM WITH SHARE TOGGLE */}
         {uploadType === 'TEXT' && (
           <form onSubmit={handleTextPost} className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
             <div className="flex items-center justify-between mb-6">
@@ -719,6 +806,7 @@ const UploadPage = () => {
                   setButtonText('');
                   setButtonUrl('');
                   setAttachments([]);
+                  setSharingEnabled(true);
                 }}
                 className="text-gray-500 hover:text-gray-700"
               >
@@ -774,7 +862,7 @@ const UploadPage = () => {
                 />
               </div>
 
-              {/* CUSTOM BUTTON SECTION - NO PREVIEW */}
+              {/* CUSTOM BUTTON SECTION */}
               <div className="border-t border-gray-200 pt-6">
                 <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-xl p-6">
                   <div className="flex items-start gap-3 mb-4">
@@ -866,7 +954,6 @@ const UploadPage = () => {
                     </div>
                   </div>
 
-                  {/* Upload Button */}
                   <div className="mb-4">
                     <label className="cursor-pointer inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg font-semibold hover:shadow-lg transition-all">
                       <Paperclip size={18} />
@@ -885,7 +972,6 @@ const UploadPage = () => {
                     </p>
                   </div>
 
-                  {/* Attached Files List */}
                   {attachments.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-sm font-semibold text-gray-700">
@@ -931,6 +1017,9 @@ const UploadPage = () => {
                 </div>
               </div>
 
+              {/* ✅ SHARE TOGGLE SECTION */}
+              <ShareToggleSection />
+
               {uploading && uploadProgress > 0 && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
@@ -958,6 +1047,7 @@ const UploadPage = () => {
                     setButtonText('');
                     setButtonUrl('');
                     setAttachments([]);
+                    setSharingEnabled(true);
                   }}
                   className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-all"
                   disabled={uploading}
@@ -983,7 +1073,7 @@ const UploadPage = () => {
           </form>
         )}
 
-        {uploadType && uploadType !== 'TEXT' && !selectedFile && (
+        {uploadType && uploadType !== 'TEXT' && uploadType !== 'EMBED' && !selectedFile && (
           <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-2xl font-bold text-primary">Upload {uploadType}</h3>
@@ -993,6 +1083,7 @@ const UploadPage = () => {
                   setUploadType(null);
                   setTitle('');
                   setDescription('');
+                  setSharingEnabled(true);
                 }}
                 className="text-gray-500 hover:text-gray-700"
               >
@@ -1037,7 +1128,8 @@ const UploadPage = () => {
           </div>
         )}
 
-        {uploadType && uploadType !== 'TEXT' && selectedFile && (
+        {/* FILE UPLOAD FORM (IMAGE/VIDEO/AUDIO) WITH SHARE TOGGLE */}
+        {uploadType && uploadType !== 'TEXT' && uploadType !== 'EMBED' && selectedFile && (
           <form onSubmit={handleFileUpload} className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-2xl font-bold text-primary">Upload {uploadType}</h3>
@@ -1052,6 +1144,7 @@ const UploadPage = () => {
                   setButtonText('');
                   setButtonUrl('');
                   setAttachments([]);
+                  setSharingEnabled(true);
                 }}
                 className="text-gray-500 hover:text-gray-700"
               >
@@ -1102,7 +1195,7 @@ const UploadPage = () => {
                 />
               </div>
 
-              {/* ✅ NEW: CUSTOM BUTTON SECTION FOR ALL MEDIA TYPES */}
+              {/* CUSTOM BUTTON SECTION FOR ALL MEDIA TYPES */}
               <div className="border-t border-gray-200 pt-6">
                 <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-xl p-6">
                   <div className="flex items-start gap-3 mb-4">
@@ -1174,7 +1267,7 @@ const UploadPage = () => {
                 </div>
               </div>
 
-              {/* ✅ NEW: DOCUMENT ATTACHMENTS SECTION FOR ALL MEDIA TYPES */}
+              {/* DOCUMENT ATTACHMENTS SECTION FOR ALL MEDIA TYPES */}
               <div className="border-t border-gray-200 pt-6">
                 <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-6">
                   <div className="flex items-start gap-3 mb-4">
@@ -1194,7 +1287,6 @@ const UploadPage = () => {
                     </div>
                   </div>
 
-                  {/* Upload Button */}
                   <div className="mb-4">
                     <label className="cursor-pointer inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg font-semibold hover:shadow-lg transition-all">
                       <Paperclip size={18} />
@@ -1213,7 +1305,6 @@ const UploadPage = () => {
                     </p>
                   </div>
 
-                  {/* Attached Files List */}
                   {attachments.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-sm font-semibold text-gray-700">
@@ -1259,6 +1350,9 @@ const UploadPage = () => {
                 </div>
               </div>
 
+              {/* ✅ SHARE TOGGLE SECTION */}
+              <ShareToggleSection />
+
               <div className="text-sm text-gray-600 bg-gray-50 p-4 rounded-lg">
                 <p><strong>File:</strong> {selectedFile.name}</p>
                 <p><strong>Size:</strong> {(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
@@ -1292,6 +1386,7 @@ const UploadPage = () => {
                     setButtonText('');
                     setButtonUrl('');
                     setAttachments([]);
+                    setSharingEnabled(true);
                   }}
                   className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-all"
                   disabled={uploading}
@@ -1317,7 +1412,7 @@ const UploadPage = () => {
           </form>
         )}
 
-        {/* EMBED UPLOAD FORM */}
+        {/* EMBED UPLOAD FORM WITH SHARE TOGGLE */}
         {uploadType === 'EMBED' && (
           <form onSubmit={handleEmbedPost} className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
             <div className="flex items-center justify-between mb-6">
@@ -1330,6 +1425,7 @@ const UploadPage = () => {
                   setDescription('');
                   setEmbedUrl('');
                   setEmbedType('');
+                  setSharingEnabled(true);
                 }}
                 className="text-gray-500 hover:text-gray-700"
               >
@@ -1519,6 +1615,9 @@ const UploadPage = () => {
                 />
               </div>
 
+              {/* ✅ SHARE TOGGLE SECTION */}
+              <ShareToggleSection />
+
               {/* Preview Box */}
               {embedUrl && (
                 <div className="border-t border-gray-200 pt-6">
@@ -1558,6 +1657,7 @@ const UploadPage = () => {
                     setDescription('');
                     setEmbedUrl('');
                     setEmbedType('');
+                    setSharingEnabled(true);
                   }}
                   className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
                   disabled={uploading}

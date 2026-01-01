@@ -944,14 +944,16 @@ const PublicCampaignViewer = () => {
                 key={item.id}
                 className="bg-white rounded-2xl shadow-lg overflow-hidden transform transition hover:scale-105 hover:shadow-2xl relative"
               >
-                {/* ✅ NEW: Share Button Overlay - Always Visible */}
-                <button
-                  onClick={(e) => handleShareClick(e, item)}
-                  className="absolute top-3 right-3 z-50 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white hover:scale-110 transition-all pointer-events-auto"
-                  title="Share this content"
-                >
-                  <Share2 size={20} className="text-primary" />
-                </button>
+                {/* ✅ UPDATED: Share Button Only Shows if sharingEnabled is true */}
+                {item.sharingEnabled && (
+                  <button
+                    onClick={(e) => handleShareClick(e, item)}
+                    className="absolute top-3 right-3 z-50 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white hover:scale-110 transition-all pointer-events-auto"
+                    title="Share this content"
+                  >
+                    <Share2 size={20} className="text-primary" />
+                  </button>
+                )}
 
                 <div 
                   onClick={() => openItem(item)}

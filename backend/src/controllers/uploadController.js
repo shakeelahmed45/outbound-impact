@@ -5,7 +5,7 @@ const QRCode = require('qrcode');
 const uploadFile = async (req, res) => {
   try {
     const userId = req.effectiveUserId;
-    const { title, description, type, fileData, fileName, fileSize, buttonText, buttonUrl, attachments } = req.body;
+    const { title, description, type, fileData, fileName, fileSize, buttonText, buttonUrl, attachments, sharingEnabled } = req.body;
 
     if (!title || !type || !fileData || !fileName) {
       return res.status(400).json({
@@ -108,6 +108,7 @@ const uploadFile = async (req, res) => {
       },
     });
 
+    // ✅ NEW: Include sharingEnabled (default true if not provided)
     const item = await prisma.item.create({
       data: {
         userId,
@@ -122,6 +123,7 @@ const uploadFile = async (req, res) => {
         buttonText: buttonText || null,
         buttonUrl: buttonUrl || null,
         attachments: attachments || null,
+        sharingEnabled: sharingEnabled !== undefined ? sharingEnabled : true, // ✅ NEW: Default true
       }
     });
 
@@ -144,6 +146,7 @@ const uploadFile = async (req, res) => {
         buttonText: item.buttonText,
         buttonUrl: item.buttonUrl,
         attachments: item.attachments,
+        sharingEnabled: item.sharingEnabled, // ✅ NEW
       }
     });
 
@@ -159,7 +162,7 @@ const uploadFile = async (req, res) => {
 const createTextPost = async (req, res) => {
   try {
     const userId = req.effectiveUserId;
-    const { title, description, content, buttonText, buttonUrl, attachments } = req.body;
+    const { title, description, content, buttonText, buttonUrl, attachments, sharingEnabled } = req.body;
 
     if (!title || !content) {
       return res.status(400).json({
@@ -218,6 +221,7 @@ const createTextPost = async (req, res) => {
       },
     });
 
+    // ✅ NEW: Include sharingEnabled (default true if not provided)
     const item = await prisma.item.create({
       data: {
         userId,
@@ -232,6 +236,7 @@ const createTextPost = async (req, res) => {
         buttonText: buttonText || null,
         buttonUrl: buttonUrl || null,
         attachments: attachments || null,
+        sharingEnabled: sharingEnabled !== undefined ? sharingEnabled : true, // ✅ NEW: Default true
       }
     });
 
@@ -259,6 +264,7 @@ const createTextPost = async (req, res) => {
         buttonText: item.buttonText,
         buttonUrl: item.buttonUrl,
         attachments: item.attachments,
+        sharingEnabled: item.sharingEnabled, // ✅ NEW
       }
     });
 
@@ -274,7 +280,7 @@ const createTextPost = async (req, res) => {
 const createEmbedPost = async (req, res) => {
   try {
     const userId = req.effectiveUserId;
-    const { title, description, embedUrl, embedType } = req.body;
+    const { title, description, embedUrl, embedType, sharingEnabled } = req.body;
 
     if (!title || !embedUrl) {
       return res.status(400).json({
@@ -318,7 +324,7 @@ const createEmbedPost = async (req, res) => {
     const qrUploadResult = await uploadToBunny(qrBuffer, qrFileName, 'image/png');
     const qrCodeUrl = qrUploadResult.success ? qrUploadResult.url : qrCodeDataUrl;
 
-    // Create item with embed URL stored in mediaUrl
+    // ✅ NEW: Include sharingEnabled (default true if not provided)
     const item = await prisma.item.create({
       data: {
         userId,
@@ -326,13 +332,14 @@ const createEmbedPost = async (req, res) => {
         title,
         description: description || `${embedType || 'External'} Embed`,
         type: 'EMBED',
-        mediaUrl: embedUrl, // Store the embed URL
-        fileSize: 0, // No file size for embeds
-        qrCodeUrl, // Now it's a string, not an object
+        mediaUrl: embedUrl,
+        fileSize: 0,
+        qrCodeUrl,
         thumbnailUrl: null,
         buttonText: embedType || 'External Content',
         buttonUrl: null,
         attachments: null,
+        sharingEnabled: sharingEnabled !== undefined ? sharingEnabled : true, // ✅ NEW: Default true
       }
     });
 
@@ -347,6 +354,7 @@ const createEmbedPost = async (req, res) => {
         mediaUrl: item.mediaUrl,
         qrCodeUrl: item.qrCodeUrl,
         publicUrl: publicUrl,
+        sharingEnabled: item.sharingEnabled, // ✅ NEW
       }
     });
 
