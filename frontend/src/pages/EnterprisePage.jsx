@@ -22,7 +22,7 @@ const EnterprisePage = () => {
     { value: 100, label: '100 GB' },
     { value: 250, label: '250 GB' },
     { value: 500, label: '500 GB' },
-    { value: 1000, label: '1 TB (1000 GB)' },
+    { value: 1000, label: '1.5 TB (1000 GB)' },
     { value: 2000, label: '2 TB (2000 GB)' },
     { value: 5000, label: '5 TB (5000 GB)' },
   ];

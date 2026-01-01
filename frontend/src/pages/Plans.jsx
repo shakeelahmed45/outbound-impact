@@ -30,14 +30,14 @@ const Plans = () => {
     {
       id: 'ORG_SMALL',
       name: 'Small Organization',
-      price: '$15',
+      price: '$35',
       period: 'per month',
-      storage: '10GB',
+      storage: '250GB',
       features: [
         'Everything in Individual',
         'Team management (up to 5 users)',
         'Campaign creation',
-        '10GB storage',
+        '250GB storage',
         'Advanced analytics',
         'Priority support',
       ],
@@ -46,14 +46,14 @@ const Plans = () => {
     {
       id: 'ORG_MEDIUM',
       name: 'Medium Organization',
-      price: '$35',
+      price: '$60',
       period: 'per month',
-      storage: '30GB',
+      storage: '500GB',
       features: [
         'Everything in Small Org',
         'Team management (up to 20 users)',
         'Custom branding',
-        '30GB storage',
+        '500GB storage',
         'Export reports (CSV/PDF)',
         'Dedicated support',
       ],
@@ -63,11 +63,11 @@ const Plans = () => {
   // Storage options for Enterprise
   const storageOptions = [
     { value: 100, label: '100 GB', price: 0 },
-    { value: 250, label: '250 GB', price: 37 },
-    { value: 500, label: '500 GB', price: 100 },
-    { value: 1000, label: '1 TB', price: 225 },
-    { value: 2000, label: '2 TB', price: 475 },
-    { value: 5000, label: '5 TB', price: 1225 },
+    { value: 250, label: '250 GB', price: 35 },
+    { value: 500, label: '500 GB', price: 60 },
+    { value: 1500, label: '1.5 TB', price: 99 },
+    { value: 2000, label: '2 TB', price: 160 },
+    { value: 5000, label: '5 TB', price: 360 },
   ];
 
   // Team member options for Enterprise

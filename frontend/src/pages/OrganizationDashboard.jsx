@@ -12,7 +12,7 @@ const OrganizationDashboard = () => {
     totalUploads: 0,
     totalViews: 0,
     storageUsed: 0,
-    storageLimit: 10737418240, // 10GB default for small org
+    storageLimit: 10737418240, // 250GB default for small org
     qrCodesGenerated: 0,
     teamMembers: 0,
     campaigns: 0,
