@@ -356,7 +356,7 @@ const assignItemToCampaign = async (req, res) => {
   }
 };
 
-// ✅ Get public campaign (with password protection check)
+// ✅ FIXED: Get public campaign (with password protection check)
 const getPublicCampaign = async (req, res) => {
   try {
     const { slug } = req.params;
@@ -375,8 +375,8 @@ const getPublicCampaign = async (req, res) => {
         qrCodeUrl: true,
         userId: true,
         createdAt: true,
-        passwordProtected: true, // ✅ NEW
-        passwordHash: true, // ✅ NEW (needed for verification)
+        passwordProtected: true,
+        passwordHash: true,
         items: {
           select: {
             id: true,
@@ -390,6 +390,7 @@ const getPublicCampaign = async (req, res) => {
             fileSize: true,
             buttonText: true,
             buttonUrl: true,
+            sharingEnabled: true, // ✅ CRITICAL FIX: Added sharingEnabled field!
             createdAt: true,
           },
           orderBy: { createdAt: 'desc' },
@@ -405,7 +406,7 @@ const getPublicCampaign = async (req, res) => {
       });
     }
 
-    // ✅ NEW: Check if campaign is password protected
+    // ✅ Check if campaign is password protected
     if (campaign.passwordProtected) {
       console.log(`🔒 Campaign is password protected: ${campaign.name}`);
       
@@ -477,7 +478,7 @@ const getPublicCampaign = async (req, res) => {
   }
 };
 
-// ✅ NEW: Verify campaign password and return full campaign data
+// ✅ FIXED: Verify campaign password and return full campaign data
 const verifyCampaignPassword = async (req, res) => {
   try {
     const { slug } = req.params;
@@ -510,6 +511,7 @@ const verifyCampaignPassword = async (req, res) => {
             buttonText: true,
             buttonUrl: true,
             attachments: true,
+            sharingEnabled: true, // ✅ CRITICAL FIX: Added sharingEnabled field!
             fileSize: true,
             createdAt: true,
           },
@@ -596,5 +598,5 @@ module.exports = {
   deleteCampaign,
   assignItemToCampaign,
   getPublicCampaign,
-  verifyCampaignPassword, // ✅ NEW
+  verifyCampaignPassword,
 };
