@@ -40,7 +40,7 @@ const getUserItems = async (req, res) => {
         publicUrl: `${process.env.FRONTEND_URL}/l/${item.slug}`,
         buttonText: item.buttonText || null,
         buttonUrl: item.buttonUrl || null,
-        sharingEnabled: item.sharingEnabled !== undefined ? item.sharingEnabled : true, // ✅ NEW
+        sharingEnabled: item.sharingEnabled !== undefined ? item.sharingEnabled : true, // âœ… NEW
       }))
     });
 
@@ -86,7 +86,7 @@ const getItemById = async (req, res) => {
         publicUrl: `${process.env.FRONTEND_URL}/l/${item.slug}`,
         buttonText: item.buttonText || null,
         buttonUrl: item.buttonUrl || null,
-        sharingEnabled: item.sharingEnabled !== undefined ? item.sharingEnabled : true, // ✅ NEW
+        sharingEnabled: item.sharingEnabled !== undefined ? item.sharingEnabled : true, // âœ… NEW
       }
     });
 
@@ -134,7 +134,7 @@ const getPublicItem = async (req, res) => {
       item: {
         ...item,
         fileSize: item.fileSize.toString(),
-        sharingEnabled: item.sharingEnabled !== undefined ? item.sharingEnabled : true, // ✅ NEW
+        sharingEnabled: item.sharingEnabled !== undefined ? item.sharingEnabled : true, // âœ… NEW
       }
     });
 
@@ -158,7 +158,7 @@ const updateItem = async (req, res) => {
 
     const userId = req.effectiveUserId;
     const { id } = req.params;
-    const { title, description, content, buttonText, buttonUrl, sharingEnabled } = req.body; // ✅ NEW: sharingEnabled
+    const { title, description, content, buttonText, buttonUrl, sharingEnabled } = req.body; // âœ… NEW: sharingEnabled
 
     const item = await prisma.item.findFirst({
       where: { id, userId }
@@ -218,7 +218,7 @@ const updateItem = async (req, res) => {
       if (buttonUrl !== undefined) updateData.buttonUrl = buttonUrl || null;
     }
 
-    // ✅ NEW: Allow updating sharingEnabled
+    // âœ… NEW: Allow updating sharingEnabled
     if (sharingEnabled !== undefined) {
       updateData.sharingEnabled = sharingEnabled;
     }
@@ -234,7 +234,7 @@ const updateItem = async (req, res) => {
       item: {
         ...updatedItem,
         fileSize: updatedItem.fileSize.toString(),
-        sharingEnabled: updatedItem.sharingEnabled !== undefined ? updatedItem.sharingEnabled : true, // ✅ NEW
+        sharingEnabled: updatedItem.sharingEnabled !== undefined ? updatedItem.sharingEnabled : true, // âœ… NEW
       }
     });
 
@@ -315,7 +315,7 @@ const uploadThumbnail = async (req, res) => {
       item: {
         ...updatedItem,
         fileSize: updatedItem.fileSize.toString(),
-        sharingEnabled: updatedItem.sharingEnabled !== undefined ? updatedItem.sharingEnabled : true, // ✅ NEW
+        sharingEnabled: updatedItem.sharingEnabled !== undefined ? updatedItem.sharingEnabled : true, // âœ… NEW
       }
     });
 
@@ -376,7 +376,7 @@ const removeThumbnail = async (req, res) => {
       item: {
         ...updatedItem,
         fileSize: updatedItem.fileSize.toString(),
-        sharingEnabled: updatedItem.sharingEnabled !== undefined ? updatedItem.sharingEnabled : true, // ✅ NEW
+        sharingEnabled: updatedItem.sharingEnabled !== undefined ? updatedItem.sharingEnabled : true, // âœ… NEW
       }
     });
 

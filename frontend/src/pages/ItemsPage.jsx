@@ -1,428 +1,587 @@
-import { useEffect, useState } from 'react';
-import { Trash2, ExternalLink, Copy, FolderOpen, Eye, Image, Upload, X, FileText, Video, Music, File } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Image, Video, Music, FileText, Link, Trash2, Edit, Eye, BarChart3, 
+  Download, Search, Filter, X, Loader2, Share2, Lock, ExternalLink, Paperclip, Save
+} from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import api from '../services/api';
+import { useToast } from '../hooks/useToast';
+import Toast from '../components/common/Toast';
+import Tooltip from '../components/common/Tooltip';
 
 const ItemsPage = () => {
-  const [items, setItems] = useState([]);
-  const [campaigns, setCampaigns] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const { toasts, showToast, removeToast } = useToast();
   
-  // Thumbnail upload states
-  const [showThumbnailModal, setShowThumbnailModal] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [thumbnailPreview, setThumbnailPreview] = useState(null);
-  const [thumbnailFile, setThumbnailFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('ALL');
+  
+  // Edit modal state
+  const [editingItem, setEditingItem] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    title: '',
+    description: '',
+    content: '',
+    sharingEnabled: true, // ✅ NEW
+    buttonText: '',
+    buttonUrl: '',
+  });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    document.title = 'Messages | Outbound Impact';
-    fetchData();
+    document.title = 'My Items | Outbound Impact';
+    fetchItems();
   }, []);
 
-  const fetchData = async () => {
+  const fetchItems = async () => {
     try {
-      const [itemsRes, campaignsRes] = await Promise.all([
-        api.get('/items'),
-        api.get('/campaigns'),
-      ]);
-      
-      if (itemsRes.data.status === 'success') {
-        setItems(itemsRes.data.items);
-      }
-      
-      if (campaignsRes.data.status === 'success') {
-        setCampaigns(campaignsRes.data.campaigns);
+      setLoading(true);
+      const response = await api.get('/items');
+      if (response.data.status === 'success') {
+        setItems(response.data.items);
       }
     } catch (error) {
-      console.error('Failed to fetch data:', error);
+      console.error('Failed to fetch items:', error);
+      showToast('Failed to load items', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const deleteItem = async (id) => {
-    if (!confirm('Are you sure you want to delete this item?')) return;
-
-    try {
-      await api.delete('/items/' + id);
-      setItems(items.filter((item) => item.id !== id));
-      alert('Item deleted successfully!');
-    } catch (error) {
-      console.error('Failed to delete item:', error);
-      alert('Failed to delete item');
-    }
+  const handleEditClick = (item) => {
+    setEditingItem(item);
+    setEditFormData({
+      title: item.title || '',
+      description: item.description || '',
+      content: item.type === 'TEXT' ? item.mediaUrl : '',
+      sharingEnabled: item.sharingEnabled !== undefined ? item.sharingEnabled : true, // ✅ NEW
+      buttonText: item.buttonText || '',
+      buttonUrl: item.buttonUrl || '',
+    });
+    setShowEditModal(true);
   };
 
-  const assignToCampaign = async (itemId, campaignId) => {
+  // ✅ NEW: Quick toggle sharing without opening edit modal
+  const handleQuickToggleSharing = async (item) => {
     try {
-      await api.post('/campaigns/assign', {
-        itemId,
-        campaignId: campaignId || null,
+      const newSharingValue = !item.sharingEnabled;
+      
+      const response = await api.put(`/items/${item.id}`, {
+        sharingEnabled: newSharingValue,
       });
-      
-      setItems(items.map(item => 
-        item.id === itemId 
-          ? { ...item, campaignId } 
-          : item
-      ));
-      
-      alert(campaignId ? 'Item assigned to campaign!' : 'Item removed from campaign!');
-    } catch (error) {
-      console.error('Failed to assign item:', error);
-      alert('Failed to assign item');
-    }
-  };
 
-  const copyPublicLink = (url) => {
-    navigator.clipboard.writeText(url);
-    alert('Link copied to clipboard!');
-  };
-
-  const formatBytes = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-  };
-
-  // Get default thumbnail based on type
-  const getDefaultThumbnail = (type) => {
-    switch (type) {
-      case 'IMAGE':
-        return null; // Will use actual image
-      case 'VIDEO':
-        return 'video';
-      case 'AUDIO':
-        return 'audio';
-      case 'TEXT':
-        return 'text';
-      default:
-        return 'file';
-    }
-  };
-
-  // Render thumbnail
-  const renderThumbnail = (item) => {
-    if (item.thumbnailUrl) {
-      return (
-        <img
-          src={item.thumbnailUrl}
-          alt={item.title}
-          className="w-full h-full object-cover"
-        />
-      );
-    }
-
-    // Default icons for non-image types
-    const iconClass = "w-12 h-12 text-gray-400";
-    switch (item.type) {
-      case 'IMAGE':
-        return item.mediaUrl ? (
-          <img src={item.mediaUrl} alt={item.title} className="w-full h-full object-cover" />
-        ) : (
-          <Image className={iconClass} />
-        );
-      case 'VIDEO':
-        return <Video className={iconClass} />;
-      case 'AUDIO':
-        return <Music className={iconClass} />;
-      case 'TEXT':
-        return <FileText className={iconClass} />;
-      default:
-        return <File className={iconClass} />;
-    }
-  };
-
-  // Open thumbnail upload modal
-  const openThumbnailModal = (item) => {
-    setSelectedItem(item);
-    setThumbnailPreview(item.thumbnailUrl);
-    setShowThumbnailModal(true);
-  };
-
-  // Close thumbnail modal
-  const closeThumbnailModal = () => {
-    setShowThumbnailModal(false);
-    setSelectedItem(null);
-    setThumbnailPreview(null);
-    setThumbnailFile(null);
-  };
-
-  // Handle thumbnail file selection
-  const handleThumbnailSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        alert('Please select an image file');
-        return;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        alert('Image must be less than 5MB');
-        return;
-      }
-      
-      setThumbnailFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setThumbnailPreview(reader.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  // Upload thumbnail
-  const uploadThumbnail = async () => {
-    if (!thumbnailFile || !selectedItem) return;
-
-    setUploading(true);
-    try {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64Data = reader.result;
-        
-        const response = await api.post(`/items/${selectedItem.id}/thumbnail`, {
-          thumbnailData: base64Data,
-          fileName: thumbnailFile.name,
-        });
-
-        if (response.data.status === 'success') {
-          setItems(items.map(item => 
-            item.id === selectedItem.id 
-              ? { ...item, thumbnailUrl: response.data.item.thumbnailUrl }
-              : item
-          ));
-          alert('Thumbnail updated successfully!');
-          closeThumbnailModal();
-        }
-      };
-      reader.readAsDataURL(thumbnailFile);
-    } catch (error) {
-      console.error('Failed to upload thumbnail:', error);
-      alert('Failed to upload thumbnail');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // Remove thumbnail
-  const removeThumbnail = async () => {
-    if (!selectedItem) return;
-
-    if (!confirm('Remove custom thumbnail?')) return;
-
-    setUploading(true);
-    try {
-      const response = await api.delete(`/items/${selectedItem.id}/thumbnail`);
-      
       if (response.data.status === 'success') {
+        // Update local state
+        setItems(items.map(i => 
+          i.id === item.id 
+            ? { ...i, sharingEnabled: newSharingValue }
+            : i
+        ));
+        
+        const statusText = newSharingValue ? 'shareable' : 'private';
+        showToast(`Item is now ${statusText}`, 'success');
+      }
+    } catch (error) {
+      console.error('Failed to toggle sharing:', error);
+      showToast('Failed to update sharing setting', 'error');
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editFormData.title) {
+      showToast('Title is required', 'error');
+      return;
+    }
+
+    // Validate button fields
+    if (editFormData.buttonText && !editFormData.buttonUrl) {
+      showToast('Please enter button URL', 'error');
+      return;
+    }
+    if (editFormData.buttonUrl && !editFormData.buttonText) {
+      showToast('Please enter button text', 'error');
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const updateData = {
+        title: editFormData.title,
+        description: editFormData.description || null,
+        sharingEnabled: editFormData.sharingEnabled, // ✅ NEW
+      };
+
+      // Add content for TEXT items
+      if (editingItem.type === 'TEXT') {
+        updateData.content = editFormData.content;
+        updateData.buttonText = editFormData.buttonText || null;
+        updateData.buttonUrl = editFormData.buttonUrl || null;
+      }
+
+      const response = await api.put(`/items/${editingItem.id}`, updateData);
+
+      if (response.data.status === 'success') {
+        // Update local state
         setItems(items.map(item => 
-          item.id === selectedItem.id 
-            ? { ...item, thumbnailUrl: response.data.item.thumbnailUrl }
+          item.id === editingItem.id 
+            ? { ...item, ...response.data.item }
             : item
         ));
-        alert('Thumbnail removed!');
-        closeThumbnailModal();
+        
+        showToast('Item updated successfully!', 'success');
+        setShowEditModal(false);
+        setEditingItem(null);
       }
     } catch (error) {
-      console.error('Failed to remove thumbnail:', error);
-      alert('Failed to remove thumbnail');
+      console.error('Failed to update item:', error);
+      showToast(error.response?.data?.message || 'Failed to update item', 'error');
     } finally {
-      setUploading(false);
+      setSaving(false);
     }
   };
 
-  if (loading) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      </DashboardLayout>
-    );
-  }
+  const handleDelete = async (itemId) => {
+    if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await api.delete(`/items/${itemId}`);
+      
+      if (response.data.status === 'success') {
+        setItems(items.filter(item => item.id !== itemId));
+        showToast('Item deleted successfully', 'success');
+      }
+    } catch (error) {
+      console.error('Failed to delete item:', error);
+      showToast('Failed to delete item', 'error');
+    }
+  };
+
+  const getTypeIcon = (type) => {
+    switch (type) {
+      case 'IMAGE': return <Image size={20} className="text-blue-500" />;
+      case 'VIDEO': return <Video size={20} className="text-purple-500" />;
+      case 'AUDIO': return <Music size={20} className="text-green-500" />;
+      case 'TEXT': return <FileText size={20} className="text-orange-500" />;
+      case 'EMBED': return <Link size={20} className="text-pink-500" />;
+      default: return <FileText size={20} className="text-gray-500" />;
+    }
+  };
+
+  const filteredItems = items.filter(item => {
+    const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (item.description && item.description.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    const matchesFilter = filterType === 'ALL' || item.type === filterType;
+    
+    return matchesSearch && matchesFilter;
+  });
 
   return (
     <DashboardLayout>
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-primary mb-2">My Items</h1>
-        <p className="text-secondary">Manage your uploaded content and thumbnails</p>
-      </div>
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-primary">My Items</h1>
+            <p className="text-secondary mt-1">
+              Manage all your uploaded content ({items.length} items)
+            </p>
+          </div>
+        </div>
 
-      {/* Thumbnail Upload Modal */}
-      {showThumbnailModal && selectedItem && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-primary">Edit Thumbnail</h2>
-              <button onClick={closeThumbnailModal} className="p-2 hover:bg-gray-100 rounded-lg">
-                <X size={20} />
-              </button>
+        {/* Search and Filter */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search items..."
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
             </div>
-            
-            <p className="text-gray-600 mb-4">{selectedItem.title}</p>
-            
-            {/* Current/Preview Thumbnail */}
-            <div className="mb-4">
-              <div className="w-full h-48 bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden">
-                {thumbnailPreview ? (
-                  <img src={thumbnailPreview} alt="Thumbnail preview" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="text-gray-400 flex flex-col items-center">
-                    <Image size={48} />
-                    <span className="text-sm mt-2">No thumbnail</span>
+
+            {/* Filter */}
+            <div className="relative">
+              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent appearance-none"
+              >
+                <option value="ALL">All Types</option>
+                <option value="IMAGE">Images</option>
+                <option value="VIDEO">Videos</option>
+                <option value="AUDIO">Audio</option>
+                <option value="TEXT">Text</option>
+                <option value="EMBED">Embeds</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Items Grid */}
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="animate-spin text-primary" size={48} />
+          </div>
+        ) : filteredItems.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-xl border border-gray-200">
+            <FileText className="mx-auto mb-4 text-gray-400" size={64} />
+            <h3 className="text-xl font-bold text-gray-700 mb-2">No items found</h3>
+            <p className="text-gray-500">
+              {searchTerm || filterType !== 'ALL' 
+                ? 'Try adjusting your search or filters'
+                : 'Upload your first item to get started!'
+              }
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredItems.map((item) => (
+              <div
+                key={item.id}
+                className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-all"
+              >
+                {/* Thumbnail */}
+                <div className="h-48 bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center relative">
+                  {item.thumbnailUrl ? (
+                    <img 
+                      src={item.thumbnailUrl} 
+                      alt={item.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center">
+                      {getTypeIcon(item.type)}
+                    </div>
+                  )}
+                  
+                  {/* ✅ NEW: Sharing Status Badge */}
+                  <div className="absolute top-3 left-3">
+                    {item.sharingEnabled ? (
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500 text-white rounded-full text-xs font-semibold shadow-lg">
+                        <Share2 size={14} />
+                        <span>Shareable</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-700 text-white rounded-full text-xs font-semibold shadow-lg">
+                        <Lock size={14} />
+                        <span>Private</span>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
 
-            {/* Upload Input */}
-            <div className="mb-4">
-              <label className="block w-full">
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer hover:border-primary transition">
-                  <Upload className="mx-auto text-gray-400 mb-2" size={24} />
-                  <span className="text-sm text-gray-600">Click to upload thumbnail</span>
-                  <span className="text-xs text-gray-400 block mt-1">Max 5MB, Images only</span>
-                </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleThumbnailSelect}
-                  className="hidden"
-                />
-              </label>
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-3">
-              {selectedItem.thumbnailUrl && (
-                <button
-                  onClick={removeThumbnail}
-                  disabled={uploading}
-                  className="flex-1 px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition disabled:opacity-50"
-                >
-                  Remove
-                </button>
-              )}
-              <button
-                onClick={uploadThumbnail}
-                disabled={!thumbnailFile || uploading}
-                className="flex-1 px-4 py-2 bg-gradient-to-r from-primary to-secondary text-white rounded-lg hover:opacity-90 transition disabled:opacity-50"
-              >
-                {uploading ? 'Uploading...' : 'Save Thumbnail'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {items.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-lg p-12 text-center border border-gray-100">
-          <div className="w-20 h-20 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center mx-auto mb-6">
-            <Image size={40} className="text-white" />
-          </div>
-          <h3 className="text-2xl font-bold text-primary mb-3">No Items Yet</h3>
-          <p className="text-secondary mb-6">
-            Upload your first item to get started!
-          </p>
-          <button
-            onClick={() => (window.location.href = '/dashboard/upload')}
-            className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-lg font-semibold"
-          >
-            Upload Your First Item
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition-all"
-            >
-              {/* Thumbnail */}
-              <div 
-                className="relative h-48 bg-gray-100 flex items-center justify-center cursor-pointer group"
-                onClick={() => openThumbnailModal(item)}
-              >
-                {renderThumbnail(item)}
-                
-                {/* Overlay on hover */}
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition flex items-center justify-center">
-                  <div className="opacity-0 group-hover:opacity-100 transition">
-                    <div className="bg-white rounded-full p-3">
-                      <Upload size={24} className="text-primary" />
+                  {/* Type Badge */}
+                  <div className="absolute top-3 right-3">
+                    <div className="px-3 py-1.5 bg-white/90 backdrop-blur-sm rounded-full text-xs font-semibold shadow-lg flex items-center gap-1.5">
+                      {getTypeIcon(item.type)}
+                      <span>{item.type}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Type badge */}
-                <span className="absolute top-3 right-3 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-                  {item.type}
-                </span>
+                {/* Content */}
+                <div className="p-4">
+                  <h3 className="font-bold text-gray-900 mb-1 truncate">{item.title}</h3>
+                  {item.description && (
+                    <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                      {item.description}
+                    </p>
+                  )}
+
+                  {/* Stats */}
+                  <div className="flex items-center gap-4 text-xs text-gray-500 mb-4">
+                    <div className="flex items-center gap-1">
+                      <Eye size={14} />
+                      <span>{item.views || 0} views</span>
+                    </div>
+                  </div>
+
+                  {/* ✅ NEW: Quick Sharing Toggle */}
+                  <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {item.sharingEnabled ? (
+                          <>
+                            <Share2 size={16} className="text-green-600" />
+                            <span className="text-sm font-medium text-gray-700">Public sharing enabled</span>
+                          </>
+                        ) : (
+                          <>
+                            <Lock size={16} className="text-gray-600" />
+                            <span className="text-sm font-medium text-gray-700">Private (no sharing)</span>
+                          </>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => handleQuickToggleSharing(item)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                          item.sharingEnabled
+                            ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            : 'bg-green-500 text-white hover:bg-green-600'
+                        }`}
+                      >
+                        {item.sharingEnabled ? 'Make Private' : 'Make Shareable'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => navigate(`/l/${item.slug}`)}
+                      className="flex-1 px-3 py-2 bg-primary text-white rounded-lg font-semibold text-sm hover:bg-primary/90 transition flex items-center justify-center gap-1"
+                    >
+                      <Eye size={16} />
+                      View
+                    </button>
+                    <button
+                      onClick={() => handleEditClick(item)}
+                      className="flex-1 px-3 py-2 border-2 border-primary text-primary rounded-lg font-semibold text-sm hover:bg-purple-50 transition flex items-center justify-center gap-1"
+                    >
+                      <Edit size={16} />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      className="px-3 py-2 border-2 border-red-500 text-red-500 rounded-lg font-semibold text-sm hover:bg-red-50 transition"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Edit Modal */}
+        {showEditModal && editingItem && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-primary to-secondary p-6 text-white">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold">Edit Item</h2>
+                  <button
+                    onClick={() => setShowEditModal(false)}
+                    className="p-2 hover:bg-white/20 rounded-lg transition"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
               </div>
 
-              {/* Content */}
-              <div className="p-4">
-                <h3 className="text-lg font-bold text-gray-800 mb-1 truncate">{item.title}</h3>
-                {item.description && (
-                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">{item.description}</p>
+              {/* Form */}
+              <div className="p-6 space-y-6">
+                {/* Title */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={editFormData.title}
+                    onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="Enter title"
+                  />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Description (Optional)
+                  </label>
+                  <textarea
+                    value={editFormData.description}
+                    onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+                    placeholder="Add a description"
+                  />
+                </div>
+
+                {/* Content (for TEXT items only) */}
+                {editingItem.type === 'TEXT' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Content
+                      </label>
+                      <textarea
+                        value={editFormData.content}
+                        onChange={(e) => setEditFormData({ ...editFormData, content: e.target.value })}
+                        rows={10}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+                        placeholder="Write your content here..."
+                      />
+                    </div>
+
+                    {/* Button fields for TEXT */}
+                    <div className="border-t border-gray-200 pt-6">
+                      <h4 className="text-lg font-bold text-gray-900 mb-4">Custom Button</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Button Text
+                          </label>
+                          <input
+                            type="text"
+                            value={editFormData.buttonText}
+                            onChange={(e) => setEditFormData({ ...editFormData, buttonText: e.target.value })}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                            placeholder="e.g., Visit Website"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Button URL
+                          </label>
+                          <input
+                            type="url"
+                            value={editFormData.buttonUrl}
+                            onChange={(e) => setEditFormData({ ...editFormData, buttonUrl: e.target.value })}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                            placeholder="https://example.com"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </>
                 )}
 
-                <div className="flex flex-wrap gap-2 text-xs text-gray-500 mb-4">
-                  <span className="bg-gray-100 px-2 py-1 rounded">{formatBytes(parseInt(item.fileSize))}</span>
-                  <span className="bg-blue-100 text-blue-600 px-2 py-1 rounded flex items-center gap-1">
-                    <Eye size={12} />
-                    {item.views || 0} views
-                  </span>
-                </div>
+                {/* ✅ NEW: Sharing Control */}
+                <div className="border-t border-gray-200 pt-6">
+                  <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-6">
+                    <div className="flex items-start gap-3 mb-4">
+                      <div className="flex-shrink-0">
+                        <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+                          {editFormData.sharingEnabled ? (
+                            <Share2 size={24} className="text-white" />
+                          ) : (
+                            <Lock size={24} className="text-white" />
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-lg font-bold text-indigo-600 mb-2">
+                          Sharing Control
+                        </h4>
+                        <p className="text-sm text-gray-600 mb-4">
+                          Choose who can share this content. This gives you control over how your content spreads.
+                        </p>
+                      </div>
+                    </div>
 
-                {/* Campaign Assignment */}
-                <div className="mb-4">
-                  <select
-                    value={item.campaignId || ''}
-                    onChange={(e) => assignToCampaign(item.id, e.target.value || null)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
-                  >
-                    <option value="">No Campaign</option>
-                    {campaigns.map((campaign) => (
-                      <option key={campaign.id} value={campaign.id}>
-                        {campaign.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                    {/* Toggle Options */}
+                    <div className="space-y-3">
+                      {/* Option 1: Keep within community */}
+                      <label 
+                        className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                          !editFormData.sharingEnabled 
+                            ? 'border-indigo-500 bg-white shadow-md' 
+                            : 'border-gray-200 bg-white hover:border-indigo-300'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="sharing-edit"
+                          checked={!editFormData.sharingEnabled}
+                          onChange={() => setEditFormData({ ...editFormData, sharingEnabled: false })}
+                          className="mt-1 w-5 h-5 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Lock size={18} className="text-indigo-600" />
+                            <span className="font-bold text-gray-900">🔒 Keep within our community</span>
+                          </div>
+                          <p className="text-sm text-gray-600">
+                            Only people with the link can view this content. Share button will be hidden.
+                          </p>
+                        </div>
+                      </label>
 
-                {/* Actions */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => copyPublicLink(item.publicUrl)}
-                    className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-gradient-to-r from-primary to-secondary text-white rounded-lg text-sm hover:opacity-90 transition"
-                  >
-                    <Copy size={14} />
-                    Copy
-                  </button>
-                  
-                  <button
-                    onClick={() => window.open(item.publicUrl, '_blank')}
-                    className="flex items-center justify-center gap-1 px-3 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 transition"
-                  >
-                    <ExternalLink size={14} />
-                  </button>
-                  
-                  <button
-                    onClick={() => deleteItem(item.id)}
-                    className="flex items-center justify-center gap-1 px-3 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                      {/* Option 2: Allow sharing */}
+                      <label 
+                        className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                          editFormData.sharingEnabled 
+                            ? 'border-indigo-500 bg-white shadow-md' 
+                            : 'border-gray-200 bg-white hover:border-indigo-300'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="sharing-edit"
+                          checked={editFormData.sharingEnabled}
+                          onChange={() => setEditFormData({ ...editFormData, sharingEnabled: true })}
+                          className="mt-1 w-5 h-5 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Share2 size={18} className="text-indigo-600" />
+                            <span className="font-bold text-gray-900">🔁 Allow others to share this</span>
+                          </div>
+                          <p className="text-sm text-gray-600">
+                            Viewers can share this content via social media, WhatsApp, email, etc.
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
+
+              {/* Footer */}
+              <div className="border-t border-gray-200 p-6 bg-gray-50 flex gap-4">
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-100 transition"
+                  disabled={saving}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={saving}
+                  className="flex-1 gradient-btn text-white px-6 py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="animate-spin" size={20} />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={20} />
+                      Save Changes
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        )}
+
+        {toasts.map((toast) => (
+          <Toast
+            key={toast.id}
+            message={toast.message}
+            type={toast.type}
+            onClose={() => removeToast(toast.id)}
+          />
+        ))}
+      </div>
     </DashboardLayout>
   );
 };
