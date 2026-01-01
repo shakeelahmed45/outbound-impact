@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Image, Video, Music, FileText, Link, Trash2, Edit, Eye, BarChart3, 
-  Download, Search, Filter, X, Loader2, Share2, Lock, ExternalLink, Paperclip, Save
+  Download, Search, Filter, X, Loader2, Share2, Lock, ExternalLink, Paperclip, Save, Folder
 } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import api from '../services/api';
@@ -15,6 +15,7 @@ const ItemsPage = () => {
   const { toasts, showToast, removeToast } = useToast();
   
   const [items, setItems] = useState([]);
+  const [campaigns, setCampaigns] = useState([]); // ✅ RESTORED: Campaign list
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('ALL');
@@ -26,7 +27,7 @@ const ItemsPage = () => {
     title: '',
     description: '',
     content: '',
-    sharingEnabled: true, // ✅ NEW
+    sharingEnabled: true,
     buttonText: '',
     buttonUrl: '',
   });
@@ -35,6 +36,7 @@ const ItemsPage = () => {
   useEffect(() => {
     document.title = 'My Items | Outbound Impact';
     fetchItems();
+    fetchCampaigns(); // ✅ RESTORED: Fetch campaigns
   }, []);
 
   const fetchItems = async () => {
@@ -52,20 +54,39 @@ const ItemsPage = () => {
     }
   };
 
+  // ✅ RESTORED: Fetch campaigns function
+  const fetchCampaigns = async () => {
+    try {
+      const response = await api.get('/campaigns');
+      if (response.data.status === 'success') {
+        setCampaigns(response.data.campaigns);
+      }
+    } catch (error) {
+      console.error('Failed to fetch campaigns:', error);
+    }
+  };
+
+  // ✅ RESTORED: Get campaign name by ID
+  const getCampaignName = (campaignId) => {
+    if (!campaignId) return 'No Campaign';
+    const campaign = campaigns.find(c => c.id === campaignId);
+    return campaign ? campaign.name : 'Unknown Campaign';
+  };
+
   const handleEditClick = (item) => {
     setEditingItem(item);
     setEditFormData({
       title: item.title || '',
       description: item.description || '',
       content: item.type === 'TEXT' ? item.mediaUrl : '',
-      sharingEnabled: item.sharingEnabled !== undefined ? item.sharingEnabled : true, // ✅ NEW
+      sharingEnabled: item.sharingEnabled !== undefined ? item.sharingEnabled : true,
       buttonText: item.buttonText || '',
       buttonUrl: item.buttonUrl || '',
     });
     setShowEditModal(true);
   };
 
-  // ✅ NEW: Quick toggle sharing without opening edit modal
+  // Quick toggle sharing without opening edit modal
   const handleQuickToggleSharing = async (item) => {
     try {
       const newSharingValue = !item.sharingEnabled;
@@ -113,7 +134,7 @@ const ItemsPage = () => {
       const updateData = {
         title: editFormData.title,
         description: editFormData.description || null,
-        sharingEnabled: editFormData.sharingEnabled, // ✅ NEW
+        sharingEnabled: editFormData.sharingEnabled,
       };
 
       // Add content for TEXT items
@@ -266,7 +287,7 @@ const ItemsPage = () => {
                     </div>
                   )}
                   
-                  {/* ✅ NEW: Sharing Status Badge */}
+                  {/* Sharing Status Badge */}
                   <div className="absolute top-3 left-3">
                     {item.sharingEnabled ? (
                       <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500 text-white rounded-full text-xs font-semibold shadow-lg">
@@ -299,6 +320,14 @@ const ItemsPage = () => {
                     </p>
                   )}
 
+                  {/* ✅ RESTORED: Campaign Info */}
+                  <div className="mb-3 flex items-center gap-2 text-sm text-gray-600">
+                    <Folder size={16} className="text-primary" />
+                    <span className="font-medium truncate">
+                      {getCampaignName(item.campaignId)}
+                    </span>
+                  </div>
+
                   {/* Stats */}
                   <div className="flex items-center gap-4 text-xs text-gray-500 mb-4">
                     <div className="flex items-center gap-1">
@@ -307,7 +336,7 @@ const ItemsPage = () => {
                     </div>
                   </div>
 
-                  {/* ✅ NEW: Quick Sharing Toggle */}
+                  {/* Quick Sharing Toggle */}
                   <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -461,7 +490,7 @@ const ItemsPage = () => {
                   </>
                 )}
 
-                {/* ✅ NEW: Sharing Control */}
+                {/* Sharing Control */}
                 <div className="border-t border-gray-200 pt-6">
                   <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-6">
                     <div className="flex items-start gap-3 mb-4">
