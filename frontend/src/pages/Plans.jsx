@@ -16,14 +16,14 @@ const Plans = () => {
     {
       id: 'INDIVIDUAL',
       name: 'Individual',
-      price: '$60',
+      price: '$85',
       period: 'one-time',
-      storage: '2GB',
+      storage: '250GB',
       features: [
         'Upload images, videos, audio',
         'QR code generation',
         'View tracking & analytics',
-        '2GB storage',
+        '250GB storage',
         'Unlimited views',
       ],
     },

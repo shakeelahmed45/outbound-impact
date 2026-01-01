@@ -14,7 +14,7 @@ const IndividualDashboard = () => {
     totalUploads: 0,
     totalViews: 0,
     storageUsed: 0,
-    storageLimit: 2147483648, // 2GB default
+    storageLimit: 2147483648, // 250GB default
     qrCodesGenerated: 0,
   });
   const [loading, setLoading] = useState(true);
