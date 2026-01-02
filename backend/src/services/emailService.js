@@ -31,10 +31,14 @@ const sendWelcomeEmail = async (userEmail, userName, userRole) => {
       INDIVIDUAL: 'Individual',
       ORG_SMALL: 'Small Organization',
       ORG_MEDIUM: 'Medium Organization',
-      ORG_ENTERPRISE: 'Enterprise'
+      ORG_ENTERPRISE: 'Enterprise',
+      'Individual': 'Individual',
+      'Small Org': 'Small Organization',
+      'Medium Org': 'Medium Organization',
+      'Enterprise': 'Enterprise'
     };
 
-    const planName = planNames[userRole] || 'Individual';
+    const planName = planNames[userRole] || userRole || 'Individual';
 
     const { data, error } = await resend.emails.send({
       from: 'Outbound Impact <noreply@outboundimpact.org>',
@@ -146,10 +150,14 @@ const sendAdminNotification = async (userData) => {
       INDIVIDUAL: 'Individual',
       ORG_SMALL: 'Small Organization',
       ORG_MEDIUM: 'Medium Organization',
-      ORG_ENTERPRISE: 'Enterprise'
+      ORG_ENTERPRISE: 'Enterprise',
+      'Individual': 'Individual',
+      'Small Org': 'Small Organization',
+      'Medium Org': 'Medium Organization',
+      'Enterprise': 'Enterprise'
     };
 
-    const planName = planNames[userData.userRole] || userData.userRole;
+    const planName = planNames[userData.plan] || planNames[userData.userRole] || userData.plan || userData.userRole || 'Individual';
 
     const { data, error } = await resend.emails.send({
       from: 'Outbound Impact System <noreply@outboundimpact.org>',
@@ -191,6 +199,10 @@ const sendAdminNotification = async (userData) => {
               </div>
               
               <div class="info-row">
+                <span class="label">Amount:</span> ${userData.amount ? '$' + userData.amount : 'N/A'}
+              </div>
+              
+              <div class="info-row">
                 <span class="label">Subscription ID:</span> ${userData.subscriptionId || 'N/A'}
               </div>
               
@@ -221,7 +233,293 @@ const sendAdminNotification = async (userData) => {
   }
 };
 
-// ✨ NEW: Send team invitation email
+// ✅ NEW: Send payment receipt email after successful payment
+const sendPaymentReceiptEmail = async (email, name, amount, currency, plan) => {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.log('⚠️ Resend not configured - skipping payment receipt');
+      return { success: false, error: 'Resend not configured' };
+    }
+
+    const { data, error } = await resend.emails.send({
+      from: 'Outbound Impact <noreply@outboundimpact.org>',
+      to: [email],
+      replyTo: 'support@outboundimpact.org',
+      subject: `✅ Payment Receipt - ${plan} Plan`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #800080 0%, #9333EA 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #ffffff; padding: 40px 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; }
+            .receipt-box { background: #f8f9fa; padding: 25px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #800080; }
+            .amount { font-size: 36px; font-weight: bold; color: #800080; margin: 15px 0; }
+            .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; padding: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1 style="margin: 0; font-size: 32px;">✅ Payment Received!</h1>
+              <p style="margin: 10px 0 0 0; font-size: 16px;">Thank you for your payment</p>
+            </div>
+            
+            <div class="content">
+              <p style="font-size: 16px; margin: 0 0 20px;">Hi ${name},</p>
+              
+              <p style="font-size: 16px; margin: 0 0 25px;">Thank you! We've successfully received your payment.</p>
+              
+              <div class="receipt-box">
+                <h3 style="color: #800080; margin: 0 0 20px;">📋 Payment Details</h3>
+                <p style="margin: 10px 0;"><strong>Plan:</strong> ${plan}</p>
+                <p style="margin: 10px 0;"><strong>Amount Paid:</strong></p>
+                <div class="amount">${currency} $${amount.toFixed(2)}</div>
+                <p style="margin: 10px 0;"><strong>Status:</strong> <span style="color: #10b981; font-weight: bold;">✅ Paid</span></p>
+                <p style="margin: 10px 0;"><strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+              </div>
+              
+              <p style="font-size: 16px; margin: 25px 0;">Your subscription is active and ready to use. You can manage your subscription anytime from your dashboard.</p>
+              
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="https://outboundimpact.net/dashboard/settings" style="display: inline-block; padding: 14px 30px; background: linear-gradient(135deg, #800080 0%, #9333EA 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                  View Subscription →
+                </a>
+              </div>
+              
+              <p style="font-size: 14px; color: #666; margin: 25px 0 0; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+                If you have any questions about this payment, feel free to reach out to our support team at <a href="mailto:support@outboundimpact.org" style="color: #800080;">support@outboundimpact.org</a>
+              </p>
+              
+              <p style="font-size: 16px; margin: 25px 0 0;">
+                Best regards,<br>
+                <strong>The Outbound Impact Team</strong>
+              </p>
+            </div>
+            
+            <div class="footer">
+              <p style="margin: 0 0 10px;">Questions? Email us at <a href="mailto:support@outboundimpact.org" style="color: #800080;">support@outboundimpact.org</a></p>
+              <p style="color: #999; font-size: 12px; margin: 0;">© ${new Date().getFullYear()} Outbound Impact. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Failed to send payment receipt:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('✅ Payment receipt sent to:', email, '(ID:', data.id, ')');
+    return { success: true, messageId: data.id };
+  } catch (error) {
+    console.error('❌ Failed to send payment receipt:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+// ✅ NEW: Send payment failed notification email
+const sendPaymentFailedEmail = async (email, name, amount, currency, reason) => {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.log('⚠️ Resend not configured - skipping payment failed email');
+      return { success: false, error: 'Resend not configured' };
+    }
+
+    const { data, error } = await resend.emails.send({
+      from: 'Outbound Impact <noreply@outboundimpact.org>',
+      to: [email],
+      replyTo: 'support@outboundimpact.org',
+      subject: '⚠️ Payment Failed - Action Required',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #ffffff; padding: 40px 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; }
+            .warning-box { background: #FEF2F2; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #EF4444; }
+            .button { display: inline-block; padding: 14px 30px; background: linear-gradient(135deg, #800080 0%, #9333EA 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: bold; }
+            .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; padding: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1 style="margin: 0; font-size: 32px;">⚠️ Payment Failed</h1>
+              <p style="margin: 10px 0 0 0; font-size: 16px;">We couldn't process your payment</p>
+            </div>
+            
+            <div class="content">
+              <p style="font-size: 16px; margin: 0 0 20px;">Hi ${name},</p>
+              
+              <p style="font-size: 16px; margin: 0 0 25px;">We were unable to process your recent payment of <strong>${currency} $${amount.toFixed(2)}</strong>.</p>
+              
+              <div class="warning-box">
+                <h3 style="color: #DC2626; margin: 0 0 15px;">❌ Reason for Failure</h3>
+                <p style="margin: 0; font-size: 15px; color: #991B1B;">${reason}</p>
+              </div>
+              
+              <h3 style="color: #800080; margin: 30px 0 15px;">🔄 What happens next?</h3>
+              <ul style="margin: 0; padding-left: 20px; color: #666;">
+                <li style="margin: 10px 0;">We'll automatically retry the payment in a few days</li>
+                <li style="margin: 10px 0;">Your subscription remains active during this grace period</li>
+                <li style="margin: 10px 0;">Please update your payment method to avoid service interruption</li>
+              </ul>
+              
+              <div style="text-align: center; margin: 35px 0;">
+                <a href="https://outboundimpact.net/dashboard/settings" class="button">
+                  Update Payment Method →
+                </a>
+              </div>
+              
+              <div style="background: #EFF6FF; padding: 20px; border-radius: 8px; border-left: 4px solid #3B82F6; margin: 25px 0;">
+                <p style="margin: 0; font-size: 14px; color: #1E40AF;">
+                  <strong>💡 Need Help?</strong> If you're having trouble updating your payment method, our support team is here to help. Contact us at <a href="mailto:support@outboundimpact.org" style="color: #800080;">support@outboundimpact.org</a>
+                </p>
+              </div>
+              
+              <p style="font-size: 16px; margin: 25px 0 0;">
+                Best regards,<br>
+                <strong>The Outbound Impact Team</strong>
+              </p>
+            </div>
+            
+            <div class="footer">
+              <p style="margin: 0 0 10px;">Questions? Email us at <a href="mailto:support@outboundimpact.org" style="color: #800080;">support@outboundimpact.org</a></p>
+              <p style="color: #999; font-size: 12px; margin: 0;">© ${new Date().getFullYear()} Outbound Impact. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Failed to send payment failed email:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('✅ Payment failed email sent to:', email, '(ID:', data.id, ')');
+    return { success: true, messageId: data.id };
+  } catch (error) {
+    console.error('❌ Failed to send payment failed email:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+// ✅ NEW: Send cancellation confirmation email
+const sendCancellationEmail = async (email, name) => {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.log('⚠️ Resend not configured - skipping cancellation email');
+      return { success: false, error: 'Resend not configured' };
+    }
+
+    const { data, error } = await resend.emails.send({
+      from: 'Outbound Impact <noreply@outboundimpact.org>',
+      to: [email],
+      replyTo: 'support@outboundimpact.org',
+      subject: 'Subscription Canceled - We\'ll Miss You',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #6B7280 0%, #4B5563 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #ffffff; padding: 40px 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; }
+            .info-box { background: #F9FAFB; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #6B7280; }
+            .button { display: inline-block; padding: 14px 30px; background: linear-gradient(135deg, #800080 0%, #9333EA 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: bold; }
+            .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; padding: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1 style="margin: 0; font-size: 32px;">Subscription Canceled</h1>
+              <p style="margin: 10px 0 0 0; font-size: 16px;">We're sorry to see you go</p>
+            </div>
+            
+            <div class="content">
+              <p style="font-size: 16px; margin: 0 0 20px;">Hi ${name},</p>
+              
+              <p style="font-size: 16px; margin: 0 0 25px;">Your subscription has been canceled as requested.</p>
+              
+              <div class="info-box">
+                <h3 style="color: #374151; margin: 0 0 15px;">📋 What This Means</h3>
+                <ul style="margin: 0; padding-left: 20px; color: #6B7280;">
+                  <li style="margin: 10px 0;">You'll have access until the end of your current billing period</li>
+                  <li style="margin: 10px 0;">No further charges will be made to your account</li>
+                  <li style="margin: 10px 0;">Your data will be retained for 30 days</li>
+                  <li style="margin: 10px 0;">You can reactivate anytime before the end of your billing period</li>
+                </ul>
+              </div>
+              
+              <h3 style="color: #800080; margin: 30px 0 15px;">💭 We'd Love Your Feedback</h3>
+              <p style="font-size: 15px; margin: 0 0 20px; color: #666;">
+                We're sorry to see you go! If you have any feedback about why you canceled, we'd really appreciate hearing it. Your input helps us improve Outbound Impact for everyone.
+              </p>
+              
+              <div style="background: #F0F0FF; padding: 20px; border-radius: 8px; border-left: 4px solid #800080; margin: 25px 0;">
+                <p style="margin: 0; font-size: 14px; color: #5B21B6;">
+                  <strong>💡 Changed Your Mind?</strong> You can reactivate your subscription anytime from your dashboard. All your campaigns and content will still be there!
+                </p>
+              </div>
+              
+              <div style="text-align: center; margin: 35px 0;">
+                <a href="https://outboundimpact.net/dashboard/settings" class="button">
+                  Reactivate Subscription →
+                </a>
+              </div>
+              
+              <p style="font-size: 14px; color: #666; margin: 25px 0 0; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+                Thank you for being part of Outbound Impact. We hope to see you again soon!
+              </p>
+              
+              <p style="font-size: 16px; margin: 25px 0 0;">
+                Best wishes,<br>
+                <strong>The Outbound Impact Team</strong>
+              </p>
+            </div>
+            
+            <div class="footer">
+              <p style="margin: 0 0 10px;">Questions? Email us at <a href="mailto:support@outboundimpact.org" style="color: #800080;">support@outboundimpact.org</a></p>
+              <p style="color: #999; font-size: 12px; margin: 0;">© ${new Date().getFullYear()} Outbound Impact. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Failed to send cancellation email:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('✅ Cancellation email sent to:', email, '(ID:', data.id, ')');
+    return { success: true, messageId: data.id };
+  } catch (error) {
+    console.error('❌ Failed to send cancellation email:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+// ✨ Send team invitation email
 const sendTeamInvitationEmail = async (invitationData) => {
   try {
     if (!process.env.RESEND_API_KEY) {
@@ -361,7 +659,7 @@ const sendTeamInvitationEmail = async (invitationData) => {
   }
 };
 
-// ✨ NEW: Send reminder email for pending invitations
+// ✨ Send reminder email for pending invitations
 const sendInvitationReminderEmail = async (reminderData) => {
   try {
     if (!process.env.RESEND_API_KEY) {
@@ -443,7 +741,7 @@ const sendInvitationReminderEmail = async (reminderData) => {
   }
 };
 
-// ✨ NEW: Send password reset email
+// ✨ Send password reset email
 const sendPasswordResetEmail = async (resetData) => {
   try {
     if (!process.env.RESEND_API_KEY) {
@@ -566,8 +864,11 @@ testConnection();
 module.exports = {
   sendWelcomeEmail,
   sendAdminNotification,
+  sendPaymentReceiptEmail,        // ✅ NEW
+  sendPaymentFailedEmail,          // ✅ NEW
+  sendCancellationEmail,           // ✅ NEW
   sendTeamInvitationEmail,
   sendInvitationReminderEmail,
-  sendPasswordResetEmail,        // ✨ NEW
+  sendPasswordResetEmail,
   testConnection
 };

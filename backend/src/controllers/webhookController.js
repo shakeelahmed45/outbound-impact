@@ -96,22 +96,113 @@ const handleStripeWebhook = async (req, res) => {
 // ============================================
 
 /**
- * Handle checkout.session.completed
+ * ✅ FIXED: Handle checkout.session.completed
  * This is called when initial payment is successful
+ * THIS IS THE CRITICAL FIX!
  */
 const handleCheckoutCompleted = async (session) => {
   console.log('💳 Processing checkout.session.completed:', session.id);
 
-  const customerEmail = session.customer_email;
+  const customerEmail = session.customer_email || session.customer_details?.email;
   const customerId = session.customer;
   const subscriptionId = session.subscription;
 
-  console.log('Customer:', customerEmail);
-  console.log('Subscription ID:', subscriptionId);
+  console.log('📧 Customer Email:', customerEmail);
+  console.log('👤 Customer ID:', customerId);
+  console.log('📋 Subscription ID:', subscriptionId);
 
-  // Note: User creation is handled by completeSignup endpoint
-  // This is just for logging and verification
-  console.log('✅ Checkout completed successfully');
+  if (!customerEmail) {
+    console.error('❌ No customer email in checkout session!');
+    return;
+  }
+
+  try {
+    // ✅ STEP 1: Find the user by email
+    const user = await prisma.user.findUnique({
+      where: { email: customerEmail.toLowerCase() }
+    });
+
+    if (!user) {
+      console.error('❌ User not found for email:', customerEmail);
+      return;
+    }
+
+    console.log('✅ Found user:', user.email, 'ID:', user.id);
+
+    // ✅ STEP 2: Get the subscription details from Stripe
+    let subscription = null;
+    let priceId = null;
+    let planName = 'Free';
+
+    if (subscriptionId) {
+      subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      priceId = subscription.items.data[0].price.id;
+      
+      // Determine plan name from price ID
+      const priceIdMap = {
+        [process.env.STRIPE_PRICE_INDIVIDUAL]: 'Individual',
+        [process.env.STRIPE_PRICE_SMALL_ORG]: 'Small Org',
+        [process.env.STRIPE_PRICE_MEDIUM_ORG]: 'Medium Org',
+        [process.env.STRIPE_PRICE_ENTERPRISE]: 'Enterprise',
+      };
+      
+      planName = priceIdMap[priceId] || 'Individual';
+      console.log('📦 Plan:', planName);
+    }
+
+    // ✅ STEP 3: Update user with Stripe details
+    const updateData = {
+      stripeCustomerId: customerId, // ← THIS IS THE KEY FIX!
+    };
+
+    if (subscription) {
+      updateData.subscriptionId = subscriptionId;
+      updateData.subscriptionStatus = subscription.status;
+      updateData.priceId = priceId;
+      // Note: subscriptionPlan is not in schema - determine from priceId in frontend
+      updateData.currentPeriodStart = new Date(subscription.current_period_start * 1000);
+      updateData.currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: updateData
+    });
+
+    console.log('✅ User updated with Stripe details!');
+    console.log('   Stripe Customer ID:', customerId);
+    console.log('   Subscription ID:', subscriptionId);
+    console.log('   Plan:', planName);
+    console.log('   Status:', subscription?.status || 'N/A');
+
+    // ✅ STEP 4: Send welcome email
+    try {
+      const emailService = require('../services/emailService');
+      await emailService.sendWelcomeEmail(user.email, user.name, planName);
+      console.log('✅ Welcome email sent to:', user.email);
+    } catch (emailError) {
+      console.error('❌ Failed to send welcome email:', emailError.message);
+    }
+
+    // ✅ STEP 5: Send admin notification
+    try {
+      const emailService = require('../services/emailService');
+      await emailService.sendAdminNotification({
+        userEmail: user.email,
+        userName: user.name,
+        plan: planName,
+        amount: session.amount_total ? (session.amount_total / 100) : 0
+      });
+      console.log('✅ Admin notification sent');
+    } catch (emailError) {
+      console.error('❌ Failed to send admin notification:', emailError.message);
+    }
+
+    console.log('✅ Checkout completed successfully for:', user.email);
+
+  } catch (error) {
+    console.error('❌ Error handling checkout.completed:', error);
+  }
 };
 
 /**
@@ -134,12 +225,23 @@ const handleSubscriptionCreated = async (subscription) => {
       return;
     }
 
+    // Determine plan name from price ID
+    const priceIdMap = {
+      [process.env.STRIPE_PRICE_INDIVIDUAL]: 'Individual',
+      [process.env.STRIPE_PRICE_SMALL_ORG]: 'Small Org',
+      [process.env.STRIPE_PRICE_MEDIUM_ORG]: 'Medium Org',
+      [process.env.STRIPE_PRICE_ENTERPRISE]: 'Enterprise',
+    };
+    
+    const planName = priceIdMap[priceId] || 'Individual';
+
     await prisma.user.update({
       where: { id: user.id },
       data: {
         subscriptionId: subscription.id,
         subscriptionStatus: subscription.status,
         priceId: priceId,
+        // Note: subscriptionPlan not in schema - determine from priceId
         currentPeriodStart: new Date(subscription.current_period_start * 1000),
         currentPeriodEnd: new Date(subscription.current_period_end * 1000),
       }
@@ -172,10 +274,21 @@ const handleSubscriptionUpdated = async (subscription) => {
       return;
     }
 
+    // Determine plan name from price ID (for logging only)
+    const priceIdMap = {
+      [process.env.STRIPE_PRICE_INDIVIDUAL]: 'Individual',
+      [process.env.STRIPE_PRICE_SMALL_ORG]: 'Small Org',
+      [process.env.STRIPE_PRICE_MEDIUM_ORG]: 'Medium Org',
+      [process.env.STRIPE_PRICE_ENTERPRISE]: 'Enterprise',
+    };
+    
+    const planName = priceIdMap[priceId] || 'Individual';
+
     // Update subscription details
     const updateData = {
       subscriptionStatus: subscription.status,
       priceId: priceId,
+      // Note: subscriptionPlan not in schema - determine from priceId
       currentPeriodStart: new Date(subscription.current_period_start * 1000),
       currentPeriodEnd: new Date(subscription.current_period_end * 1000),
     };
@@ -193,6 +306,7 @@ const handleSubscriptionUpdated = async (subscription) => {
 
     console.log('✅ Subscription updated for user:', user.email);
     console.log('   Status:', subscription.status);
+    console.log('   Plan:', planName);
     console.log('   Period End:', new Date(subscription.current_period_end * 1000));
   } catch (error) {
     console.error('❌ Error handling subscription.updated:', error);
@@ -223,6 +337,7 @@ const handleSubscriptionDeleted = async (subscription) => {
       where: { id: user.id },
       data: {
         subscriptionStatus: 'canceled',
+        // Note: subscriptionPlan not in schema
         // Keep subscriptionId for reference
         // currentPeriodEnd stays as is (they have access until this date)
       }
@@ -230,13 +345,13 @@ const handleSubscriptionDeleted = async (subscription) => {
 
     console.log('✅ Subscription canceled for user:', user.email);
 
-    // Optional: Send cancellation email
+    // Send cancellation email
     try {
       const emailService = require('../services/emailService');
-      // You can create a sendCancellationEmail function later
-      console.log('📧 Would send cancellation email to:', user.email);
+      await emailService.sendCancellationEmail(user.email, user.name);
+      console.log('📧 Cancellation email sent to:', user.email);
     } catch (emailError) {
-      console.log('⚠️ Email service not available');
+      console.error('❌ Failed to send cancellation email:', emailError.message);
     }
 
   } catch (error) {
@@ -287,13 +402,29 @@ const handlePaymentSucceeded = async (invoice) => {
     console.log('   Amount:', invoice.amount_paid / 100, invoice.currency.toUpperCase());
     console.log('   New period end:', new Date(subscription.current_period_end * 1000));
 
-    // Optional: Send payment receipt email
+    // Send payment receipt email
     try {
       const emailService = require('../services/emailService');
-      // You can create a sendPaymentReceiptEmail function later
-      console.log('📧 Would send payment receipt to:', user.email);
+      
+      // Determine plan name from priceId for email
+      const priceIdMap = {
+        [process.env.STRIPE_PRICE_INDIVIDUAL]: 'Individual',
+        [process.env.STRIPE_PRICE_SMALL_ORG]: 'Small Org',
+        [process.env.STRIPE_PRICE_MEDIUM_ORG]: 'Medium Org',
+        [process.env.STRIPE_PRICE_ENTERPRISE]: 'Enterprise',
+      };
+      const planName = priceIdMap[subscription.items.data[0].price.id] || 'Individual';
+      
+      await emailService.sendPaymentReceiptEmail(
+        user.email,
+        user.name,
+        invoice.amount_paid / 100,
+        invoice.currency.toUpperCase(),
+        planName
+      );
+      console.log('📧 Payment receipt sent to:', user.email);
     } catch (emailError) {
-      console.log('⚠️ Email service not available');
+      console.error('❌ Failed to send payment receipt:', emailError.message);
     }
 
   } catch (error) {
@@ -337,10 +468,16 @@ const handlePaymentFailed = async (invoice) => {
     // Send payment failed email
     try {
       const emailService = require('../services/emailService');
-      // You can create a sendPaymentFailedEmail function later
-      console.log('📧 Would send payment failure notice to:', user.email);
+      await emailService.sendPaymentFailedEmail(
+        user.email,
+        user.name,
+        invoice.amount_due / 100,
+        invoice.currency.toUpperCase(),
+        invoice.last_payment_error?.message || 'Unknown'
+      );
+      console.log('📧 Payment failure notice sent to:', user.email);
     } catch (emailError) {
-      console.log('⚠️ Email service not available');
+      console.error('❌ Failed to send payment failure email:', emailError.message);
     }
 
   } catch (error) {
