@@ -471,122 +471,237 @@ const PublicCampaignViewer = () => {
   };
 
   const getThumbnail = (item) => {
-    // ✅ IMAGE with blowing eye icon effect (NEW!)
-    if (item.type === 'IMAGE') {
-      return (
-        <div className="relative w-full h-full">
-          {/* Background image */}
-          <img
-            src={item.mediaUrl}
-            alt={item.title}
-            className="w-full h-full object-cover"
-          />
-          
-          {/* Dark overlay with gradient */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
-          
-          {/* ✅ Eye icon with pulsing waves - Bottom positioning */}
-          <div className="absolute bottom-0 left-0 right-0 p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              {/* Eye icon with animated pulsing waves */}
-              <div className="relative flex-shrink-0">
-                {/* Animated pulsing waves */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-10 h-10 rounded-full bg-white/10 animate-ping"></div>
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center animation-delay-150">
-                  <div className="w-8 h-8 rounded-full bg-white/20 animate-ping"></div>
-                </div>
-                
-                {/* Eye icon */}
-                <div className="relative z-10 w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/30">
-                  <Eye className="w-4 h-4 text-white" />
-                </div>
+  // ✅ IMAGE with blowing eye icon effect
+  if (item.type === 'IMAGE') {
+    return (
+      <div className="relative w-full h-full">
+        {/* Background image */}
+        <img
+          src={item.mediaUrl}
+          alt={item.title}
+          className="w-full h-full object-cover"
+        />
+        
+        {/* Dark overlay with gradient */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+        
+        {/* ✅ Eye icon with pulsing waves - Bottom positioning */}
+        <div className="absolute bottom-0 left-0 right-0 p-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Eye icon with animated pulsing waves */}
+            <div className="relative flex-shrink-0">
+              {/* Animated pulsing waves */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-white/10 animate-ping"></div>
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center animation-delay-150">
+                <div className="w-8 h-8 rounded-full bg-white/20 animate-ping"></div>
               </div>
               
-              {/* Text */}
-              <span className="text-white text-xs sm:text-sm font-bold drop-shadow-lg">
-                Click here to view image
-              </span>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (item.type === 'VIDEO') {
-      return (
-        <div className="relative w-full h-full">
-          <video
-            src={item.mediaUrl}
-            className="w-full h-full object-cover"
-            muted
-          />
-          <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-            {getMediaIcon(item.type)}
-          </div>
-        </div>
-      );
-    }
-
-    // ✅ TEXT card with pink/purple gradient and white text
-    if (item.type === 'TEXT') {
-      const textContent = item.mediaUrl || 'No content available';
-      const hasLongContent = textContent.length > 200;
-      
-      return (
-        <div className="w-full h-full bg-gradient-to-br from-pink-500 via-purple-500 to-violet-600 p-4 flex flex-col overflow-hidden relative">
-          {/* Animated gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-tr from-purple-600/20 via-pink-500/20 to-violet-600/20 animate-pulse pointer-events-none"></div>
-          
-          {/* Content */}
-          <div className="relative z-10 flex flex-col h-full">
-            <div className="flex items-center gap-2 mb-3">
-              <FileText className="text-white" size={20} />
-              <span className="text-white text-xs font-bold tracking-wide">TEXT MESSAGE</span>
-            </div>
-            
-            <div className="flex-1 overflow-hidden">
-              <div className="text-white text-sm leading-relaxed line-clamp-6 font-medium">
-                {textContent}
+              {/* Eye icon */}
+              <div className="relative z-10 w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/30">
+                <Eye className="w-4 h-4 text-white" />
               </div>
             </div>
             
-            {/* ✅ "Click to read more" indicator with pulsing animation */}
-            {hasLongContent && (
-              <div className="mt-auto pt-3 border-t border-white/30">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  {/* Eye icon with animated pulsing waves */}
-                  <div className="relative flex-shrink-0">
-                    {/* Animated pulsing waves */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-10 h-10 rounded-full bg-white/10 animate-ping"></div>
-                    </div>
-                    <div className="absolute inset-0 flex items-center justify-center animation-delay-150">
-                      <div className="w-8 h-8 rounded-full bg-white/20 animate-ping"></div>
-                    </div>
-                    
-                    {/* Eye icon */}
-                    <div className="relative z-10 w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/30">
-                      <Eye className="w-4 h-4 text-white" />
-                    </div>
+            {/* Text */}
+            <span className="text-white text-xs sm:text-sm font-bold drop-shadow-lg">
+              Click here to view image
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ VIDEO with play button
+  if (item.type === 'VIDEO') {
+    return (
+      <div className="relative w-full h-full">
+        <video
+          src={item.mediaUrl}
+          className="w-full h-full object-cover"
+          muted
+        />
+        <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+          {getMediaIcon(item.type)}
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ TEXT card with pink/purple gradient
+  if (item.type === 'TEXT') {
+    const textContent = item.mediaUrl || 'No content available';
+    const hasLongContent = textContent.length > 200;
+    
+    return (
+      <div className="w-full h-full bg-gradient-to-br from-pink-500 via-purple-500 to-violet-600 p-4 flex flex-col overflow-hidden relative">
+        {/* Animated gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-purple-600/20 via-pink-500/20 to-violet-600/20 animate-pulse pointer-events-none"></div>
+        
+        {/* Content */}
+        <div className="relative z-10 flex flex-col h-full">
+          <div className="flex items-center gap-2 mb-3">
+            <FileText className="text-white" size={20} />
+            <span className="text-white text-xs font-bold tracking-wide">TEXT MESSAGE</span>
+          </div>
+          
+          <div className="flex-1 overflow-hidden">
+            <div className="text-white text-sm leading-relaxed line-clamp-6 font-medium">
+              {textContent}
+            </div>
+          </div>
+          
+          {/* ✅ "Click to read more" indicator with pulsing animation */}
+          {hasLongContent && (
+            <div className="mt-auto pt-3 border-t border-white/30">
+              <div className="flex items-center gap-2 sm:gap-3">
+                {/* Eye icon with animated pulsing waves */}
+                <div className="relative flex-shrink-0">
+                  {/* Animated pulsing waves */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-white/10 animate-ping"></div>
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center animation-delay-150">
+                    <div className="w-8 h-8 rounded-full bg-white/20 animate-ping"></div>
                   </div>
                   
-                  {/* Text only - no wave bars */}
-                  <span className="text-white text-xs sm:text-sm font-bold">Click to read full text</span>
+                  {/* Eye icon */}
+                  <div className="relative z-10 w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/30">
+                    <Eye className="w-4 h-4 text-white" />
+                  </div>
                 </div>
+                
+                {/* Text only - no wave bars */}
+                <span className="text-white text-xs sm:text-sm font-bold">Click to read full text</span>
               </div>
-            )}
+            </div>
+          )}
+        </div>
+        
+        {/* Bottom gradient fade */}
+        <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-purple-900/50 to-transparent pointer-events-none"></div>
+      </div>
+    );
+  }
+
+  // ✅ AUDIO card with mic icon and waves
+  if (item.type === 'AUDIO') {
+    return (
+      <div className="w-full h-full bg-gradient-to-br from-pink-500 via-purple-500 to-violet-600 p-4 flex flex-col items-center justify-center overflow-hidden relative">
+        {/* Animated background effect */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-purple-600/30 via-pink-500/30 to-violet-600/30 animate-pulse pointer-events-none"></div>
+        
+        {/* Content */}
+        <div className="relative z-10 flex flex-col items-center text-center h-full justify-center space-y-4">
+          {/* Header message */}
+          <div className="px-3 py-1.5 bg-white/20 backdrop-blur-sm rounded-full">
+            <p className="text-white text-xs font-bold tracking-wide">
+              🎉 GREAT NEWS!
+            </p>
           </div>
           
-          {/* Bottom gradient fade */}
-          <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-purple-900/50 to-transparent pointer-events-none"></div>
+          <p className="text-white text-sm font-semibold px-2">
+            Here is a new audio message for you
+          </p>
+          
+          {/* Mic icon with animated waves */}
+          <div className="relative my-4">
+            {/* Animated sound waves */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-20 h-20 rounded-full bg-white/10 animate-ping"></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center animation-delay-150">
+              <div className="w-16 h-16 rounded-full bg-white/20 animate-ping"></div>
+            </div>
+            
+            {/* Mic icon */}
+            <div className="relative z-10 w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
+              <Mic className="text-purple-600" size={32} />
+            </div>
+          </div>
+          
+          {/* Visual sound waves */}
+          <div className="flex items-center gap-1 justify-center">
+            <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '8px', animationDelay: '0ms' }}></div>
+            <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '16px', animationDelay: '150ms' }}></div>
+            <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '24px', animationDelay: '300ms' }}></div>
+            <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '16px', animationDelay: '450ms' }}></div>
+            <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '8px', animationDelay: '600ms' }}></div>
+          </div>
+          
+          {/* Call to action */}
+          <div className="mt-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-lg border border-white/30">
+            <div className="flex items-center gap-2 text-white text-xs font-bold">
+              <Play className="w-4 h-4" />
+              <span>Click here to hear</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ EMBED card with PROPER CATEGORIZATION
+  if (item.type === 'EMBED') {
+    const platformType = item.buttonText || 'External';
+    
+    // ✅ CATEGORIZE EMBED TYPE
+    const isVideoEmbed = platformType.includes('YouTube') || platformType.includes('Vimeo');
+    const isAudioEmbed = platformType.includes('SoundCloud') || platformType.includes('Spotify');
+    const isDocumentEmbed = platformType.includes('Google Docs') || 
+                            platformType.includes('Google Sheets') || 
+                            platformType.includes('Google Drive') || 
+                            platformType.includes('Google Slides');
+    
+    // ✅ VIDEO EMBEDS (YouTube, Vimeo) - Same as VIDEO card
+    if (isVideoEmbed) {
+      return (
+        <div className="relative w-full h-full">
+          {/* Black gradient background */}
+          <div className="w-full h-full bg-gradient-to-br from-gray-900 via-gray-800 to-black"></div>
+          
+          {/* Overlay with play icon */}
+          <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+            <div className="relative">
+              {/* Animated pulsing rings */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-20 h-20 rounded-full bg-white/10 animate-ping"></div>
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center animation-delay-150">
+                <div className="w-16 h-16 rounded-full bg-white/20 animate-ping"></div>
+              </div>
+              
+              {/* Play icon */}
+              <div className="relative z-10 w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
+                <Play className="text-gray-900 ml-1" size={32} />
+              </div>
+            </div>
+          </div>
+          
+          {/* Platform badge */}
+          <div className="absolute top-4 left-4">
+            <div className="px-3 py-1.5 bg-white/20 backdrop-blur-sm rounded-full border border-white/30">
+              <p className="text-white text-xs font-bold tracking-wide">
+                🎬 {platformType.toUpperCase()}
+              </p>
+            </div>
+          </div>
+          
+          {/* Bottom info */}
+          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
+            <div className="flex items-center gap-2">
+              <Eye className="w-4 h-4 text-white" />
+              <span className="text-white text-xs sm:text-sm font-bold">Click to watch video</span>
+            </div>
+          </div>
         </div>
       );
     }
-
-    // ✅ AUDIO card with custom design
-    if (item.type === 'AUDIO') {
+    
+    // ✅ AUDIO EMBEDS (SoundCloud, Spotify) - Same as AUDIO card
+    if (isAudioEmbed) {
       return (
         <div className="w-full h-full bg-gradient-to-br from-pink-500 via-purple-500 to-violet-600 p-4 flex flex-col items-center justify-center overflow-hidden relative">
           {/* Animated background effect */}
@@ -602,7 +717,7 @@ const PublicCampaignViewer = () => {
             </div>
             
             <p className="text-white text-sm font-semibold px-2">
-              Here is a new audio message for you
+              Here is a new audio track for you
             </p>
             
             {/* Mic icon with animated waves */}
@@ -615,9 +730,9 @@ const PublicCampaignViewer = () => {
                 <div className="w-16 h-16 rounded-full bg-white/20 animate-ping"></div>
               </div>
               
-              {/* Mic icon */}
+              {/* Music icon */}
               <div className="relative z-10 w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
-                <Mic className="text-purple-600" size={32} />
+                <Music className="text-purple-600" size={32} />
               </div>
             </div>
             
@@ -630,88 +745,145 @@ const PublicCampaignViewer = () => {
               <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '8px', animationDelay: '600ms' }}></div>
             </div>
             
+            {/* Platform badge */}
+            <div className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-lg border border-white/30">
+              <p className="text-white text-xs font-bold">
+                🎵 {platformType.toUpperCase()}
+              </p>
+            </div>
+            
             {/* Call to action */}
             <div className="mt-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-lg border border-white/30">
               <div className="flex items-center gap-2 text-white text-xs font-bold">
                 <Play className="w-4 h-4" />
-                <span>Click here to hear</span>
+                <span>Click here to listen</span>
               </div>
             </div>
           </div>
         </div>
       );
     }
-
-    // ✅ EMBED card with video/link design
-    if (item.type === 'EMBED') {
-      // Detect embed type from buttonText (which stores the platform type)
-      const platformType = item.buttonText || 'External';
-      const platformIcon = platformType.includes('YouTube') || platformType.includes('Vimeo') ? '🎬' : 
-                          platformType.includes('SoundCloud') || platformType.includes('Spotify') ? '🎵' :
-                          platformType.includes('Google') ? '📄' : '🔗';
-      
+    
+    // ✅ DOCUMENT EMBEDS (Google Docs, Sheets, Drive, Slides) - Same as TEXT card
+    if (isDocumentEmbed) {
       return (
-        <div className="w-full h-full bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 p-4 flex flex-col items-center justify-center overflow-hidden relative">
-          {/* Animated background */}
-          <div className="absolute inset-0 bg-gradient-to-tr from-indigo-600/30 via-blue-500/30 to-purple-600/30 animate-pulse pointer-events-none"></div>
+        <div className="w-full h-full bg-gradient-to-br from-pink-500 via-purple-500 to-violet-600 p-4 flex flex-col overflow-hidden relative">
+          {/* Animated gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-tr from-purple-600/20 via-pink-500/20 to-violet-600/20 animate-pulse pointer-events-none"></div>
           
           {/* Content */}
-          <div className="relative z-10 flex flex-col items-center text-center h-full justify-center space-y-4">
-            {/* Platform badge */}
-            <div className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full border border-white/30">
-              <p className="text-white text-xs font-bold tracking-wide">
-                {platformIcon} {platformType.toUpperCase()}
-              </p>
+          <div className="relative z-10 flex flex-col h-full">
+            <div className="flex items-center gap-2 mb-3">
+              <FileText className="text-white" size={20} />
+              <span className="text-white text-xs font-bold tracking-wide">
+                📄 {platformType.toUpperCase()}
+              </span>
             </div>
             
-            {/* Play icon with animated waves (same as audio) */}
-            <div className="relative my-2">
-              {/* Animated pulsing waves */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-20 h-20 rounded-full bg-white/10 animate-ping"></div>
-              </div>
-              <div className="absolute inset-0 flex items-center justify-center animation-delay-150">
-                <div className="w-16 h-16 rounded-full bg-white/20 animate-ping"></div>
-              </div>
-              
-              {/* Play icon */}
-              <div className="relative z-10 w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
-                <Play className="text-indigo-600" size={32} />
+            <div className="flex-1 overflow-hidden">
+              <div className="text-white text-sm leading-relaxed font-medium">
+                <p className="mb-2">Document available for viewing</p>
+                <p className="text-white/90 text-xs">
+                  Click to open and view this {platformType.toLowerCase()} document
+                </p>
               </div>
             </div>
             
-            {/* Visual wave bars (same as audio) */}
-            <div className="flex items-center gap-1 justify-center">
-              <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '8px', animationDelay: '0ms' }}></div>
-              <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '16px', animationDelay: '150ms' }}></div>
-              <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '24px', animationDelay: '300ms' }}></div>
-              <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '16px', animationDelay: '450ms' }}></div>
-              <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '8px', animationDelay: '600ms' }}></div>
-            </div>
-            
-            {/* Description */}
-            <p className="text-white text-sm font-semibold px-2">
-              Click to view embedded content
-            </p>
-            
-            {/* Call to action */}
-            <div className="mt-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-lg border border-white/30">
-              <div className="flex items-center gap-2 text-white text-xs font-bold">
-                <Eye className="w-4 h-4" />
-                <span>Click to view</span>
+            {/* ✅ "Click to view" indicator with pulsing animation */}
+            <div className="mt-auto pt-3 border-t border-white/30">
+              <div className="flex items-center gap-2 sm:gap-3">
+                {/* Eye icon with animated pulsing waves */}
+                <div className="relative flex-shrink-0">
+                  {/* Animated pulsing waves */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-white/10 animate-ping"></div>
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center animation-delay-150">
+                    <div className="w-8 h-8 rounded-full bg-white/20 animate-ping"></div>
+                  </div>
+                  
+                  {/* Eye icon */}
+                  <div className="relative z-10 w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/30">
+                    <Eye className="w-4 h-4 text-white" />
+                  </div>
+                </div>
+                
+                {/* Text */}
+                <span className="text-white text-xs sm:text-sm font-bold">Click to view document</span>
               </div>
             </div>
           </div>
+          
+          {/* Bottom gradient fade */}
+          <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-purple-900/50 to-transparent pointer-events-none"></div>
         </div>
       );
     }
-
+    
+    // ✅ EXTERNAL/OTHER EMBEDS (Custom iFrame, External Links) - Blue card design
     return (
-      <div className="w-full h-full bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center">
-        {getMediaIcon(item.type)}
+      <div className="w-full h-full bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 p-4 flex flex-col items-center justify-center overflow-hidden relative">
+        {/* Animated background */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-indigo-600/30 via-blue-500/30 to-purple-600/30 animate-pulse pointer-events-none"></div>
+        
+        {/* Content */}
+        <div className="relative z-10 flex flex-col items-center text-center h-full justify-center space-y-4">
+          {/* Platform badge */}
+          <div className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full border border-white/30">
+            <p className="text-white text-xs font-bold tracking-wide">
+              🔗 {platformType.toUpperCase()}
+            </p>
+          </div>
+          
+          {/* Link icon with animated waves */}
+          <div className="relative my-2">
+            {/* Animated pulsing waves */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-20 h-20 rounded-full bg-white/10 animate-ping"></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center animation-delay-150">
+              <div className="w-16 h-16 rounded-full bg-white/20 animate-ping"></div>
+            </div>
+            
+            {/* Link icon */}
+            <div className="relative z-10 w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
+              <ExternalLink className="text-indigo-600" size={32} />
+            </div>
+          </div>
+          
+          {/* Visual wave bars */}
+          <div className="flex items-center gap-1 justify-center">
+            <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '8px', animationDelay: '0ms' }}></div>
+            <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '16px', animationDelay: '150ms' }}></div>
+            <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '24px', animationDelay: '300ms' }}></div>
+            <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '16px', animationDelay: '450ms' }}></div>
+            <div className="w-1 bg-white rounded-full animate-pulse" style={{ height: '8px', animationDelay: '600ms' }}></div>
+          </div>
+          
+          {/* Description */}
+          <p className="text-white text-sm font-semibold px-2">
+            Click to view embedded content
+          </p>
+          
+          {/* Call to action */}
+          <div className="mt-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-lg border border-white/30">
+            <div className="flex items-center gap-2 text-white text-xs font-bold">
+              <Eye className="w-4 h-4" />
+              <span>Click to view</span>
+            </div>
+          </div>
+        </div>
       </div>
     );
-  };
+  }
+
+  // ✅ DEFAULT fallback
+  return (
+    <div className="w-full h-full bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center">
+      {getMediaIcon(item.type)}
+    </div>
+  );
+};
 
   const openItem = (item) => {
     // Preserve preview parameter when navigating to item
