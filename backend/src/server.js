@@ -25,6 +25,9 @@ const platformRoutes = require('./routes/platformIntegrationRoutes');
 // 🔍 DEBUG ROUTES
 const debugRoutes = require('./routes/debugRoutes');
 
+// 🎯 STRIPE WEBHOOK CONTROLLER
+const webhookController = require('./controllers/webhookController');
+
 dotenv.config();
 
 const app = express();
@@ -112,7 +115,23 @@ app.use(cors({
   credentials: true
 }));
 
-// Body parser middleware with increased limit for file uploads
+// ═══════════════════════════════════════════════
+// 🎯 STRIPE WEBHOOK ENDPOINT
+// ═══════════════════════════════════════════════
+// ⚠️ CRITICAL: This MUST come BEFORE express.json()
+// Stripe webhooks need the raw body to verify signatures
+
+app.post(
+  '/api/stripe/webhook',
+  express.raw({ type: 'application/json' }),
+  webhookController.handleStripeWebhook
+);
+
+// ═══════════════════════════════════════════════
+// 📦 BODY PARSER MIDDLEWARE
+// ═══════════════════════════════════════════════
+// ⚠️ This comes AFTER the webhook endpoint
+
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
@@ -144,7 +163,8 @@ app.get('/api/health', (req, res) => {
     },
     uptime: `${Math.floor(process.uptime())}s`,
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    webhookConfigured: !!process.env.STRIPE_WEBHOOK_SECRET
   });
 });
 
@@ -211,6 +231,10 @@ if (process.env.VERCEL) {
     console.log('🛡️ Protection Active:');
     console.log('  ✅ Database refresh (2h)');
     console.log('  ✅ Connection cleanup (3h)');
+    console.log('───────────────────────────────────────────────');
+    console.log('💳 Stripe Integration:');
+    console.log('  ✅ Webhook endpoint: /api/stripe/webhook');
+    console.log(`  ${process.env.STRIPE_WEBHOOK_SECRET ? '✅' : '❌'} Webhook secret configured`);
     console.log('───────────────────────────────────────────────');
     console.log('✨ Enterprise features enabled!');
     console.log('🛍️ Multi-platform e-commerce integration ready!');
