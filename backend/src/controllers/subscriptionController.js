@@ -14,32 +14,58 @@ const toggleAutoRenewal = async (req, res) => {
     const { autoRenewal } = req.body;
 
     console.log('🔄 Toggling auto-renewal:', autoRenewal ? 'ON' : 'OFF');
+    console.log('   User ID:', userId);
 
-    // Get user
+    // ✅ FIXED: Get user with ALL subscription fields including stripeCustomerId
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
         email: true,
+        stripeCustomerId: true,      // ✅ ADDED - Critical field!
         subscriptionId: true,
         subscriptionStatus: true,
+        priceId: true,
         currentPeriodEnd: true,
+        currentPeriodStart: true,
       }
     });
 
     if (!user) {
+      console.error('❌ User not found:', userId);
       return res.status(404).json({
         status: 'error',
         message: 'User not found'
       });
     }
 
-    if (!user.subscriptionId) {
+    // ✅ FIXED: Check BOTH stripeCustomerId AND subscriptionId
+    if (!user.stripeCustomerId || !user.subscriptionId) {
+      console.error('❌ Missing subscription data:');
+      console.error('   stripeCustomerId:', user.stripeCustomerId || 'MISSING');
+      console.error('   subscriptionId:', user.subscriptionId || 'MISSING');
+      
       return res.status(400).json({
         status: 'error',
-        message: 'No active subscription found'
+        message: 'No active subscription found. Please subscribe to a plan first.'
       });
     }
+
+    // ✅ FIXED: Check subscription status
+    if (user.subscriptionStatus === 'canceled' || user.subscriptionStatus === 'incomplete') {
+      console.error('❌ Invalid subscription status:', user.subscriptionStatus);
+      
+      return res.status(400).json({
+        status: 'error',
+        message: 'No active subscription found. Please subscribe to a plan first.'
+      });
+    }
+
+    console.log('✅ User subscription found:');
+    console.log('   Email:', user.email);
+    console.log('   Stripe Customer ID:', user.stripeCustomerId);
+    console.log('   Subscription ID:', user.subscriptionId);
+    console.log('   Status:', user.subscriptionStatus);
 
     // Update subscription in Stripe
     const subscription = await stripe.subscriptions.update(
@@ -50,6 +76,7 @@ const toggleAutoRenewal = async (req, res) => {
     );
 
     console.log('✅ Stripe subscription updated:', subscription.id);
+    console.log('   cancel_at_period_end:', subscription.cancel_at_period_end);
 
     // Update user in database
     const updatedUser = await prisma.user.update({
@@ -74,8 +101,8 @@ const toggleAutoRenewal = async (req, res) => {
     res.json({
       status: 'success',
       message: autoRenewal 
-        ? 'Auto-renewal enabled' 
-        : 'Auto-renewal disabled - subscription will end on ' + new Date(subscription.current_period_end * 1000).toLocaleDateString(),
+        ? 'Auto-renewal enabled. Your subscription will continue automatically.' 
+        : 'Auto-renewal disabled. Subscription will end on ' + new Date(subscription.current_period_end * 1000).toLocaleDateString(),
       user: {
         ...updatedUser,
         storageUsed: updatedUser.storageUsed.toString(),
@@ -86,6 +113,9 @@ const toggleAutoRenewal = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Toggle renewal error:', error);
+    console.error('   Error message:', error.message);
+    console.error('   Error type:', error.type);
+    
     res.status(500).json({
       status: 'error',
       message: error.message || 'Failed to toggle auto-renewal'
@@ -104,15 +134,16 @@ const cancelSubscription = async (req, res) => {
 
     console.log('🗑️ Canceling subscription with refund for user:', userId);
 
-    // Get user
+    // ✅ FIXED: Get user with ALL subscription fields including stripeCustomerId
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
         email: true,
+        name: true,
+        stripeCustomerId: true,      // ✅ ADDED - Critical field!
         subscriptionId: true,
         subscriptionStatus: true,
-        stripeCustomerId: true,
         currentPeriodStart: true,
         currentPeriodEnd: true,
         priceId: true,
@@ -120,18 +151,40 @@ const cancelSubscription = async (req, res) => {
     });
 
     if (!user) {
+      console.error('❌ User not found:', userId);
       return res.status(404).json({
         status: 'error',
         message: 'User not found'
       });
     }
 
-    if (!user.subscriptionId) {
+    // ✅ FIXED: Check BOTH stripeCustomerId AND subscriptionId
+    if (!user.stripeCustomerId || !user.subscriptionId) {
+      console.error('❌ Missing subscription data:');
+      console.error('   stripeCustomerId:', user.stripeCustomerId || 'MISSING');
+      console.error('   subscriptionId:', user.subscriptionId || 'MISSING');
+      
       return res.status(400).json({
         status: 'error',
-        message: 'No active subscription found'
+        message: 'No active subscription found. Please subscribe to a plan first.'
       });
     }
+
+    // ✅ FIXED: Check subscription status
+    if (user.subscriptionStatus === 'canceled' || user.subscriptionStatus === 'incomplete') {
+      console.error('❌ Invalid subscription status:', user.subscriptionStatus);
+      
+      return res.status(400).json({
+        status: 'error',
+        message: 'No active subscription found. Please subscribe to a plan first.'
+      });
+    }
+
+    console.log('✅ User subscription found:');
+    console.log('   Email:', user.email);
+    console.log('   Stripe Customer ID:', user.stripeCustomerId);
+    console.log('   Subscription ID:', user.subscriptionId);
+    console.log('   Status:', user.subscriptionStatus);
 
     // Get subscription details from Stripe
     const subscription = await stripe.subscriptions.retrieve(user.subscriptionId);
@@ -196,8 +249,9 @@ const cancelSubscription = async (req, res) => {
       where: { id: userId },
       data: {
         subscriptionStatus: 'canceled',
-        subscriptionId: null, // Clear subscription ID
-        priceId: null,
+        // Keep stripeCustomerId for reference
+        // Keep subscriptionId for reference (or set to null if preferred)
+        // Keep priceId for reference
         // Keep currentPeriodEnd for reference
       },
       select: {
@@ -214,18 +268,18 @@ const cancelSubscription = async (req, res) => {
 
     console.log('✅ User subscription canceled:', user.email);
 
-    // Send cancellation email (optional)
+    // Send cancellation email
     try {
       const emailService = require('../services/emailService');
-      // You can create a sendCancellationEmail function if needed
-      console.log('📧 Cancellation email would be sent to:', user.email);
+      await emailService.sendCancellationEmail(user.email, user.name);
+      console.log('📧 Cancellation email sent to:', user.email);
     } catch (emailError) {
-      console.log('⚠️ Email service not available');
+      console.error('❌ Failed to send cancellation email:', emailError.message);
     }
 
     res.json({
       status: 'success',
-      message: 'Subscription canceled successfully' + (refund ? ` and refund of $${(refundAmount / 100).toFixed(2)} has been processed` : ''),
+      message: 'Subscription canceled successfully' + (refund ? `. A refund of $${(refundAmount / 100).toFixed(2)} has been processed and will appear in your account within 5-10 business days.` : '.'),
       user: {
         ...updatedUser,
         storageUsed: updatedUser.storageUsed.toString(),
@@ -233,13 +287,16 @@ const cancelSubscription = async (req, res) => {
       },
       refund: refund ? {
         id: refund.id,
-        amount: refundAmount,
+        amount: refundAmount / 100,
         status: refund.status,
       } : null,
     });
 
   } catch (error) {
     console.error('❌ Cancel subscription error:', error);
+    console.error('   Error message:', error.message);
+    console.error('   Error type:', error.type);
+    
     res.status(500).json({
       status: 'error',
       message: error.message || 'Failed to cancel subscription'
