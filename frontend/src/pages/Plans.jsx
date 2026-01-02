@@ -16,28 +16,29 @@ const Plans = () => {
     {
       id: 'INDIVIDUAL',
       name: 'Individual',
-      price: '$85',
+      price: '$85',              // ✅ UPDATED from $60
       period: 'one-time',
-      storage: '250GB',
+      storage: '250GB',          // ✅ UPDATED from 2GB
       features: [
         'Upload images, videos, audio',
         'QR code generation',
         'View tracking & analytics',
-        '250GB storage',
+        '250GB storage',         // ✅ UPDATED from 2GB
         'Unlimited views',
+        'Lifetime access',       // ✅ ADDED to clarify
       ],
     },
     {
       id: 'ORG_SMALL',
       name: 'Small Organization',
-      price: '$35',
+      price: '$35',              // ✅ UPDATED from $15
       period: 'per month',
-      storage: '250GB',
+      storage: '250GB',          // ✅ UPDATED from 10GB
       features: [
         'Everything in Individual',
         'Team management (up to 5 users)',
         'Campaign creation',
-        '250GB storage',
+        '250GB storage',         // ✅ UPDATED from 10GB
         'Advanced analytics',
         'Priority support',
       ],
@@ -46,14 +47,14 @@ const Plans = () => {
     {
       id: 'ORG_MEDIUM',
       name: 'Medium Organization',
-      price: '$60',
+      price: '$60',              // ✅ UPDATED from $35
       period: 'per month',
-      storage: '500GB',
+      storage: '500GB',          // ✅ UPDATED from 30GB
       features: [
         'Everything in Small Org',
         'Team management (up to 20 users)',
         'Custom branding',
-        '500GB storage',
+        '500GB storage',         // ✅ UPDATED from 30GB
         'Export reports (CSV/PDF)',
         'Dedicated support',
       ],
@@ -63,11 +64,11 @@ const Plans = () => {
   // Storage options for Enterprise
   const storageOptions = [
     { value: 100, label: '100 GB', price: 0 },
-    { value: 250, label: '250 GB', price: 35 },
-    { value: 500, label: '500 GB', price: 60 },
-    { value: 1500, label: '1.5 TB', price: 99 },
-    { value: 2000, label: '2 TB', price: 160 },
-    { value: 5000, label: '5 TB', price: 360 },
+    { value: 250, label: '250 GB', price: 37 },
+    { value: 500, label: '500 GB', price: 100 },
+    { value: 1000, label: '1 TB', price: 225 },
+    { value: 2000, label: '2 TB', price: 475 },
+    { value: 5000, label: '5 TB', price: 1225 },
   ];
 
   // Team member options for Enterprise
@@ -82,7 +83,7 @@ const Plans = () => {
 
   // Calculate Enterprise price
   const calculateEnterprisePrice = () => {
-    let basePrice = 199;
+    let basePrice = 99;          // ✅ UPDATED from 199
     
     const storageOption = storageOptions.find(opt => opt.value === enterpriseStorage);
     if (storageOption) {
@@ -205,18 +206,18 @@ const Plans = () => {
           >
             {plan.popular && (
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                <span className="gradient-btn text-white px-4 py-1 rounded-full text-sm font-semibold">
-                  MOST POPULAR
+                <span className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-2 rounded-full text-sm font-bold shadow-lg">
+                  🔥 Most Popular
                 </span>
               </div>
             )}
 
             <div className="text-center mb-6">
-              <h3 className="text-2xl font-bold text-primary mb-2">
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
                 {plan.name}
               </h3>
-              <div className="mb-4">
-                <span className="text-5xl font-bold text-gray-900">
+              <div className="mb-2">
+                <span className="text-5xl font-bold text-primary">
                   {plan.price}
                 </span>
                 <span className="text-secondary ml-2">
