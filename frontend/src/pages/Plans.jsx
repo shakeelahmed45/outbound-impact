@@ -9,7 +9,7 @@ const Plans = () => {
   const [selectedPlan, setSelectedPlan] = useState('');
   
   // Enterprise customization state
-  const [enterpriseStorage, setEnterpriseStorage] = useState(100);
+  const [enterpriseStorage, setEnterpriseStorage] = useState(1500);  // ✅ Default: 1500GB
   const [enterpriseTeamMembers, setEnterpriseTeamMembers] = useState(50);
 
   const plans = [
@@ -63,12 +63,11 @@ const Plans = () => {
 
   // Storage options for Enterprise
   const storageOptions = [
-    { value: 100, label: '100 GB', price: 0 },
-    { value: 250, label: '250 GB', price: 37 },
-    { value: 500, label: '500 GB', price: 100 },
-    { value: 1000, label: '1 TB', price: 225 },
-    { value: 2000, label: '2 TB', price: 475 },
-    { value: 5000, label: '5 TB', price: 1225 },
+    { value: 1500, label: '1.5 TB', price: 0 },      // ✅ Base: 1500GB for $99
+    { value: 2000, label: '2 TB', price: 50 },
+    { value: 3000, label: '3 TB', price: 150 },
+    { value: 5000, label: '5 TB', price: 350 },
+    { value: 10000, label: '10 TB', price: 850 },
   ];
 
   // Team member options for Enterprise

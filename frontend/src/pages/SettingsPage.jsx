@@ -224,6 +224,12 @@ const SettingsPage = () => {
 
   // ✅ NEW: Toggle auto-renewal
   const handleToggleAutoRenewal = async () => {
+    // ⚠️ Check if user has a subscription
+    if (!effectiveUser?.subscriptionId) {
+      showToast('No active subscription found. Please subscribe to a plan first.', 'error');
+      return;
+    }
+    
     const newState = !autoRenewal;
     
     const confirmed = window.confirm(
@@ -261,6 +267,12 @@ const SettingsPage = () => {
 
   // ✅ NEW: Cancel subscription with refund
   const handleCancelSubscription = async () => {
+    // ⚠️ Check if user has a subscription
+    if (!effectiveUser?.subscriptionId) {
+      showToast('No active subscription found. Please subscribe to a plan first.', 'error');
+      return;
+    }
+    
     const confirmed = window.confirm(
       '⚠️ Cancel Subscription?\n\n' +
       'Your subscription will be canceled immediately and you will receive a prorated refund for the unused time.\n\n' +
@@ -673,7 +685,8 @@ const SettingsPage = () => {
             </div>
 
             {/* ✅ AUTO-RENEWAL TOGGLE */}
-            {!userIsTeamMember && effectiveUser?.subscriptionId && effectiveRole !== 'INDIVIDUAL' && (
+            {/* ⚠️ TESTING VERSION: Shows even without subscriptionId */}
+            {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border-2 border-blue-200 shadow-lg">
                 <div className="flex items-center justify-between">
                   <div>
@@ -775,7 +788,8 @@ const SettingsPage = () => {
             </div>
 
             {/* ✅ CANCEL SUBSCRIPTION BUTTON (WORKING NOW!) */}
-            {!userIsTeamMember && effectiveUser?.subscriptionId && effectiveRole !== 'INDIVIDUAL' && (
+            {/* ⚠️ TESTING VERSION: Shows even without subscriptionId */}
+            {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <button
                   onClick={handleCancelSubscription}
