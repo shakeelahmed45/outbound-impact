@@ -22,6 +22,9 @@ const whiteLabelRoutes = require('./routes/whiteLabelRoutes');
 const integrationsRoutes = require('./routes/integrationsRoutes');
 const platformRoutes = require('./routes/platformIntegrationRoutes');
 
+// 💳 Subscription management routes
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
+
 // 🔍 DEBUG ROUTES
 const debugRoutes = require('./routes/debugRoutes');
 
@@ -190,6 +193,9 @@ app.use('/api/white-label', whiteLabelRoutes);
 app.use('/api/integrations', integrationsRoutes);
 app.use('/api/platforms', platformRoutes);
 
+// 💳 Subscription management routes
+app.use('/api/subscription', subscriptionRoutes);
+
 // 🔍 DEBUG ROUTES
 app.use('/api/debug', debugRoutes);
 
@@ -237,6 +243,7 @@ if (process.env.VERCEL) {
     console.log(`  ${process.env.STRIPE_WEBHOOK_SECRET ? '✅' : '❌'} Webhook secret configured`);
     console.log('───────────────────────────────────────────────');
     console.log('✨ Enterprise features enabled!');
+    console.log('💳 Subscription management enabled!');
     console.log('🛍️ Multi-platform e-commerce integration ready!');
     console.log('🔍 Debug routes active at /api/debug');
     console.log('═══════════════════════════════════════════════\n');

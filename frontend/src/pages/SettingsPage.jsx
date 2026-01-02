@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, CreditCard, Shield, LogOut, Upload, Trash2, MessageSquare, MessagesSquare, BookOpen, TrendingUp, UserCheck, Mail, Check, AlertTriangle } from 'lucide-react';
+import { User, CreditCard, Shield, LogOut, Upload, Trash2, MessageSquare, MessagesSquare, BookOpen, TrendingUp, UserCheck, Mail, Check, AlertTriangle, ToggleLeft, ToggleRight } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import Tooltip from '../components/common/Tooltip';
 import useAuthStore from '../store/authStore';
@@ -18,7 +18,7 @@ const SettingsPage = () => {
   const userIsTeamMember = user?.isTeamMember === true;
   const effectiveRole = effectiveUser?.role;
 
-  const [activeTab, setActiveTab] = useState(null); // Start with nothing open
+  const [activeTab, setActiveTab] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [profileData, setProfileData] = useState({
@@ -26,6 +26,11 @@ const SettingsPage = () => {
     email: user?.email || '',
   });
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  
+  // ✅ NEW: Auto-renewal state
+  const [autoRenewal, setAutoRenewal] = useState(true);
+  const [togglingRenewal, setTogglingRenewal] = useState(false);
+  const [cancelingSubscription, setCancelingSubscription] = useState(false);
   
   // Email change states
   const [showEmailChange, setShowEmailChange] = useState(false);
@@ -44,7 +49,12 @@ const SettingsPage = () => {
 
   useEffect(() => {
     document.title = 'Settings | Outbound Impact';
-  }, []);
+    
+    // ✅ Check if subscription has cancel_at_period_end set
+    if (effectiveUser?.subscriptionStatus === 'canceling') {
+      setAutoRenewal(false);
+    }
+  }, [effectiveUser]);
 
   const handleLogout = () => {
     logout();
@@ -125,7 +135,6 @@ const SettingsPage = () => {
     e.preventDefault();
     setPasswordError('');
     
-    // Validation
     if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
       setPasswordError('All fields are required');
       return;
@@ -210,6 +219,93 @@ const SettingsPage = () => {
       showToast('Failed to upload photo', 'error');
     } finally {
       setUploadingPhoto(false);
+    }
+  };
+
+  // ✅ NEW: Toggle auto-renewal
+  const handleToggleAutoRenewal = async () => {
+    const newState = !autoRenewal;
+    
+    const confirmed = window.confirm(
+      newState 
+        ? 'Enable auto-renewal? Your subscription will automatically renew at the end of the current period.'
+        : 'Disable auto-renewal? Your subscription will be canceled at the end of the current billing period. You will still have access until then.'
+    );
+
+    if (!confirmed) return;
+
+    setTogglingRenewal(true);
+
+    try {
+      const response = await api.post('/subscription/toggle-renewal', {
+        autoRenewal: newState
+      });
+
+      if (response.data.status === 'success') {
+        setAutoRenewal(newState);
+        setUser(response.data.user);
+        showToast(
+          newState 
+            ? 'Auto-renewal enabled! Your subscription will renew automatically.'
+            : 'Auto-renewal disabled. Your subscription will end on ' + new Date(response.data.currentPeriodEnd).toLocaleDateString(),
+          'success'
+        );
+      }
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || 'Failed to toggle auto-renewal';
+      showToast(errorMessage, 'error');
+    } finally {
+      setTogglingRenewal(false);
+    }
+  };
+
+  // ✅ NEW: Cancel subscription with refund
+  const handleCancelSubscription = async () => {
+    const confirmed = window.confirm(
+      '⚠️ Cancel Subscription?\n\n' +
+      'Your subscription will be canceled immediately and you will receive a prorated refund for the unused time.\n\n' +
+      'You will lose access to:\n' +
+      '• All uploaded content\n' +
+      '• Team collaboration features\n' +
+      '• Analytics and tracking\n' +
+      '• QR code generation\n\n' +
+      'This action cannot be undone. Are you sure?'
+    );
+
+    if (!confirmed) return;
+
+    const doubleConfirm = window.prompt(
+      'Type "CANCEL" to confirm subscription cancellation and refund:'
+    );
+
+    if (doubleConfirm !== 'CANCEL') {
+      showToast('Cancellation cancelled', 'warning');
+      return;
+    }
+
+    setCancelingSubscription(true);
+
+    try {
+      const response = await api.post('/subscription/cancel');
+
+      if (response.data.status === 'success') {
+        showToast(
+          `Subscription canceled! ${response.data.refund ? 'Refund of $' + (response.data.refund.amount / 100).toFixed(2) + ' has been processed.' : ''}`,
+          'success'
+        );
+        
+        setUser(response.data.user);
+        
+        // Redirect to plans page after 3 seconds
+        setTimeout(() => {
+          navigate('/plans');
+        }, 3000);
+      }
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || 'Failed to cancel subscription';
+      showToast(errorMessage, 'error');
+    } finally {
+      setCancelingSubscription(false);
     }
   };
 
@@ -313,7 +409,6 @@ const SettingsPage = () => {
     },
   ];
 
-  // Add Security tab if not a team member
   if (!userIsTeamMember) {
     menuItems.push({
       id: 'security',
@@ -499,6 +594,9 @@ const SettingsPage = () => {
     }
 
     if (activeTab === 'subscription') {
+      // ✅ Check if subscription will end (auto-renewal OFF or already canceled)
+      const subscriptionEnding = !autoRenewal || effectiveUser?.subscriptionStatus === 'canceling';
+      
       return (
         <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 border border-gray-100">
           <div className="flex items-center gap-3 mb-6">
@@ -530,6 +628,30 @@ const SettingsPage = () => {
             </div>
           )}
 
+          {/* ✅ WARNING: Subscription Ending */}
+          {subscriptionEnding && effectiveUser?.currentPeriodEnd && (
+            <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-400 rounded-2xl p-6 mb-6 shadow-lg">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="text-yellow-600 flex-shrink-0 mt-1" size={24} />
+                <div>
+                  <h4 className="font-bold text-yellow-900 mb-2">Subscription Ending</h4>
+                  <p className="text-yellow-800 mb-3">
+                    Your subscription will end on <strong>{new Date(effectiveUser.currentPeriodEnd).toLocaleDateString()}</strong>. 
+                    You will lose access to all features after this date.
+                  </p>
+                  <button
+                    onClick={handleToggleAutoRenewal}
+                    disabled={togglingRenewal}
+                    className="px-4 py-2 bg-yellow-600 text-white rounded-lg font-semibold hover:bg-yellow-700 transition-all flex items-center gap-2"
+                  >
+                    <ToggleRight size={18} />
+                    {togglingRenewal ? 'Processing...' : 'Reactivate Subscription'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-2xl border border-purple-200">
@@ -543,12 +665,57 @@ const SettingsPage = () => {
               </div>
               <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-2xl border border-green-200">
                 <p className="text-sm text-gray-600 mb-2">Status</p>
-                <span className="px-4 py-2 bg-green-500 text-white rounded-full font-semibold inline-flex items-center gap-2 shadow-lg">
+                <span className={`px-4 py-2 ${subscriptionEnding ? 'bg-yellow-500' : 'bg-green-500'} text-white rounded-full font-semibold inline-flex items-center gap-2 shadow-lg`}>
                   <Check size={18} />
-                  Active
+                  {subscriptionEnding ? 'Ending Soon' : 'Active'}
                 </span>
               </div>
             </div>
+
+            {/* ✅ AUTO-RENEWAL TOGGLE */}
+            {!userIsTeamMember && effectiveUser?.subscriptionId && effectiveRole !== 'INDIVIDUAL' && (
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border-2 border-blue-200 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-gray-800 mb-1 flex items-center gap-2">
+                      Auto-Renewal
+                      <Tooltip content="Automatically renew your subscription at the end of each billing period" />
+                    </h4>
+                    <p className="text-sm text-gray-600">
+                      {autoRenewal 
+                        ? 'Your subscription will automatically renew' 
+                        : 'Your subscription will end on ' + (effectiveUser?.currentPeriodEnd ? new Date(effectiveUser.currentPeriodEnd).toLocaleDateString() : 'period end')
+                      }
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleToggleAutoRenewal}
+                    disabled={togglingRenewal}
+                    className={`
+                      relative w-16 h-8 rounded-full transition-all duration-300 flex items-center
+                      ${autoRenewal ? 'bg-green-500' : 'bg-gray-300'}
+                      ${togglingRenewal ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-lg'}
+                    `}
+                  >
+                    <div className={`
+                      absolute w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300
+                      ${autoRenewal ? 'right-1' : 'left-1'}
+                    `}>
+                      {togglingRenewal && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                        </div>
+                      )}
+                    </div>
+                    {autoRenewal ? (
+                      <ToggleRight className="absolute right-1 text-white" size={16} />
+                    ) : (
+                      <ToggleLeft className="absolute left-1 text-gray-500" size={16} />
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="border-t-2 border-gray-200 pt-6">
               <p className="text-sm text-gray-600 mb-3 flex items-center gap-1">
@@ -607,13 +774,25 @@ const SettingsPage = () => {
               </ul>
             </div>
 
-            {!userIsTeamMember && (
+            {/* ✅ CANCEL SUBSCRIPTION BUTTON (WORKING NOW!) */}
+            {!userIsTeamMember && effectiveUser?.subscriptionId && effectiveRole !== 'INDIVIDUAL' && (
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <button
-                  onClick={() => showToast('Contact support to cancel your subscription.', 'warning')}
-                  className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-all"
+                  onClick={handleCancelSubscription}
+                  disabled={cancelingSubscription}
+                  className="px-6 py-3 border-2 border-red-500 text-red-600 rounded-xl font-semibold hover:bg-red-50 transition-all flex items-center gap-2 justify-center disabled:opacity-50"
                 >
-                  Cancel Subscription
+                  {cancelingSubscription ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-red-600"></div>
+                      Canceling...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={18} />
+                      Cancel Subscription & Get Refund
+                    </>
+                  )}
                 </button>
               </div>
             )}
