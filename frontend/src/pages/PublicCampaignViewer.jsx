@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Calendar, Folder, Play, FileText, Music, Image as ImageIcon, Eye, Mic, ArrowLeft, Share2, Copy, Check, X, Lock, Loader2, Key, Shield } from 'lucide-react';
+import { Calendar, Folder, Play, FileText, Music, Image as ImageIcon, Eye, Mic, ArrowLeft, Share2, Copy, Check, X, Lock, Loader2, Key, Shield, ExternalLink, Link } from 'lucide-react';
 import axios from 'axios';
 import {
   copyToClipboard,
@@ -643,7 +643,7 @@ const PublicCampaignViewer = () => {
     );
   }
 
-  // ✅ EMBED card with PROPER CATEGORIZATION
+  // ✅ EMBED card with PROPER CATEGORIZATION - ALL USING OFFICIAL GRADIENT COLORS
   if (item.type === 'EMBED') {
     const platformType = item.buttonText || 'External';
     
@@ -655,15 +655,15 @@ const PublicCampaignViewer = () => {
                             platformType.includes('Google Drive') || 
                             platformType.includes('Google Slides');
     
-    // ✅ VIDEO EMBEDS (YouTube, Vimeo) - Same as VIDEO card
+    // ✅ VIDEO EMBEDS (YouTube, Vimeo) - OFFICIAL GRADIENT COLORS
     if (isVideoEmbed) {
       return (
         <div className="relative w-full h-full">
-          {/* Black gradient background */}
-          <div className="w-full h-full bg-gradient-to-br from-gray-900 via-gray-800 to-black"></div>
+          {/* ✅ CHANGED: Official purple/violet gradient background */}
+          <div className="w-full h-full bg-gradient-to-br from-purple-600 via-violet-600 to-indigo-700"></div>
           
           {/* Overlay with play icon */}
-          <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
             <div className="relative">
               {/* Animated pulsing rings */}
               <div className="absolute inset-0 flex items-center justify-center">
@@ -675,7 +675,7 @@ const PublicCampaignViewer = () => {
               
               {/* Play icon */}
               <div className="relative z-10 w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
-                <Play className="text-gray-900 ml-1" size={32} />
+                <Play className="text-purple-600 ml-1" size={32} />
               </div>
             </div>
           </div>
@@ -690,7 +690,7 @@ const PublicCampaignViewer = () => {
           </div>
           
           {/* Bottom info */}
-          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
+          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-purple-900/80 to-transparent">
             <div className="flex items-center gap-2">
               <Eye className="w-4 h-4 text-white" />
               <span className="text-white text-xs sm:text-sm font-bold">Click to watch video</span>
