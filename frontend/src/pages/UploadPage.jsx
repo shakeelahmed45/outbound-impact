@@ -1837,8 +1837,3 @@ const ProtectedUploadPage = () => (
 );
 
 export default ProtectedUploadPage;
-
-// ═══════════════════════════════════════════════════════════════
-// ✅ END OF UPLOADPAGE.JSX - FILE COMPLETE!
-// All syntax errors fixed - ready to use!
-// ═══════════════════════════════════════════════════════════════
