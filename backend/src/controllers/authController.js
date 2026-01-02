@@ -104,17 +104,17 @@ const createCheckout = async (req, res) => {
       case 'INDIVIDUAL':
         priceId = process.env.STRIPE_INDIVIDUAL_PRICE;
         role = 'INDIVIDUAL';
-        storageLimit = 2 * 1024 * 1024 * 1024;
+        storageLimit = 250 * 1024 * 1024 * 1024;
         break;
       case 'ORG_SMALL':
         priceId = process.env.STRIPE_SMALL_ORG_PRICE;
         role = 'ORG_SMALL';
-        storageLimit = 10 * 1024 * 1024 * 1024;
+        storageLimit = 250 * 1024 * 1024 * 1024;
         break;
       case 'ORG_MEDIUM':
         priceId = process.env.STRIPE_MEDIUM_ORG_PRICE;
         role = 'ORG_MEDIUM';
-        storageLimit = 30 * 1024 * 1024 * 1024;
+        storageLimit = 500 * 1024 * 1024 * 1024;
         break;
       case 'ORG_ENTERPRISE':
         priceId = process.env.STRIPE_ENTERPRISE_PRICE;
@@ -122,7 +122,7 @@ const createCheckout = async (req, res) => {
         if (enterpriseConfig && enterpriseConfig.storageGB) {
           storageLimit = enterpriseConfig.storageGB * 1024 * 1024 * 1024;
         } else {
-          storageLimit = 100 * 1024 * 1024 * 1024;
+          storageLimit = 1500 * 1024 * 1024 * 1024;
         }
         break;
       default:
@@ -574,15 +574,15 @@ const handleUpgradePlan = async (req, res) => {
     switch (newPlan) {
       case 'ORG_SMALL':
         newPriceId = process.env.STRIPE_SMALL_ORG_PRICE;
-        newStorageLimit = 10 * 1024 * 1024 * 1024;
+        newStorageLimit = 250 * 1024 * 1024 * 1024;
         break;
       case 'ORG_MEDIUM':
         newPriceId = process.env.STRIPE_MEDIUM_ORG_PRICE;
-        newStorageLimit = 30 * 1024 * 1024 * 1024;
+        newStorageLimit = 500 * 1024 * 1024 * 1024;
         break;
       case 'ORG_ENTERPRISE':
         newPriceId = process.env.STRIPE_ENTERPRISE_PRICE;
-        newStorageLimit = 100 * 1024 * 1024 * 1024;
+        newStorageLimit = 1500 * 1024 * 1024 * 1024;
         break;
       default:
         return res.status(400).json({
