@@ -159,7 +159,6 @@ const handleCheckoutCompleted = async (session) => {
       updateData.subscriptionId = subscriptionId;
       updateData.subscriptionStatus = subscription.status;
       updateData.priceId = priceId;
-      // Note: subscriptionPlan is not in schema - determine from priceId in frontend
       updateData.currentPeriodStart = new Date(subscription.current_period_start * 1000);
       updateData.currentPeriodEnd = new Date(subscription.current_period_end * 1000);
     }
@@ -235,16 +234,24 @@ const handleSubscriptionCreated = async (subscription) => {
     
     const planName = priceIdMap[priceId] || 'Individual';
 
+    // ✅ FIXED: Build update data with validated dates
+    const updateData = {
+      subscriptionId: subscription.id,
+      subscriptionStatus: subscription.status,
+      priceId: priceId,
+    };
+
+    if (subscription.current_period_start && typeof subscription.current_period_start === 'number') {
+      updateData.currentPeriodStart = new Date(subscription.current_period_start * 1000);
+    }
+
+    if (subscription.current_period_end && typeof subscription.current_period_end === 'number') {
+      updateData.currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+    }
+
     await prisma.user.update({
       where: { id: user.id },
-      data: {
-        subscriptionId: subscription.id,
-        subscriptionStatus: subscription.status,
-        priceId: priceId,
-        // Note: subscriptionPlan not in schema - determine from priceId
-        currentPeriodStart: new Date(subscription.current_period_start * 1000),
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-      }
+      data: updateData
     });
 
     console.log('✅ Subscription created for user:', user.email);
@@ -254,9 +261,9 @@ const handleSubscriptionCreated = async (subscription) => {
 };
 
 /**
- * Handle customer.subscription.updated
- * Called when subscription is modified (upgrade, downgrade, renewal)
- * THIS IS CRITICAL FOR MONTHLY RENEWALS!
+ * ✅ FIXED: Handle customer.subscription.updated
+ * Called when subscription is modified (upgrade, downgrade, renewal, cancel_at_period_end toggle)
+ * THIS IS CRITICAL FOR MONTHLY RENEWALS AND TOGGLE FEATURE!
  */
 const handleSubscriptionUpdated = async (subscription) => {
   console.log('🔄 Processing subscription.updated:', subscription.id);
@@ -284,14 +291,22 @@ const handleSubscriptionUpdated = async (subscription) => {
     
     const planName = priceIdMap[priceId] || 'Individual';
 
-    // Update subscription details
+    // ✅ FIXED: Build update data with only valid fields
     const updateData = {
       subscriptionStatus: subscription.status,
       priceId: priceId,
-      // Note: subscriptionPlan not in schema - determine from priceId
-      currentPeriodStart: new Date(subscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
     };
+
+    // ✅ FIXED: Only add dates if they exist and are valid
+    if (subscription.current_period_start && typeof subscription.current_period_start === 'number') {
+      updateData.currentPeriodStart = new Date(subscription.current_period_start * 1000);
+      console.log('   Period Start:', updateData.currentPeriodStart);
+    }
+
+    if (subscription.current_period_end && typeof subscription.current_period_end === 'number') {
+      updateData.currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+      console.log('   Period End:', updateData.currentPeriodEnd);
+    }
 
     // If subscription was canceled, mark cancel date
     if (subscription.cancel_at_period_end) {
@@ -305,9 +320,8 @@ const handleSubscriptionUpdated = async (subscription) => {
     });
 
     console.log('✅ Subscription updated for user:', user.email);
-    console.log('   Status:', subscription.status);
+    console.log('   Status:', updateData.subscriptionStatus);
     console.log('   Plan:', planName);
-    console.log('   Period End:', new Date(subscription.current_period_end * 1000));
   } catch (error) {
     console.error('❌ Error handling subscription.updated:', error);
   }
@@ -337,9 +351,6 @@ const handleSubscriptionDeleted = async (subscription) => {
       where: { id: user.id },
       data: {
         subscriptionStatus: 'canceled',
-        // Note: subscriptionPlan not in schema
-        // Keep subscriptionId for reference
-        // currentPeriodEnd stays as is (they have access until this date)
       }
     });
 
@@ -360,7 +371,7 @@ const handleSubscriptionDeleted = async (subscription) => {
 };
 
 /**
- * Handle invoice.payment_succeeded
+ * ✅ FIXED: Handle invoice.payment_succeeded
  * Called when a payment succeeds (including renewals)
  * THIS ENSURES RENEWALS ARE TRACKED!
  */
@@ -389,18 +400,29 @@ const handlePaymentSucceeded = async (invoice) => {
     // Get updated subscription details
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
+    // ✅ FIXED: Build update data with validated dates
+    const updateData = {
+      subscriptionStatus: 'active',
+    };
+
+    if (subscription.current_period_start && typeof subscription.current_period_start === 'number') {
+      updateData.currentPeriodStart = new Date(subscription.current_period_start * 1000);
+    }
+
+    if (subscription.current_period_end && typeof subscription.current_period_end === 'number') {
+      updateData.currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+    }
+
     await prisma.user.update({
       where: { id: user.id },
-      data: {
-        subscriptionStatus: 'active',
-        currentPeriodStart: new Date(subscription.current_period_start * 1000),
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-      }
+      data: updateData
     });
 
     console.log('✅ Payment succeeded for user:', user.email);
     console.log('   Amount:', invoice.amount_paid / 100, invoice.currency.toUpperCase());
-    console.log('   New period end:', new Date(subscription.current_period_end * 1000));
+    if (updateData.currentPeriodEnd) {
+      console.log('   New period end:', updateData.currentPeriodEnd);
+    }
 
     // Send payment receipt email
     try {
