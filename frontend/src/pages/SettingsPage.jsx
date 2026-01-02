@@ -222,14 +222,8 @@ const SettingsPage = () => {
     }
   };
 
-  // ✅ NEW: Toggle auto-renewal
+  // ✅ FIXED: Toggle auto-renewal (removed frontend validation)
   const handleToggleAutoRenewal = async () => {
-    // ⚠️ Check if user has a subscription
-    if (!effectiveUser?.subscriptionId) {
-      showToast('No active subscription found. Please subscribe to a plan first.', 'error');
-      return;
-    }
-    
     const newState = !autoRenewal;
     
     const confirmed = window.confirm(
@@ -265,14 +259,8 @@ const SettingsPage = () => {
     }
   };
 
-  // ✅ NEW: Cancel subscription with refund
+  // ✅ FIXED: Cancel subscription (removed frontend validation)
   const handleCancelSubscription = async () => {
-    // ⚠️ Check if user has a subscription
-    if (!effectiveUser?.subscriptionId) {
-      showToast('No active subscription found. Please subscribe to a plan first.', 'error');
-      return;
-    }
-    
     const confirmed = window.confirm(
       '⚠️ Cancel Subscription?\n\n' +
       'Your subscription will be canceled immediately and you will receive a prorated refund for the unused time.\n\n' +
@@ -685,7 +673,6 @@ const SettingsPage = () => {
             </div>
 
             {/* ✅ AUTO-RENEWAL TOGGLE */}
-            {/* ⚠️ TESTING VERSION: Shows even without subscriptionId */}
             {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border-2 border-blue-200 shadow-lg">
                 <div className="flex items-center justify-between">
@@ -787,8 +774,7 @@ const SettingsPage = () => {
               </ul>
             </div>
 
-            {/* ✅ CANCEL SUBSCRIPTION BUTTON (WORKING NOW!) */}
-            {/* ⚠️ TESTING VERSION: Shows even without subscriptionId */}
+            {/* ✅ CANCEL SUBSCRIPTION BUTTON */}
             {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <button
