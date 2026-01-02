@@ -854,17 +854,6 @@ const UploadPage = () => {
             </div>
           </>
         )}
-
-// ═══════════════════════════════════════════════════════════════
-// END OF PART 3
-// Continue with Part 4 (FINAL PART)...
-// ═══════════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════════
-// UploadPage.jsx - PART 4 of 4 (ERROR-FREE VERSION - FINAL)
-// PASTE THIS IMMEDIATELY AFTER PART 3 (no gap, no extra lines)
-// This completes the file!
-// ═══════════════════════════════════════════════════════════════
-
         {uploadType === 'TEXT' && (
           <form onSubmit={handleTextPost} className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
             <div className="flex items-center justify-between mb-6">
