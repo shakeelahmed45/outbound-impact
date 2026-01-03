@@ -212,21 +212,3 @@ const SignIn = () => {
               </button>
             )}
           </form>
-
-          {!requires2FA && (
-            <div className="mt-6 text-center">
-              <p className="text-gray-600">
-                Don't have an account?{' '}
-                <Link to="/signup" className="text-primary font-semibold hover:text-secondary transition-colors">
-                  Sign Up
-                </Link>
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default SignIn;
