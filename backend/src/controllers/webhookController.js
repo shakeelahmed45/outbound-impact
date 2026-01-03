@@ -98,7 +98,7 @@ const handleStripeWebhook = async (req, res) => {
 /**
  * ✅ FIXED: Handle checkout.session.completed
  * This is called when initial payment is successful
- * THIS IS THE CRITICAL FIX!
+ * NOW INCLUDES RECEIPT EMAIL!
  */
 const handleCheckoutCompleted = async (session) => {
   console.log('💳 Processing checkout.session.completed:', session.id);
@@ -110,6 +110,7 @@ const handleCheckoutCompleted = async (session) => {
   console.log('📧 Customer Email:', customerEmail);
   console.log('👤 Customer ID:', customerId);
   console.log('📋 Subscription ID:', subscriptionId);
+  console.log('💰 Amount Total:', session.amount_total);
 
   if (!customerEmail) {
     console.error('❌ No customer email in checkout session!');
@@ -152,7 +153,7 @@ const handleCheckoutCompleted = async (session) => {
 
     // ✅ STEP 3: Update user with Stripe details
     const updateData = {
-      stripeCustomerId: customerId, // ← THIS IS THE KEY FIX!
+      stripeCustomerId: customerId,
     };
 
     if (subscription) {
@@ -174,6 +175,12 @@ const handleCheckoutCompleted = async (session) => {
     console.log('   Plan:', planName);
     console.log('   Status:', subscription?.status || 'N/A');
 
+    // ✅ Calculate amount for emails (IMPORTANT!)
+    const amount = session.amount_total ? (session.amount_total / 100) : 0;
+    const currency = session.currency ? session.currency.toUpperCase() : 'USD';
+    
+    console.log('💵 Amount (converted):', amount, currency);
+
     // ✅ STEP 4: Send welcome email
     try {
       const emailService = require('../services/emailService');
@@ -183,16 +190,38 @@ const handleCheckoutCompleted = async (session) => {
       console.error('❌ Failed to send welcome email:', emailError.message);
     }
 
-    // ✅ STEP 5: Send admin notification
+    // ✅ STEP 5: Send payment receipt email (NEW!)
     try {
       const emailService = require('../services/emailService');
+      
+      if (amount > 0) {
+        await emailService.sendPaymentReceiptEmail(
+          user.email,
+          user.name,
+          amount,
+          currency,
+          planName
+        );
+        console.log('✅ Payment receipt sent to:', user.email, '- Amount:', amount, currency);
+      } else {
+        console.log('⚠️ Skipping receipt email - amount is 0');
+      }
+    } catch (emailError) {
+      console.error('❌ Failed to send payment receipt:', emailError.message);
+    }
+
+    // ✅ STEP 6: Send admin notification (FIXED!)
+    try {
+      const emailService = require('../services/emailService');
+      
       await emailService.sendAdminNotification({
         userEmail: user.email,
         userName: user.name,
         plan: planName,
-        amount: session.amount_total ? (session.amount_total / 100) : 0
+        amount: amount,
+        subscriptionId: subscriptionId,
       });
-      console.log('✅ Admin notification sent');
+      console.log('✅ Admin notification sent - Amount:', amount);
     } catch (emailError) {
       console.error('❌ Failed to send admin notification:', emailError.message);
     }
