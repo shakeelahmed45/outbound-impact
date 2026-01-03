@@ -610,4 +610,75 @@ const TeamPage = () => {
                         onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                         className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm sm:text-base"
                         disabled={inviting}
-                     
+                      >
+                        <option value="VIEWER">👁️ Viewer - Can view content</option>
+                        <option value="EDITOR">✏️ Editor - Can edit content</option>
+                        <option value="ADMIN">👑 Admin - Full access</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Personal Message (Optional)
+                      </label>
+                      <textarea
+                        value={formData.message}
+                        onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                        className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none text-sm sm:text-base"
+                        placeholder="e.g., Would love you to add content and stories about nan as we are putting together a memorial for her..."
+                        rows={3}
+                        disabled={inviting}
+                        maxLength={500}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        {formData.message.length}/500 characters • Explain why you're inviting this person
+                      </p>
+                    </div>
+                  </div>
+                </form>
+              </div>
+
+              {/* Footer - Fixed at bottom */}
+              <div className="p-4 sm:p-6 border-t border-gray-200 flex-shrink-0">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowInviteModal(false);
+                      setFormData({ email: '', role: 'VIEWER', message: '' });
+                      setError('');
+                    }}
+                    className="flex-1 px-4 py-2.5 sm:px-6 sm:py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-all text-sm sm:text-base"
+                    disabled={inviting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    form="invite-form"
+                    className="flex-1 gradient-btn text-white px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm sm:text-base"
+                    disabled={inviting}
+                  >
+                    {inviting ? (
+                      <>
+                        <Loader2 className="animate-spin" size={16} />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Mail size={16} />
+                        Send Invitation
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </DashboardLayout>
+  );
+};
+
+export default TeamPage;
