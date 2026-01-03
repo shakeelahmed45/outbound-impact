@@ -161,6 +161,9 @@ const createCheckout = async (req, res) => {
   }
 };
 
+/**
+ * ✅ FIXED: Handle race condition where webhook creates user before frontend calls this
+ */
 const completeSignup = async (req, res) => {
   try {
     const { sessionId } = req.body;
@@ -181,12 +184,52 @@ const completeSignup = async (req, res) => {
       });
     }
 
+    // ✅ FIX: Get customer email from session
+    const customerEmail = (session.customer_email || session.customer_details?.email)?.toLowerCase().trim();
+
+    if (!customerEmail) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Customer email not found in session'
+      });
+    }
+
+    // ✅ FIX: Check if user already exists (created by webhook)
+    let user = await prisma.user.findUnique({
+      where: { email: customerEmail }
+    });
+
+    // ✅ If user exists, webhook already created them - just log them in
+    if (user) {
+      console.log('✅ User already created by webhook, logging in:', user.email);
+
+      const accessToken = generateAccessToken(user.id, user.email, user.role);
+      const refreshToken = generateRefreshToken(user.id);
+
+      return res.json({
+        status: 'success',
+        message: 'Account created successfully',
+        accessToken,
+        refreshToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          profilePicture: user.profilePicture,
+          role: user.role,
+          storageUsed: user.storageUsed.toString(),
+          storageLimit: user.storageLimit.toString(),
+        }
+      });
+    }
+
+    // ✅ If user doesn't exist, create from pending signup (fallback)
     const signupData = global.pendingSignups?.[sessionId];
 
     if (!signupData) {
       return res.status(400).json({
         status: 'error',
-        message: 'Signup data not found'
+        message: 'Signup data not found. Please try signing in with your email and password.'
       });
     }
 
@@ -204,7 +247,7 @@ const completeSignup = async (req, res) => {
       };
     }
 
-    const user = await prisma.user.create({
+    user = await prisma.user.create({
       data: {
         email: normalizedEmail,
         name: signupData.name,
