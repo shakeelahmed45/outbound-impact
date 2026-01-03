@@ -37,46 +37,27 @@ const handleStripeWebhook = async (req, res) => {
   // Handle the event
   try {
     switch (event.type) {
-      // ============================================
-      // CHECKOUT COMPLETED (Initial Payment)
-      // ============================================
       case 'checkout.session.completed':
         await handleCheckoutCompleted(event.data.object);
         break;
-
-      // ============================================
-      // SUBSCRIPTION EVENTS
-      // ============================================
       case 'customer.subscription.created':
         await handleSubscriptionCreated(event.data.object);
         break;
-
       case 'customer.subscription.updated':
         await handleSubscriptionUpdated(event.data.object);
         break;
-
       case 'customer.subscription.deleted':
         await handleSubscriptionDeleted(event.data.object);
         break;
-
-      // ============================================
-      // INVOICE/PAYMENT EVENTS
-      // ============================================
       case 'invoice.payment_succeeded':
         await handlePaymentSucceeded(event.data.object);
         break;
-
       case 'invoice.payment_failed':
         await handlePaymentFailed(event.data.object);
         break;
-
-      // ============================================
-      // CUSTOMER EVENTS
-      // ============================================
       case 'customer.updated':
         await handleCustomerUpdated(event.data.object);
         break;
-
       default:
         console.log(`⚠️ Unhandled event type: ${event.type}`);
     }
@@ -91,14 +72,9 @@ const handleStripeWebhook = async (req, res) => {
   }
 };
 
-// ============================================
-// EVENT HANDLERS
-// ============================================
-
 /**
- * ✅ FIXED: Handle checkout.session.completed
- * This is called when initial payment is successful
- * NOW INCLUDES RECEIPT EMAIL!
+ * ✅ COMPLETE FIX: Handle checkout.session.completed
+ * Handles BOTH new signups AND existing user subscriptions
  */
 const handleCheckoutCompleted = async (session) => {
   console.log('💳 Processing checkout.session.completed:', session.id);
@@ -118,22 +94,66 @@ const handleCheckoutCompleted = async (session) => {
   }
 
   try {
-    // ✅ STEP 1: Find the user by email
-    const user = await prisma.user.findUnique({
-      where: { email: customerEmail.toLowerCase() }
+    const normalizedEmail = customerEmail.toLowerCase().trim();
+
+    // ✅ STEP 1: Check if user already exists
+    let user = await prisma.user.findUnique({
+      where: { email: normalizedEmail }
     });
 
+    // ✅ STEP 2: If user doesn't exist, check for pending signup
     if (!user) {
-      console.error('❌ User not found for email:', customerEmail);
-      return;
+      console.log('👤 User not found, checking for pending signup...');
+      
+      // Check global.pendingSignups for signup data
+      const signupData = global.pendingSignups?.[session.id];
+      
+      if (!signupData) {
+        console.error('❌ No pending signup data found for session:', session.id);
+        console.error('❌ User must register before subscribing!');
+        return;
+      }
+
+      console.log('✅ Found pending signup data, creating user...');
+
+      // Get subscription details if exists
+      let subscriptionData = {};
+      if (subscriptionId) {
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        subscriptionData = {
+          currentPeriodStart: new Date(subscription.current_period_start * 1000),
+          currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+          priceId: subscription.items.data[0].price.id,
+        };
+      }
+
+      // Create the user from pending signup data
+      user = await prisma.user.create({
+        data: {
+          email: normalizedEmail,
+          name: signupData.name,
+          password: signupData.password,
+          role: signupData.role,
+          storageLimit: signupData.storageLimit,
+          stripeCustomerId: customerId,
+          subscriptionId: subscriptionId || null,
+          subscriptionStatus: 'active',
+          ...subscriptionData,
+        }
+      });
+
+      console.log('✅ User created successfully:', user.email, 'ID:', user.id);
+
+      // Clean up pending signup
+      delete global.pendingSignups[session.id];
+    } else {
+      console.log('✅ Found existing user:', user.email, 'ID:', user.id);
     }
 
-    console.log('✅ Found user:', user.email, 'ID:', user.id);
-
-    // ✅ STEP 2: Get the subscription details from Stripe
+    // ✅ STEP 3: Get subscription details and plan name
     let subscription = null;
     let priceId = null;
-    let planName = 'Free';
+    let planName = user.role || 'Free';
 
     if (subscriptionId) {
       subscription = await stripe.subscriptions.retrieve(subscriptionId);
@@ -141,17 +161,17 @@ const handleCheckoutCompleted = async (session) => {
       
       // Determine plan name from price ID
       const priceIdMap = {
-        [process.env.STRIPE_PRICE_INDIVIDUAL]: 'Individual',
-        [process.env.STRIPE_PRICE_SMALL_ORG]: 'Small Org',
-        [process.env.STRIPE_PRICE_MEDIUM_ORG]: 'Medium Org',
-        [process.env.STRIPE_PRICE_ENTERPRISE]: 'Enterprise',
+        [process.env.STRIPE_INDIVIDUAL_PRICE]: 'Individual',
+        [process.env.STRIPE_SMALL_ORG_PRICE]: 'Small Org',
+        [process.env.STRIPE_MEDIUM_ORG_PRICE]: 'Medium Org',
+        [process.env.STRIPE_ENTERPRISE_PRICE]: 'Enterprise',
       };
       
-      planName = priceIdMap[priceId] || 'Individual';
+      planName = priceIdMap[priceId] || user.role || 'Individual';
       console.log('📦 Plan:', planName);
     }
 
-    // ✅ STEP 3: Update user with Stripe details
+    // ✅ STEP 4: Update user with Stripe details (for existing users or updates)
     const updateData = {
       stripeCustomerId: customerId,
     };
@@ -175,13 +195,13 @@ const handleCheckoutCompleted = async (session) => {
     console.log('   Plan:', planName);
     console.log('   Status:', subscription?.status || 'N/A');
 
-    // ✅ Calculate amount for emails (IMPORTANT!)
+    // ✅ Calculate amount for emails
     const amount = session.amount_total ? (session.amount_total / 100) : 0;
     const currency = session.currency ? session.currency.toUpperCase() : 'USD';
     
     console.log('💵 Amount (converted):', amount, currency);
 
-    // ✅ STEP 4: Send welcome email
+    // ✅ STEP 5: Send welcome email
     try {
       const emailService = require('../services/emailService');
       await emailService.sendWelcomeEmail(user.email, user.name, planName);
@@ -190,7 +210,7 @@ const handleCheckoutCompleted = async (session) => {
       console.error('❌ Failed to send welcome email:', emailError.message);
     }
 
-    // ✅ STEP 5: Send payment receipt email (NEW!)
+    // ✅ STEP 6: Send payment receipt email
     try {
       const emailService = require('../services/emailService');
       
@@ -210,7 +230,7 @@ const handleCheckoutCompleted = async (session) => {
       console.error('❌ Failed to send payment receipt:', emailError.message);
     }
 
-    // ✅ STEP 6: Send admin notification (FIXED!)
+    // ✅ STEP 7: Send admin notification
     try {
       const emailService = require('../services/emailService');
       
@@ -235,7 +255,6 @@ const handleCheckoutCompleted = async (session) => {
 
 /**
  * Handle customer.subscription.created
- * Called when a new subscription is created
  */
 const handleSubscriptionCreated = async (subscription) => {
   console.log('🆕 Processing subscription.created:', subscription.id);
@@ -253,17 +272,15 @@ const handleSubscriptionCreated = async (subscription) => {
       return;
     }
 
-    // Determine plan name from price ID
     const priceIdMap = {
-      [process.env.STRIPE_PRICE_INDIVIDUAL]: 'Individual',
-      [process.env.STRIPE_PRICE_SMALL_ORG]: 'Small Org',
-      [process.env.STRIPE_PRICE_MEDIUM_ORG]: 'Medium Org',
-      [process.env.STRIPE_PRICE_ENTERPRISE]: 'Enterprise',
+      [process.env.STRIPE_INDIVIDUAL_PRICE]: 'Individual',
+      [process.env.STRIPE_SMALL_ORG_PRICE]: 'Small Org',
+      [process.env.STRIPE_MEDIUM_ORG_PRICE]: 'Medium Org',
+      [process.env.STRIPE_ENTERPRISE_PRICE]: 'Enterprise',
     };
     
     const planName = priceIdMap[priceId] || 'Individual';
 
-    // ✅ FIXED: Build update data with validated dates
     const updateData = {
       subscriptionId: subscription.id,
       subscriptionStatus: subscription.status,
@@ -290,9 +307,7 @@ const handleSubscriptionCreated = async (subscription) => {
 };
 
 /**
- * ✅ FIXED: Handle customer.subscription.updated
- * Called when subscription is modified (upgrade, downgrade, renewal, cancel_at_period_end toggle)
- * THIS IS CRITICAL FOR MONTHLY RENEWALS AND TOGGLE FEATURE!
+ * Handle customer.subscription.updated
  */
 const handleSubscriptionUpdated = async (subscription) => {
   console.log('🔄 Processing subscription.updated:', subscription.id);
@@ -310,23 +325,20 @@ const handleSubscriptionUpdated = async (subscription) => {
       return;
     }
 
-    // Determine plan name from price ID (for logging only)
     const priceIdMap = {
-      [process.env.STRIPE_PRICE_INDIVIDUAL]: 'Individual',
-      [process.env.STRIPE_PRICE_SMALL_ORG]: 'Small Org',
-      [process.env.STRIPE_PRICE_MEDIUM_ORG]: 'Medium Org',
-      [process.env.STRIPE_PRICE_ENTERPRISE]: 'Enterprise',
+      [process.env.STRIPE_INDIVIDUAL_PRICE]: 'Individual',
+      [process.env.STRIPE_SMALL_ORG_PRICE]: 'Small Org',
+      [process.env.STRIPE_MEDIUM_ORG_PRICE]: 'Medium Org',
+      [process.env.STRIPE_ENTERPRISE_PRICE]: 'Enterprise',
     };
     
     const planName = priceIdMap[priceId] || 'Individual';
 
-    // ✅ FIXED: Build update data with only valid fields
     const updateData = {
       subscriptionStatus: subscription.status,
       priceId: priceId,
     };
 
-    // ✅ FIXED: Only add dates if they exist and are valid
     if (subscription.current_period_start && typeof subscription.current_period_start === 'number') {
       updateData.currentPeriodStart = new Date(subscription.current_period_start * 1000);
       console.log('   Period Start:', updateData.currentPeriodStart);
@@ -337,7 +349,6 @@ const handleSubscriptionUpdated = async (subscription) => {
       console.log('   Period End:', updateData.currentPeriodEnd);
     }
 
-    // If subscription was canceled, mark cancel date
     if (subscription.cancel_at_period_end) {
       updateData.subscriptionStatus = 'canceling';
       console.log('⚠️ Subscription set to cancel at period end');
@@ -358,7 +369,6 @@ const handleSubscriptionUpdated = async (subscription) => {
 
 /**
  * Handle customer.subscription.deleted
- * Called when subscription is canceled/deleted
  */
 const handleSubscriptionDeleted = async (subscription) => {
   console.log('🗑️ Processing subscription.deleted:', subscription.id);
@@ -375,7 +385,6 @@ const handleSubscriptionDeleted = async (subscription) => {
       return;
     }
 
-    // Update user to reflect canceled subscription
     await prisma.user.update({
       where: { id: user.id },
       data: {
@@ -385,7 +394,6 @@ const handleSubscriptionDeleted = async (subscription) => {
 
     console.log('✅ Subscription canceled for user:', user.email);
 
-    // Send cancellation email
     try {
       const emailService = require('../services/emailService');
       await emailService.sendCancellationEmail(user.email, user.name);
@@ -400,9 +408,7 @@ const handleSubscriptionDeleted = async (subscription) => {
 };
 
 /**
- * ✅ FIXED: Handle invoice.payment_succeeded
- * Called when a payment succeeds (including renewals)
- * THIS ENSURES RENEWALS ARE TRACKED!
+ * Handle invoice.payment_succeeded
  */
 const handlePaymentSucceeded = async (invoice) => {
   console.log('💰 Processing payment_succeeded:', invoice.id);
@@ -410,7 +416,6 @@ const handlePaymentSucceeded = async (invoice) => {
   const customerId = invoice.customer;
   const subscriptionId = invoice.subscription;
 
-  // Skip if no subscription (one-time payment)
   if (!subscriptionId) {
     console.log('ℹ️ One-time payment, skipping subscription update');
     return;
@@ -426,10 +431,8 @@ const handlePaymentSucceeded = async (invoice) => {
       return;
     }
 
-    // Get updated subscription details
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
-    // ✅ FIXED: Build update data with validated dates
     const updateData = {
       subscriptionStatus: 'active',
     };
@@ -453,16 +456,14 @@ const handlePaymentSucceeded = async (invoice) => {
       console.log('   New period end:', updateData.currentPeriodEnd);
     }
 
-    // Send payment receipt email
     try {
       const emailService = require('../services/emailService');
       
-      // Determine plan name from priceId for email
       const priceIdMap = {
-        [process.env.STRIPE_PRICE_INDIVIDUAL]: 'Individual',
-        [process.env.STRIPE_PRICE_SMALL_ORG]: 'Small Org',
-        [process.env.STRIPE_PRICE_MEDIUM_ORG]: 'Medium Org',
-        [process.env.STRIPE_PRICE_ENTERPRISE]: 'Enterprise',
+        [process.env.STRIPE_INDIVIDUAL_PRICE]: 'Individual',
+        [process.env.STRIPE_SMALL_ORG_PRICE]: 'Small Org',
+        [process.env.STRIPE_MEDIUM_ORG_PRICE]: 'Medium Org',
+        [process.env.STRIPE_ENTERPRISE_PRICE]: 'Enterprise',
       };
       const planName = priceIdMap[subscription.items.data[0].price.id] || 'Individual';
       
@@ -485,8 +486,6 @@ const handlePaymentSucceeded = async (invoice) => {
 
 /**
  * Handle invoice.payment_failed
- * Called when a payment fails (card declined, insufficient funds, etc.)
- * THIS IS CRITICAL FOR HANDLING FAILED RENEWALS!
  */
 const handlePaymentFailed = async (invoice) => {
   console.log('❌ Processing payment_failed:', invoice.id);
@@ -504,7 +503,6 @@ const handlePaymentFailed = async (invoice) => {
       return;
     }
 
-    // Update subscription status to past_due
     await prisma.user.update({
       where: { id: user.id },
       data: {
@@ -516,7 +514,6 @@ const handlePaymentFailed = async (invoice) => {
     console.log('   Reason:', invoice.last_payment_error?.message || 'Unknown');
     console.log('   Amount:', invoice.amount_due / 100, invoice.currency.toUpperCase());
 
-    // Send payment failed email
     try {
       const emailService = require('../services/emailService');
       await emailService.sendPaymentFailedEmail(
@@ -538,7 +535,6 @@ const handlePaymentFailed = async (invoice) => {
 
 /**
  * Handle customer.updated
- * Called when customer details are updated (email, payment method, etc.)
  */
 const handleCustomerUpdated = async (customer) => {
   console.log('👤 Processing customer.updated:', customer.id);
@@ -553,11 +549,8 @@ const handleCustomerUpdated = async (customer) => {
       return;
     }
 
-    // You can update user email if it changed in Stripe
     if (customer.email && customer.email !== user.email) {
       console.log('📧 Customer email changed:', user.email, '→', customer.email);
-      // Optionally update user email
-      // Be careful with this - might want manual verification
     }
 
     console.log('✅ Customer updated for user:', user.email);
