@@ -75,6 +75,7 @@ const handleStripeWebhook = async (req, res) => {
 /**
  * ✅ COMPLETE FIX: Handle checkout.session.completed
  * Handles BOTH new signups AND existing user subscriptions
+ * WITH EMAIL DELAYS to respect Resend rate limits
  */
 const handleCheckoutCompleted = async (session) => {
   console.log('💳 Processing checkout.session.completed:', session.id);
@@ -105,7 +106,6 @@ const handleCheckoutCompleted = async (session) => {
     if (!user) {
       console.log('👤 User not found, checking for pending signup...');
       
-      // Check global.pendingSignups for signup data
       const signupData = global.pendingSignups?.[session.id];
       
       if (!signupData) {
@@ -116,7 +116,6 @@ const handleCheckoutCompleted = async (session) => {
 
       console.log('✅ Found pending signup data, creating user...');
 
-      // Get subscription details if exists
       let subscriptionData = {};
       if (subscriptionId) {
         const subscription = await stripe.subscriptions.retrieve(subscriptionId);
@@ -127,7 +126,6 @@ const handleCheckoutCompleted = async (session) => {
         };
       }
 
-      // Create the user from pending signup data
       user = await prisma.user.create({
         data: {
           email: normalizedEmail,
@@ -144,7 +142,6 @@ const handleCheckoutCompleted = async (session) => {
 
       console.log('✅ User created successfully:', user.email, 'ID:', user.id);
 
-      // Clean up pending signup
       delete global.pendingSignups[session.id];
     } else {
       console.log('✅ Found existing user:', user.email, 'ID:', user.id);
@@ -159,7 +156,6 @@ const handleCheckoutCompleted = async (session) => {
       subscription = await stripe.subscriptions.retrieve(subscriptionId);
       priceId = subscription.items.data[0].price.id;
       
-      // Determine plan name from price ID
       const priceIdMap = {
         [process.env.STRIPE_INDIVIDUAL_PRICE]: 'Individual',
         [process.env.STRIPE_SMALL_ORG_PRICE]: 'Small Org',
@@ -171,7 +167,7 @@ const handleCheckoutCompleted = async (session) => {
       console.log('📦 Plan:', planName);
     }
 
-    // ✅ STEP 4: Update user with Stripe details (for existing users or updates)
+    // ✅ STEP 4: Update user with Stripe details
     const updateData = {
       stripeCustomerId: customerId,
     };
@@ -210,6 +206,10 @@ const handleCheckoutCompleted = async (session) => {
       console.error('❌ Failed to send welcome email:', emailError.message);
     }
 
+    // ✅ IMPORTANT: Wait 1 second to respect rate limits (2 emails per second)
+    console.log('⏳ Waiting 1 second before next email...');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     // ✅ STEP 6: Send payment receipt email
     try {
       const emailService = require('../services/emailService');
@@ -229,6 +229,10 @@ const handleCheckoutCompleted = async (session) => {
     } catch (emailError) {
       console.error('❌ Failed to send payment receipt:', emailError.message);
     }
+
+    // ✅ IMPORTANT: Wait another 1 second before admin notification
+    console.log('⏳ Waiting 1 second before admin notification...');
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     // ✅ STEP 7: Send admin notification
     try {
@@ -409,6 +413,7 @@ const handleSubscriptionDeleted = async (subscription) => {
 
 /**
  * Handle invoice.payment_succeeded
+ * ✅ SKIP sending receipt email here since checkout.session.completed already sent it
  */
 const handlePaymentSucceeded = async (invoice) => {
   console.log('💰 Processing payment_succeeded:', invoice.id);
@@ -456,27 +461,37 @@ const handlePaymentSucceeded = async (invoice) => {
       console.log('   New period end:', updateData.currentPeriodEnd);
     }
 
-    try {
-      const emailService = require('../services/emailService');
+    // ✅ ONLY send receipt for RENEWAL payments (not initial payment)
+    // Initial payment receipt is already sent by checkout.session.completed
+    const isRenewal = invoice.billing_reason === 'subscription_cycle';
+    
+    if (isRenewal) {
+      console.log('📧 Sending renewal receipt...');
       
-      const priceIdMap = {
-        [process.env.STRIPE_INDIVIDUAL_PRICE]: 'Individual',
-        [process.env.STRIPE_SMALL_ORG_PRICE]: 'Small Org',
-        [process.env.STRIPE_MEDIUM_ORG_PRICE]: 'Medium Org',
-        [process.env.STRIPE_ENTERPRISE_PRICE]: 'Enterprise',
-      };
-      const planName = priceIdMap[subscription.items.data[0].price.id] || 'Individual';
-      
-      await emailService.sendPaymentReceiptEmail(
-        user.email,
-        user.name,
-        invoice.amount_paid / 100,
-        invoice.currency.toUpperCase(),
-        planName
-      );
-      console.log('📧 Payment receipt sent to:', user.email);
-    } catch (emailError) {
-      console.error('❌ Failed to send payment receipt:', emailError.message);
+      try {
+        const emailService = require('../services/emailService');
+        
+        const priceIdMap = {
+          [process.env.STRIPE_INDIVIDUAL_PRICE]: 'Individual',
+          [process.env.STRIPE_SMALL_ORG_PRICE]: 'Small Org',
+          [process.env.STRIPE_MEDIUM_ORG_PRICE]: 'Medium Org',
+          [process.env.STRIPE_ENTERPRISE_PRICE]: 'Enterprise',
+        };
+        const planName = priceIdMap[subscription.items.data[0].price.id] || 'Individual';
+        
+        await emailService.sendPaymentReceiptEmail(
+          user.email,
+          user.name,
+          invoice.amount_paid / 100,
+          invoice.currency.toUpperCase(),
+          planName
+        );
+        console.log('✅ Renewal receipt sent to:', user.email);
+      } catch (emailError) {
+        console.error('❌ Failed to send renewal receipt:', emailError.message);
+      }
+    } else {
+      console.log('ℹ️ Skipping receipt email (already sent by checkout.session.completed)');
     }
 
   } catch (error) {
