@@ -124,24 +124,25 @@ const toggleAutoRenewal = async (req, res) => {
 };
 
 /**
- * ✅ CANCEL SUBSCRIPTION WITH PRORATED REFUND
+ * ✅ CANCEL SUBSCRIPTION WITH 7-DAY REFUND LOGIC
  * 
- * Immediately cancel subscription and issue prorated refund for unused time
+ * - Within 7 days: Full refund + immediate cancellation
+ * - After 7 days: Cancel at period end (no refund)
  */
 const cancelSubscription = async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    console.log('🗑️ Canceling subscription with refund for user:', userId);
+    console.log('🗑️ Canceling subscription for user:', userId);
 
-    // ✅ FIXED: Get user with ALL subscription fields including stripeCustomerId
+    // Get user with ALL subscription fields
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
         email: true,
         name: true,
-        stripeCustomerId: true,      // ✅ ADDED - Critical field!
+        stripeCustomerId: true,
         subscriptionId: true,
         subscriptionStatus: true,
         currentPeriodStart: true,
@@ -158,7 +159,7 @@ const cancelSubscription = async (req, res) => {
       });
     }
 
-    // ✅ FIXED: Check BOTH stripeCustomerId AND subscriptionId
+    // Check for active subscription
     if (!user.stripeCustomerId || !user.subscriptionId) {
       console.error('❌ Missing subscription data:');
       console.error('   stripeCustomerId:', user.stripeCustomerId || 'MISSING');
@@ -166,17 +167,17 @@ const cancelSubscription = async (req, res) => {
       
       return res.status(400).json({
         status: 'error',
-        message: 'No active subscription found. Please subscribe to a plan first.'
+        message: 'No active subscription found.'
       });
     }
 
-    // ✅ FIXED: Check subscription status
-    if (user.subscriptionStatus === 'canceled' || user.subscriptionStatus === 'incomplete') {
-      console.error('❌ Invalid subscription status:', user.subscriptionStatus);
+    // Check subscription status
+    if (user.subscriptionStatus === 'canceled') {
+      console.error('❌ Subscription already canceled:', user.subscriptionStatus);
       
       return res.status(400).json({
         status: 'error',
-        message: 'No active subscription found. Please subscribe to a plan first.'
+        message: 'Subscription is already canceled.'
       });
     }
 
@@ -185,75 +186,115 @@ const cancelSubscription = async (req, res) => {
     console.log('   Stripe Customer ID:', user.stripeCustomerId);
     console.log('   Subscription ID:', user.subscriptionId);
     console.log('   Status:', user.subscriptionStatus);
+    console.log('   Period Start:', user.currentPeriodStart);
 
-    // Get subscription details from Stripe
-    const subscription = await stripe.subscriptions.retrieve(user.subscriptionId);
-    
-    // Calculate prorated refund amount
-    const now = Math.floor(Date.now() / 1000);
-    const periodStart = subscription.current_period_start;
-    const periodEnd = subscription.current_period_end;
-    const totalPeriod = periodEnd - periodStart;
-    const timeUsed = now - periodStart;
-    const timeRemaining = periodEnd - now;
-    
-    // Get the price amount
-    const price = await stripe.prices.retrieve(user.priceId);
-    const fullAmount = price.unit_amount; // Amount in cents
-    
-    // Calculate refund (prorated based on time remaining)
-    const refundAmount = Math.floor((timeRemaining / totalPeriod) * fullAmount);
-    
-    console.log('📊 Refund calculation:');
-    console.log('   Full amount:', fullAmount / 100, 'USD');
-    console.log('   Time remaining:', Math.floor(timeRemaining / 86400), 'days');
-    console.log('   Refund amount:', refundAmount / 100, 'USD');
+    // ✅ CALCULATE 7-DAY REFUND ELIGIBILITY
+    let isRefundEligible = false;
+    let daysSinceStart = 999; // Default to high number if no start date
 
-    let refund = null;
-
-    // Only issue refund if there's a significant amount (> $1)
-    if (refundAmount > 100) {
-      // Get the latest invoice
-      const invoices = await stripe.invoices.list({
-        customer: user.stripeCustomerId,
-        subscription: user.subscriptionId,
-        limit: 1,
-      });
-
-      if (invoices.data.length > 0 && invoices.data[0].charge) {
-        // Create refund for prorated amount
-        refund = await stripe.refunds.create({
-          charge: invoices.data[0].charge,
-          amount: refundAmount,
-          reason: 'requested_by_customer',
-          metadata: {
-            userId: user.id,
-            email: user.email,
-            reason: 'Prorated refund for subscription cancellation'
-          }
-        });
-
-        console.log('✅ Refund created:', refund.id, '-', refundAmount / 100, 'USD');
-      }
+    if (user.currentPeriodStart) {
+      const subscriptionDate = new Date(user.currentPeriodStart);
+      const now = new Date();
+      const diffTime = now - subscriptionDate;
+      daysSinceStart = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      isRefundEligible = daysSinceStart <= 7;
+      
+      console.log('📅 Subscription age:', daysSinceStart, 'days');
+      console.log('💰 Refund eligible:', isRefundEligible ? 'YES' : 'NO');
     } else {
-      console.log('ℹ️ No refund issued (amount too small or period nearly complete)');
+      console.warn('⚠️ No currentPeriodStart found - cannot check refund eligibility');
     }
 
-    // Cancel subscription immediately in Stripe
-    const canceledSubscription = await stripe.subscriptions.cancel(user.subscriptionId);
-    
-    console.log('✅ Subscription canceled in Stripe:', canceledSubscription.id);
+    let refundInfo = null;
+    let cancellationMessage = '';
 
-    // Update user in database
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        subscriptionStatus: 'canceled',
-        // Keep stripeCustomerId for reference
-        // Keep subscriptionId for reference (or set to null if preferred)
-        // Keep priceId for reference
-        // Keep currentPeriodEnd for reference
-      },
+    if (isRefundEligible) {
+      // ✅ WITHIN 7 DAYS: Cancel immediately with full refund
+      console.log('✅ Within 7-day refund window - processing refund');
+
+      // Cancel subscription immediately
+      const canceledSubscription = await stripe.subscriptions.cancel(
+        user.subscriptionId
+      );
+
+      console.log('✅ Subscription canceled in Stripe:', canceledSubscription.id);
+
+      // Get the latest invoice to refund
+      const invoices = await stripe.invoices.list({
+        subscription: user.subscriptionId,
+        limit: 1
+      });
+
+      if (invoices.data.length > 0 && invoices.data[0].paid) {
+        const invoice = invoices.data[0];
+        
+        // Create full refund
+        const refund = await stripe.refunds.create({
+          payment_intent: invoice.payment_intent,
+          reason: 'requested_by_customer',
+        });
+
+        console.log('💰 Refund processed:', refund.id);
+        console.log('   Amount:', (refund.amount / 100).toFixed(2), refund.currency.toUpperCase());
+
+        refundInfo = {
+          id: refund.id,
+          amount: refund.amount,
+          currency: refund.currency,
+        };
+
+        cancellationMessage = `Subscription canceled and refund of $${(refund.amount / 100).toFixed(2)} ${refund.currency.toUpperCase()} has been processed. You will see the refund in 5-10 business days.`;
+      } else {
+        cancellationMessage = 'Subscription canceled successfully.';
+      }
+
+      // Update database immediately
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          subscriptionStatus: 'canceled',
+        }
+      });
+
+    } else {
+      // ❌ AFTER 7 DAYS: Cancel at period end (no refund)
+      console.log('⚠️ Past 7-day refund window - canceling at period end');
+
+      // Set subscription to cancel at period end (no immediate cancellation)
+      const updatedSubscription = await stripe.subscriptions.update(
+        user.subscriptionId,
+        {
+          cancel_at_period_end: true
+        }
+      );
+
+      console.log('⚠️ Subscription set to cancel at period end:', updatedSubscription.cancel_at);
+      console.log('   Access until:', new Date(updatedSubscription.current_period_end * 1000).toLocaleDateString());
+
+      // Update database to "canceling" status
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          subscriptionStatus: 'canceling',
+        }
+      });
+
+      const accessUntilDate = new Date(updatedSubscription.current_period_end * 1000).toLocaleDateString();
+      cancellationMessage = `Subscription will be canceled on ${accessUntilDate}. You will have access to all features until then. No refund is available as the 7-day refund period has passed.`;
+    }
+
+    // Send cancellation email
+    try {
+      const emailService = require('../services/emailService');
+      await emailService.sendCancellationEmail(user.email, user.name);
+      console.log('📧 Cancellation email sent to:', user.email);
+    } catch (emailError) {
+      console.error('❌ Failed to send cancellation email:', emailError.message);
+    }
+
+    // Get updated user data
+    const updatedUser = await prisma.user.findUnique({
+      where: { id: user.id },
       select: {
         id: true,
         email: true,
@@ -266,30 +307,19 @@ const cancelSubscription = async (req, res) => {
       }
     });
 
-    console.log('✅ User subscription canceled:', user.email);
-
-    // Send cancellation email
-    try {
-      const emailService = require('../services/emailService');
-      await emailService.sendCancellationEmail(user.email, user.name);
-      console.log('📧 Cancellation email sent to:', user.email);
-    } catch (emailError) {
-      console.error('❌ Failed to send cancellation email:', emailError.message);
-    }
+    console.log('✅ Cancellation complete:', user.email);
 
     res.json({
       status: 'success',
-      message: 'Subscription canceled successfully' + (refund ? `. A refund of $${(refundAmount / 100).toFixed(2)} has been processed and will appear in your account within 5-10 business days.` : '.'),
+      message: cancellationMessage,
+      isRefundEligible: isRefundEligible,
       user: {
         ...updatedUser,
         storageUsed: updatedUser.storageUsed.toString(),
         storageLimit: updatedUser.storageLimit.toString(),
       },
-      refund: refund ? {
-        id: refund.id,
-        amount: refundAmount / 100,
-        status: refund.status,
-      } : null,
+      refund: refundInfo,
+      currentPeriodEnd: user.currentPeriodEnd,
     });
 
   } catch (error) {
