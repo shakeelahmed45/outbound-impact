@@ -122,7 +122,7 @@ const SettingsPage = () => {
         setTimeout(() => {
           logout();
           window.location.href = '/signin';
-        }, 3000);
+        }, 1000); // ✅ 1 second for faster response
       } else {
         showToast('Failed to change email', 'error');
       }
@@ -299,10 +299,10 @@ const SettingsPage = () => {
         
         setUser(response.data.user);
         
-        // Redirect to plans page after 3 seconds
+        // ✅ Redirect to dashboard to trigger blocking modal
         setTimeout(() => {
           navigate('/dashboard');
-        }, 3000);
+        }, 1000); // 1 second for faster modal appearance
       }
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Failed to cancel subscription';

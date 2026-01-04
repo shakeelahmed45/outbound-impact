@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import DashboardHeader from './DashboardHeader';
 import BottomNav from './BottomNav';
 import SubscriptionBlockedModal from '../SubscriptionBlockedModal';
@@ -6,6 +7,8 @@ import useAuthStore from '../../store/authStore';
 
 const DashboardLayout = ({ children }) => {
   const { user, setUser } = useAuthStore();
+  const navigate = useNavigate();
+  const [showBlockingModal, setShowBlockingModal] = useState(false);
 
   // Check if user's subscription is canceled and they should be blocked
   const isSubscriptionBlocked = () => {
@@ -22,13 +25,23 @@ const DashboardLayout = ({ children }) => {
     return false;
   };
 
+  // ✅ NEW: Watch for user changes and check blocking status
+  useEffect(() => {
+    const shouldBlock = isSubscriptionBlocked();
+    
+    if (shouldBlock !== showBlockingModal) {
+      setShowBlockingModal(shouldBlock);
+    }
+  }, [user?.subscriptionStatus, user?.isTeamMember]); // Re-run when these change
+
   const handleReactivateSuccess = (updatedUser) => {
     // Update user in store
     setUser(updatedUser);
+    setShowBlockingModal(false);
   };
 
   // If subscription is blocked, show the blocking modal
-  if (isSubscriptionBlocked()) {
+  if (showBlockingModal) {
     return <SubscriptionBlockedModal user={user} onReactivateSuccess={handleReactivateSuccess} />;
   }
 
