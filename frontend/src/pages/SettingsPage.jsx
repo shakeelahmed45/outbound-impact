@@ -301,7 +301,7 @@ const SettingsPage = () => {
         
         // Redirect to plans page after 3 seconds
         setTimeout(() => {
-          navigate('/plans');
+          navigate('/dashboard');
         }, 3000);
       }
     } catch (error) {
@@ -1215,46 +1215,50 @@ const SettingsPage = () => {
         </div>
       )}
 
-      {/* ✅ REFUND POLICY MODAL */}
+      {/* ✅ REFUND POLICY MODAL - FULLY RESPONSIVE */}
       {showRefundPolicy && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8 max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-violet-600 text-white p-6 rounded-t-2xl z-10">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="bg-white/20 p-3 rounded-full">
-                    <BookOpen size={24} />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          {/* Modal Container - Fixed height with flex layout */}
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col" style={{ maxHeight: 'calc(100vh - 2rem)' }}>
+            
+            {/* Header - Fixed at top */}
+            <div className="flex-shrink-0 bg-gradient-to-r from-purple-600 to-violet-600 text-white p-4 sm:p-6 rounded-t-2xl">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="bg-white/20 p-2 sm:p-3 rounded-full flex-shrink-0">
+                    <BookOpen size={20} className="sm:w-6 sm:h-6" />
                   </div>
-                  <div>
-                    <h2 className="text-2xl font-bold">Refund Policy</h2>
-                    <p className="text-purple-100 text-sm mt-1">7-Day Money-Back Guarantee</p>
+                  <div className="min-w-0">
+                    <h2 className="text-lg sm:text-2xl font-bold truncate">Refund Policy</h2>
+                    <p className="text-purple-100 text-xs sm:text-sm mt-0.5 sm:mt-1">7-Day Money-Back Guarantee</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowRefundPolicy(false)}
-                  className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-full transition-all"
+                  className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-full transition-all flex-shrink-0"
+                  aria-label="Close modal"
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
             </div>
 
-            {/* Content */}
-            <div className="p-6 space-y-6">
+            {/* Scrollable Content Area */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
+              
               {/* 7-Day Guarantee */}
-              <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-6">
-                <div className="flex items-start gap-4">
-                  <div className="bg-green-500 text-white p-3 rounded-full flex-shrink-0">
-                    <Check size={24} />
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-4 sm:p-6">
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className="bg-green-500 text-white p-2 sm:p-3 rounded-full flex-shrink-0">
+                    <Check size={20} className="sm:w-6 sm:h-6" />
                   </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-green-900 mb-2">
+                  <div className="min-w-0">
+                    <h3 className="text-lg sm:text-xl font-bold text-green-900 mb-2">
                       7-Day Money-Back Guarantee
                     </h3>
-                    <p className="text-green-800 leading-relaxed">
+                    <p className="text-sm sm:text-base text-green-800 leading-relaxed">
                       We're confident you'll love our service! If you're not completely satisfied within the first <strong>7 days</strong> of your subscription, simply cancel and receive a <strong>full refund</strong> of your subscription fee.
                     </p>
                   </div>
@@ -1262,84 +1266,84 @@ const SettingsPage = () => {
               </div>
 
               {/* How to Get a Refund */}
-              <div className="bg-white border-2 border-gray-200 rounded-xl p-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <span className="bg-purple-100 text-purple-600 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">1</span>
-                  How to Cancel & Get Your Refund
+              <div className="bg-white border-2 border-gray-200 rounded-xl p-4 sm:p-6">
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+                  <span className="bg-purple-100 text-purple-600 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">1</span>
+                  <span className="min-w-0">How to Cancel & Get Your Refund</span>
                 </h3>
-                <div className="space-y-3 ml-10">
-                  <div className="flex items-start gap-3">
-                    <div className="bg-purple-100 text-purple-600 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <div className="space-y-2 sm:space-y-3 ml-9 sm:ml-10">
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <div className="bg-purple-100 text-purple-600 w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-1">
+                      <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                       </svg>
                     </div>
-                    <p className="text-gray-700">Go to <strong>Settings → Subscription</strong></p>
+                    <p className="text-sm sm:text-base text-gray-700 min-w-0">Go to <strong>Settings → Subscription</strong></p>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="bg-purple-100 text-purple-600 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <div className="bg-purple-100 text-purple-600 w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-1">
+                      <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                       </svg>
                     </div>
-                    <p className="text-gray-700">Click <strong>"Cancel Subscription & Get Refund"</strong> button</p>
+                    <p className="text-sm sm:text-base text-gray-700 min-w-0">Click <strong>"Cancel Subscription & Get Refund"</strong> button</p>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="bg-purple-100 text-purple-600 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <div className="bg-purple-100 text-purple-600 w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-1">
+                      <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                       </svg>
                     </div>
-                    <p className="text-gray-700">Confirm your cancellation</p>
+                    <p className="text-sm sm:text-base text-gray-700 min-w-0">Confirm your cancellation</p>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="bg-purple-100 text-purple-600 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <div className="bg-purple-100 text-purple-600 w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-1">
+                      <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                       </svg>
                     </div>
-                    <p className="text-gray-700">Your refund will be processed automatically within <strong>5-10 business days</strong></p>
+                    <p className="text-sm sm:text-base text-gray-700 min-w-0">Your refund will be processed automatically within <strong>5-10 business days</strong></p>
                   </div>
                 </div>
               </div>
 
               {/* Refund Eligibility */}
-              <div className="bg-white border-2 border-gray-200 rounded-xl p-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <span className="bg-purple-100 text-purple-600 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">2</span>
-                  Refund Eligibility
+              <div className="bg-white border-2 border-gray-200 rounded-xl p-4 sm:p-6">
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+                  <span className="bg-purple-100 text-purple-600 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">2</span>
+                  <span className="min-w-0">Refund Eligibility</span>
                 </h3>
-                <div className="space-y-3 ml-10">
-                  <div className="flex items-start gap-3">
-                    <Check className="text-green-500 flex-shrink-0 mt-1" size={20} />
-                    <p className="text-gray-700"><strong>Within 7 days:</strong> Full refund, no questions asked</p>
+                <div className="space-y-2 sm:space-y-3 ml-9 sm:ml-10">
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <Check className="text-green-500 flex-shrink-0 mt-0.5 sm:mt-1" size={18} />
+                    <p className="text-sm sm:text-base text-gray-700 min-w-0"><strong>Within 7 days:</strong> Full refund, no questions asked</p>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 flex-shrink-0 mt-0.5 sm:mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
-                    <p className="text-gray-700"><strong>After 7 days:</strong> No refund available (subscription canceled immediately)</p>
+                    <p className="text-sm sm:text-base text-gray-700 min-w-0"><strong>After 7 days:</strong> No refund available (subscription canceled immediately)</p>
                   </div>
                 </div>
               </div>
 
               {/* CRITICAL WARNING: Account Deletion */}
-              <div className="bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-300 rounded-xl p-6">
-                <div className="flex items-start gap-4">
-                  <div className="bg-red-500 text-white p-3 rounded-full flex-shrink-0">
-                    <AlertTriangle size={24} />
+              <div className="bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-300 rounded-xl p-4 sm:p-6">
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className="bg-red-500 text-white p-2 sm:p-3 rounded-full flex-shrink-0">
+                    <AlertTriangle size={20} className="sm:w-6 sm:h-6" />
                   </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-red-900 mb-3">
+                  <div className="min-w-0">
+                    <h3 className="text-lg sm:text-xl font-bold text-red-900 mb-2 sm:mb-3">
                       ⚠️ IMPORTANT: Do NOT Delete Your Account Directly!
                     </h3>
-                    <div className="space-y-3 text-red-800">
-                      <p className="leading-relaxed">
+                    <div className="space-y-2 sm:space-y-3 text-red-800">
+                      <p className="text-sm sm:text-base leading-relaxed">
                         <strong>Never delete your account from Settings → Security → Delete Account</strong> if you want to cancel your subscription and get a refund.
                       </p>
-                      <div className="bg-white/60 border-2 border-red-200 rounded-lg p-4 space-y-2">
-                        <p className="font-semibold text-red-900">❌ If you delete your account directly:</p>
-                        <ul className="space-y-1 ml-5 list-disc">
+                      <div className="bg-white/60 border-2 border-red-200 rounded-lg p-3 sm:p-4 space-y-1.5 sm:space-y-2">
+                        <p className="text-sm sm:text-base font-semibold text-red-900">❌ If you delete your account directly:</p>
+                        <ul className="space-y-1 ml-4 sm:ml-5 list-disc text-xs sm:text-sm">
                           <li><strong>You will NOT receive any refund</strong></li>
                           <li><strong>All your data will be permanently deleted</strong></li>
                           <li><strong>All uploaded content will be lost forever</strong></li>
@@ -1347,9 +1351,9 @@ const SettingsPage = () => {
                           <li><strong>This action CANNOT be undone</strong></li>
                         </ul>
                       </div>
-                      <div className="bg-green-500/10 border-2 border-green-400 rounded-lg p-4">
-                        <p className="font-semibold text-green-900 mb-2">✅ Correct Way to Cancel:</p>
-                        <p className="text-green-800">Always use the <strong>"Cancel Subscription & Get Refund"</strong> button in the Subscription section above. This ensures you get your refund (if eligible) and your data is handled properly.</p>
+                      <div className="bg-green-500/10 border-2 border-green-400 rounded-lg p-3 sm:p-4">
+                        <p className="text-sm sm:text-base font-semibold text-green-900 mb-1.5 sm:mb-2">✅ Correct Way to Cancel:</p>
+                        <p className="text-xs sm:text-sm text-green-800">Always use the <strong>"Cancel Subscription & Get Refund"</strong> button in the Subscription section above. This ensures you get your refund (if eligible) and your data is handled properly.</p>
                       </div>
                     </div>
                   </div>
@@ -1357,17 +1361,17 @@ const SettingsPage = () => {
               </div>
 
               {/* Processing Time */}
-              <div className="bg-white border-2 border-gray-200 rounded-xl p-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <span className="bg-purple-100 text-purple-600 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">3</span>
-                  Refund Processing Time
+              <div className="bg-white border-2 border-gray-200 rounded-xl p-4 sm:p-6">
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+                  <span className="bg-purple-100 text-purple-600 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">3</span>
+                  <span className="min-w-0">Refund Processing Time</span>
                 </h3>
-                <div className="ml-10 space-y-3">
-                  <p className="text-gray-700">
+                <div className="ml-9 sm:ml-10 space-y-2 sm:space-y-3">
+                  <p className="text-sm sm:text-base text-gray-700">
                     Refunds are processed automatically when you cancel within the 7-day window.
                   </p>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-blue-900 text-sm">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+                    <p className="text-blue-900 text-xs sm:text-sm">
                       <strong>Timeline:</strong> Refunds typically appear in your account within <strong>5-10 business days</strong>, depending on your bank or payment provider.
                     </p>
                   </div>
@@ -1375,23 +1379,23 @@ const SettingsPage = () => {
               </div>
 
               {/* Contact Support */}
-              <div className="bg-gradient-to-br from-purple-50 to-violet-50 border-2 border-purple-200 rounded-xl p-6">
-                <div className="flex items-start gap-4">
-                  <div className="bg-purple-500 text-white p-3 rounded-full flex-shrink-0">
-                    <Mail size={24} />
+              <div className="bg-gradient-to-br from-purple-50 to-violet-50 border-2 border-purple-200 rounded-xl p-4 sm:p-6">
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className="bg-purple-500 text-white p-2 sm:p-3 rounded-full flex-shrink-0">
+                    <Mail size={20} className="sm:w-6 sm:h-6" />
                   </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-purple-900 mb-2">
+                  <div className="min-w-0">
+                    <h3 className="text-lg sm:text-xl font-bold text-purple-900 mb-2">
                       Need Help?
                     </h3>
-                    <p className="text-purple-800 leading-relaxed mb-3">
+                    <p className="text-sm sm:text-base text-purple-800 leading-relaxed mb-3">
                       If you have any questions about our refund policy or need assistance with cancellation, our support team is here to help!
                     </p>
                     <a
                       href="mailto:support@outboundimpact.com"
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-all"
+                      className="inline-flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 bg-purple-600 text-white rounded-lg text-sm sm:text-base font-semibold hover:bg-purple-700 transition-all"
                     >
-                      <Mail size={18} />
+                      <Mail size={16} className="sm:w-5 sm:h-5" />
                       Contact Support
                     </a>
                   </div>
@@ -1399,11 +1403,11 @@ const SettingsPage = () => {
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="sticky bottom-0 bg-gray-50 px-6 py-4 rounded-b-2xl border-t-2 border-gray-200">
+            {/* Footer - Fixed at bottom */}
+            <div className="flex-shrink-0 bg-gray-50 px-4 sm:px-6 py-3 sm:py-4 rounded-b-2xl border-t-2 border-gray-200">
               <button
                 onClick={() => setShowRefundPolicy(false)}
-                className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-violet-700 transition-all shadow-lg"
+                className="w-full px-4 py-2.5 sm:px-6 sm:py-3 bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-xl text-sm sm:text-base font-semibold hover:from-purple-700 hover:to-violet-700 transition-all shadow-lg"
               >
                 I Understand
               </button>
