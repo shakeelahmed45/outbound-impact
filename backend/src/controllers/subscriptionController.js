@@ -155,20 +155,9 @@ const cancelSubscription = async (req, res) => {
 
     console.log('🗑️ Canceling subscription for user:', userId);
 
-    // Get user with ALL subscription fields
+    // Get user with subscription fields and memberOf relation
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        stripeCustomerId: true,
-        subscriptionId: true,
-        subscriptionStatus: true,
-        currentPeriodStart: true,
-        currentPeriodEnd: true,
-        priceId: true,
-      },
       include: {
         memberOf: {
           select: { id: true }  // Check if user is a team member
@@ -301,24 +290,9 @@ const cancelSubscription = async (req, res) => {
       console.error('❌ Failed to send cancellation email:', emailError.message);
     }
 
-    // Get updated user data with fields that actually exist in database
+    // Get updated user data with memberOf relation
     const updatedUser = await prisma.user.findUnique({
       where: { id: user.id },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        profilePicture: true,  // ✅ FIXED: was 'photo', should be 'profilePicture'
-        subscriptionStatus: true,
-        subscriptionId: true,
-        stripeCustomerId: true,
-        priceId: true,
-        currentPeriodStart: true,
-        currentPeriodEnd: true,
-        storageUsed: true,
-        storageLimit: true,
-      },
       include: {
         memberOf: {
           select: { id: true }  // Check if user is a team member
