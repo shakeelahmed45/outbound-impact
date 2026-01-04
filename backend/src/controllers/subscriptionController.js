@@ -78,7 +78,7 @@ const toggleAutoRenewal = async (req, res) => {
     console.log('✅ Stripe subscription updated:', subscription.id);
     console.log('   cancel_at_period_end:', subscription.cancel_at_period_end);
 
-    // Update user in database
+    // Update user in database with fields that actually exist
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
@@ -98,15 +98,6 @@ const toggleAutoRenewal = async (req, res) => {
         currentPeriodEnd: true,
         storageUsed: true,
         storageLimit: true,
-        isTeamMember: true,
-        teamRole: true,
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          }
-        },
       }
     });
 
@@ -290,7 +281,7 @@ const cancelSubscription = async (req, res) => {
       console.error('❌ Failed to send cancellation email:', emailError.message);
     }
 
-    // Get updated user data with ALL necessary fields
+    // Get updated user data with fields that actually exist in database
     const updatedUser = await prisma.user.findUnique({
       where: { id: user.id },
       select: {
@@ -307,15 +298,6 @@ const cancelSubscription = async (req, res) => {
         currentPeriodEnd: true,
         storageUsed: true,
         storageLimit: true,
-        isTeamMember: true,
-        teamRole: true,
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          }
-        },
       }
     });
 

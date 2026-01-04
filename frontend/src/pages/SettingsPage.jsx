@@ -14,7 +14,8 @@ const SettingsPage = () => {
   const { user, logout, setUser } = useAuthStore();
   const { toasts, showToast, removeToast } = useToast();
 
-  const effectiveUser = user?.isTeamMember ? user.organization : user;
+  // Use user directly (no team member fields exist in User model)
+  const effectiveUser = user;
   const userIsTeamMember = user?.isTeamMember === true;
   const effectiveRole = effectiveUser?.role;
 
