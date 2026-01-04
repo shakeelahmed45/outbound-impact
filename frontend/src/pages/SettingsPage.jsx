@@ -334,6 +334,12 @@ const SettingsPage = () => {
         
         // Update user data
         setUser(response.data.user);
+        
+        // ✅ Redirect to dashboard to trigger blocking check
+        // This ensures DashboardLayout sees the updated status and shows modal
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 1000); // Small delay to show success message
       }
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Failed to cancel subscription';
