@@ -89,7 +89,7 @@ const toggleAutoRenewal = async (req, res) => {
         email: true,
         name: true,
         role: true,
-        photo: true,
+        profilePicture: true,  // ✅ FIXED: was 'photo', should be 'profilePicture'
         subscriptionStatus: true,
         subscriptionId: true,
         stripeCustomerId: true,
@@ -314,7 +314,7 @@ const cancelSubscription = async (req, res) => {
         email: true,
         name: true,
         role: true,
-        photo: true,
+        profilePicture: true,  // ✅ FIXED: was 'photo', should be 'profilePicture'
         subscriptionStatus: true,
         subscriptionId: true,
         stripeCustomerId: true,
