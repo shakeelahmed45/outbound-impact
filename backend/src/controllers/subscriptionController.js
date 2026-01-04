@@ -334,7 +334,115 @@ const cancelSubscription = async (req, res) => {
   }
 };
 
+/**
+ * ✅ REACTIVATE CANCELED SUBSCRIPTION
+ * 
+ * Creates a new Stripe checkout session for a canceled subscription
+ */
+const reactivateSubscription = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    console.log('🔄 Reactivating subscription for user:', userId);
+
+    // Get user
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        subscriptionStatus: true,
+        priceId: true,
+      }
+    });
+
+    if (!user) {
+      console.error('❌ User not found:', userId);
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    // Check if subscription is actually canceled
+    if (user.subscriptionStatus !== 'canceled') {
+      console.error('❌ Subscription not canceled:', user.subscriptionStatus);
+      return res.status(400).json({
+        status: 'error',
+        message: 'Subscription is not canceled. Current status: ' + user.subscriptionStatus
+      });
+    }
+
+    // Determine which price ID to use based on user's role
+    let priceId = user.priceId; // Try to use their previous price
+
+    if (!priceId) {
+      // If no previous price, determine from role
+      const roleToPriceMap = {
+        'INDIVIDUAL': process.env.STRIPE_INDIVIDUAL_PRICE,
+        'ORG_SMALL': process.env.STRIPE_SMALL_ORG_PRICE,
+        'ORG_MEDIUM': process.env.STRIPE_MEDIUM_ORG_PRICE,
+        'ORG_ENTERPRISE': process.env.STRIPE_ENTERPRISE_PRICE,
+      };
+
+      priceId = roleToPriceMap[user.role];
+    }
+
+    if (!priceId) {
+      console.error('❌ Could not determine price ID for role:', user.role);
+      return res.status(400).json({
+        status: 'error',
+        message: 'Could not determine subscription plan'
+      });
+    }
+
+    console.log('✅ Creating checkout session for reactivation:');
+    console.log('   Email:', user.email);
+    console.log('   Role:', user.role);
+    console.log('   Price ID:', priceId);
+
+    // Create Stripe checkout session
+    const session = await stripe.checkout.sessions.create({
+      customer_email: user.email,
+      line_items: [
+        {
+          price: priceId,
+          quantity: 1,
+        },
+      ],
+      mode: 'subscription',
+      success_url: `${process.env.FRONTEND_URL}/dashboard?reactivated=true`,
+      cancel_url: `${process.env.FRONTEND_URL}/settings?reactivation_canceled=true`,
+      metadata: {
+        userId: user.id,
+        reactivation: 'true',
+      },
+    });
+
+    console.log('✅ Checkout session created:', session.id);
+    console.log('   URL:', session.url);
+
+    res.json({
+      status: 'success',
+      checkoutUrl: session.url,
+      sessionId: session.id,
+    });
+
+  } catch (error) {
+    console.error('❌ Reactivate subscription error:', error);
+    console.error('   Error message:', error.message);
+    
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to reactivate subscription'
+    });
+  }
+};
+
 module.exports = {
   toggleAutoRenewal,
   cancelSubscription,
+  reactivateSubscription,
 };
