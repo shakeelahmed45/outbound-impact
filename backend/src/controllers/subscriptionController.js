@@ -222,16 +222,19 @@ const cancelSubscription = async (req, res) => {
     let refundInfo = null;
     let cancellationMessage = '';
 
+    // ✅ ALWAYS CANCEL IMMEDIATELY (both within 7 days and after)
+    console.log('🗑️ Canceling subscription immediately in Stripe...');
+
+    // Cancel subscription immediately in Stripe
+    const canceledSubscription = await stripe.subscriptions.cancel(
+      user.subscriptionId
+    );
+
+    console.log('✅ Subscription canceled in Stripe:', canceledSubscription.id);
+
     if (isRefundEligible) {
-      // ✅ WITHIN 7 DAYS: Cancel immediately with full refund
-      console.log('✅ Within 7-day refund window - processing refund');
-
-      // Cancel subscription immediately
-      const canceledSubscription = await stripe.subscriptions.cancel(
-        user.subscriptionId
-      );
-
-      console.log('✅ Subscription canceled in Stripe:', canceledSubscription.id);
+      // ✅ WITHIN 7 DAYS: Process full refund
+      console.log('💰 Within 7-day refund window - processing refund');
 
       // Get the latest invoice to refund
       const invoices = await stripe.invoices.list({
@@ -257,45 +260,26 @@ const cancelSubscription = async (req, res) => {
           currency: refund.currency,
         };
 
-        cancellationMessage = `Subscription canceled and refund of $${(refund.amount / 100).toFixed(2)} ${refund.currency.toUpperCase()} has been processed. You will see the refund in 5-10 business days.`;
+        cancellationMessage = `Subscription canceled immediately and refund of $${(refund.amount / 100).toFixed(2)} ${refund.currency.toUpperCase()} has been processed. You will see the refund in 5-10 business days.`;
       } else {
-        cancellationMessage = 'Subscription canceled successfully.';
+        cancellationMessage = 'Subscription canceled successfully with refund processing.';
       }
 
-      // Update database immediately
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          subscriptionStatus: 'canceled',
-        }
-      });
-
     } else {
-      // ❌ AFTER 7 DAYS: Cancel at period end (no refund)
-      console.log('⚠️ Past 7-day refund window - canceling at period end');
-
-      // Set subscription to cancel at period end (no immediate cancellation)
-      const updatedSubscription = await stripe.subscriptions.update(
-        user.subscriptionId,
-        {
-          cancel_at_period_end: true
-        }
-      );
-
-      console.log('⚠️ Subscription set to cancel at period end:', updatedSubscription.cancel_at);
-      console.log('   Access until:', new Date(updatedSubscription.current_period_end * 1000).toLocaleDateString());
-
-      // Update database to "canceling" status
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          subscriptionStatus: 'canceling',
-        }
-      });
-
-      const accessUntilDate = new Date(updatedSubscription.current_period_end * 1000).toLocaleDateString();
-      cancellationMessage = `Subscription will be canceled on ${accessUntilDate}. You will have access to all features until then. No refund is available as the 7-day refund period has passed.`;
+      // ❌ AFTER 7 DAYS: Cancel immediately but NO refund
+      console.log('⚠️ Past 7-day refund window - no refund processed');
+      cancellationMessage = `Subscription has been canceled immediately. No refund is available as the 7-day refund period has passed.`;
     }
+
+    // ✅ ALWAYS update database to 'canceled' status (immediate blocking)
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        subscriptionStatus: 'canceled',
+      }
+    });
+
+    console.log('✅ Database updated - Status: canceled');
 
     // Send cancellation email
     try {

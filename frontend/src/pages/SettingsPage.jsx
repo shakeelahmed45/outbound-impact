@@ -289,21 +289,21 @@ const SettingsPage = () => {
 
     const isWithin7Days = daysSince <= 7;
 
-    // Show appropriate confirmation based on 7-day window
+    // ✅ UPDATED: Both cases now cancel immediately
     const confirmMessage = isWithin7Days
       ? '⚠️ Cancel Subscription & Get Refund?\n\n' +
         `You subscribed ${daysSince} day${daysSince === 1 ? '' : 's'} ago.\n\n` +
         'This will:\n' +
         '• Process a FULL REFUND to your payment method\n' +
-        '• Cancel your subscription immediately\n' +
-        '• You will lose access to all features\n\n' +
+        '• Cancel your subscription IMMEDIATELY\n' +
+        '• You will lose access to all features RIGHT NOW\n\n' +
         'Are you sure?'
       : '⚠️ Cancel Subscription?\n\n' +
         `You subscribed ${daysSince} days ago (past the 7-day refund window).\n\n` +
         'This will:\n' +
-        '• Cancel your subscription at period end\n' +
-        '• NO refund will be processed\n' +
-        '• You will keep access until ' + (effectiveUser?.currentPeriodEnd ? new Date(effectiveUser.currentPeriodEnd).toLocaleDateString() : 'period end') + '\n\n' +
+        '• Cancel your subscription IMMEDIATELY\n' +
+        '• NO refund will be processed (past 7-day window)\n' +
+        '• You will lose access to all features RIGHT NOW\n\n' +
         'Are you sure?';
 
     const confirmed = window.confirm(confirmMessage);
