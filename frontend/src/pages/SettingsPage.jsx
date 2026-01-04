@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, CreditCard, Shield, LogOut, Upload, Trash2, MessageSquare, MessagesSquare, BookOpen, TrendingUp, UserCheck, Mail, Check, AlertTriangle, ToggleLeft, ToggleRight } from 'lucide-react';
+import { User, CreditCard, Shield, LogOut, Upload, Trash2, MessageSquare, MessagesSquare, BookOpen, TrendingUp, UserCheck, Mail, Check, AlertTriangle, ToggleLeft, ToggleRight, Clock } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import Tooltip from '../components/common/Tooltip';
 import useAuthStore from '../store/authStore';
@@ -32,6 +32,12 @@ const SettingsPage = () => {
   const [togglingRenewal, setTogglingRenewal] = useState(false);
   const [cancelingSubscription, setCancelingSubscription] = useState(false);
   
+  // ✅ NEW: 7-day refund policy state
+  const [refundEligible, setRefundEligible] = useState(false);
+  const [daysRemaining, setDaysRemaining] = useState(0);
+  const [hoursRemaining, setHoursRemaining] = useState(0);
+  const [minutesRemaining, setMinutesRemaining] = useState(0);
+  
   // Email change states
   const [showEmailChange, setShowEmailChange] = useState(false);
   const [newEmail, setNewEmail] = useState('');
@@ -47,14 +53,72 @@ const SettingsPage = () => {
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState('');
 
+  // ✅ NEW: Calculate 7-day refund eligibility
   useEffect(() => {
     document.title = 'Settings | Outbound Impact';
     
-    // ✅ Check if subscription has cancel_at_period_end set
+    // Check if subscription has cancel_at_period_end set
     if (effectiveUser?.subscriptionStatus === 'canceling') {
       setAutoRenewal(false);
     }
-  }, [effectiveUser]);
+
+    // Calculate 7-day refund eligibility
+    if (effectiveUser?.subscriptionStartDate && effectiveRole !== 'INDIVIDUAL') {
+      const subscriptionDate = new Date(effectiveUser.subscriptionStartDate);
+      const now = new Date();
+      const diffTime = now - subscriptionDate;
+      const diffDays = diffTime / (1000 * 60 * 60 * 24);
+      
+      if (diffDays <= 7) {
+        setRefundEligible(true);
+        
+        // Calculate time remaining
+        const endDate = new Date(subscriptionDate.getTime() + (7 * 24 * 60 * 60 * 1000));
+        const timeLeft = endDate - now;
+        
+        const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+        
+        setDaysRemaining(days);
+        setHoursRemaining(hours);
+        setMinutesRemaining(minutes);
+      } else {
+        setRefundEligible(false);
+      }
+    }
+  }, [effectiveUser, effectiveRole]);
+
+  // ✅ NEW: Update countdown timer every minute
+  useEffect(() => {
+    if (!refundEligible) return;
+
+    const timer = setInterval(() => {
+      if (effectiveUser?.subscriptionStartDate) {
+        const subscriptionDate = new Date(effectiveUser.subscriptionStartDate);
+        const now = new Date();
+        const endDate = new Date(subscriptionDate.getTime() + (7 * 24 * 60 * 60 * 1000));
+        const timeLeft = endDate - now;
+        
+        if (timeLeft <= 0) {
+          setRefundEligible(false);
+          setDaysRemaining(0);
+          setHoursRemaining(0);
+          setMinutesRemaining(0);
+        } else {
+          const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+          const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+          const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+          
+          setDaysRemaining(days);
+          setHoursRemaining(hours);
+          setMinutesRemaining(minutes);
+        }
+      }
+    }, 60000); // Update every minute
+
+    return () => clearInterval(timer);
+  }, [refundEligible, effectiveUser]);
 
   const handleLogout = () => {
     logout();
@@ -222,7 +286,7 @@ const SettingsPage = () => {
     }
   };
 
-  // ✅ FIXED: Toggle auto-renewal (removed frontend validation)
+  // ✅ Toggle auto-renewal
   const handleToggleAutoRenewal = async () => {
     const newState = !autoRenewal;
     
@@ -259,53 +323,101 @@ const SettingsPage = () => {
     }
   };
 
-  // ✅ FIXED: Cancel subscription (removed frontend validation)
+  // ✅ ENHANCED: Cancel subscription with refund logic
   const handleCancelSubscription = async () => {
-    const confirmed = window.confirm(
-      '⚠️ Cancel Subscription?\n\n' +
-      'Your subscription will be canceled immediately and you will receive a prorated refund for the unused time.\n\n' +
-      'You will lose access to:\n' +
-      '• All uploaded content\n' +
-      '• Team collaboration features\n' +
-      '• Analytics and tracking\n' +
-      '• QR code generation\n\n' +
-      'This action cannot be undone. Are you sure?'
-    );
+    // Different flow based on 7-day eligibility
+    if (refundEligible) {
+      // Within 7 days - Process refund and delete account
+      const confirmed = window.confirm(
+        '⚠️ Cancel Subscription & Get Refund?\n\n' +
+        'This will:\n' +
+        '• Process a FULL REFUND to your payment method\n' +
+        '• PERMANENTLY DELETE your account and ALL data\n' +
+        '• Deactivate all your QR codes\n' +
+        '• Remove all media files\n\n' +
+        'You have ' + daysRemaining + ' days, ' + hoursRemaining + ' hours remaining for a refund.\n\n' +
+        'This action CANNOT be undone. Are you sure?'
+      );
 
-    if (!confirmed) return;
+      if (!confirmed) return;
 
-    const doubleConfirm = window.prompt(
-      'Type "CANCEL" to confirm subscription cancellation and refund:'
-    );
+      const doubleConfirm = window.prompt(
+        'Type "REFUND" to confirm refund and account deletion:'
+      );
 
-    if (doubleConfirm !== 'CANCEL') {
-      showToast('Cancellation cancelled', 'warning');
-      return;
-    }
-
-    setCancelingSubscription(true);
-
-    try {
-      const response = await api.post('/subscription/cancel');
-
-      if (response.data.status === 'success') {
-        showToast(
-          `Subscription canceled! ${response.data.refund ? 'Refund of $' + (response.data.refund.amount / 100).toFixed(2) + ' has been processed.' : ''}`,
-          'success'
-        );
-        
-        setUser(response.data.user);
-        
-        // Redirect to plans page after 3 seconds
-        setTimeout(() => {
-          navigate('/plans');
-        }, 3000);
+      if (doubleConfirm !== 'REFUND') {
+        showToast('Cancellation cancelled', 'warning');
+        return;
       }
-    } catch (error) {
-      const errorMessage = error.response?.data?.message || 'Failed to cancel subscription';
-      showToast(errorMessage, 'error');
-    } finally {
-      setCancelingSubscription(false);
+
+      setCancelingSubscription(true);
+
+      try {
+        // Call refund endpoint
+        const response = await api.post('/user/refund/request', {
+          reason: 'User requested refund within 7-day period'
+        });
+
+        if (response.data.status === 'success') {
+          showToast(
+            `Refund of $${response.data.refund.amount} processed successfully! Your account has been deleted.`,
+            'success'
+          );
+          
+          // User will be logged out
+          setTimeout(() => {
+            logout();
+            window.location.href = '/signin';
+          }, 3000);
+        }
+      } catch (error) {
+        const errorMessage = error.response?.data?.message || 'Failed to process refund';
+        showToast(errorMessage, 'error');
+      } finally {
+        setCancelingSubscription(false);
+      }
+    } else {
+      // After 7 days - Only cancel subscription (no refund, no deletion)
+      const confirmed = window.confirm(
+        '⚠️ Cancel Subscription?\n\n' +
+        'Your subscription will be canceled, but:\n' +
+        '• NO refund will be processed (7-day period has passed)\n' +
+        '• Your account will remain active\n' +
+        '• You will lose access at the end of your billing period\n' +
+        '• All data will be preserved\n\n' +
+        'Are you sure?'
+      );
+
+      if (!confirmed) return;
+
+      const doubleConfirm = window.prompt(
+        'Type "CANCEL" to confirm subscription cancellation:'
+      );
+
+      if (doubleConfirm !== 'CANCEL') {
+        showToast('Cancellation cancelled', 'warning');
+        return;
+      }
+
+      setCancelingSubscription(true);
+
+      try {
+        const response = await api.post('/subscription/cancel');
+
+        if (response.data.status === 'success') {
+          showToast(
+            'Subscription canceled. You will have access until ' + new Date(response.data.currentPeriodEnd).toLocaleDateString(),
+            'success'
+          );
+          
+          setUser(response.data.user);
+        }
+      } catch (error) {
+        const errorMessage = error.response?.data?.message || 'Failed to cancel subscription';
+        showToast(errorMessage, 'error');
+      } finally {
+        setCancelingSubscription(false);
+      }
     }
   };
 
@@ -594,7 +706,7 @@ const SettingsPage = () => {
     }
 
     if (activeTab === 'subscription') {
-      // ✅ Check if subscription will end (auto-renewal OFF or already canceled)
+      // Check if subscription will end (auto-renewal OFF or already canceled)
       const subscriptionEnding = !autoRenewal || effectiveUser?.subscriptionStatus === 'canceling';
       
       return (
@@ -628,7 +740,56 @@ const SettingsPage = () => {
             </div>
           )}
 
-          {/* ✅ WARNING: Subscription Ending */}
+          {/* ✅ NEW: 7-Day Refund Countdown Timer */}
+          {refundEligible && !userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-400 rounded-2xl p-6 mb-6 shadow-lg">
+              <div className="flex items-start gap-3">
+                <Clock className="text-green-600 flex-shrink-0 mt-1" size={24} />
+                <div className="flex-1">
+                  <h4 className="font-bold text-green-900 mb-2 flex items-center gap-2">
+                    🎉 7-Day Refund Policy Active!
+                  </h4>
+                  <p className="text-green-800 mb-4">
+                    You can get a <strong>FULL REFUND</strong> if you cancel within 7 days of subscribing. 
+                    After the timer expires, you can still cancel but without a refund.
+                  </p>
+                  
+                  {/* Countdown Timer */}
+                  <div className="bg-white rounded-xl p-4 shadow-md">
+                    <p className="text-sm text-gray-600 mb-2 text-center">Time Remaining for Refund:</p>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="text-center">
+                        <div className="bg-gradient-to-br from-green-500 to-emerald-500 text-white rounded-lg p-3">
+                          <div className="text-3xl font-bold">{daysRemaining}</div>
+                          <div className="text-xs uppercase mt-1">Days</div>
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="bg-gradient-to-br from-green-500 to-emerald-500 text-white rounded-lg p-3">
+                          <div className="text-3xl font-bold">{hoursRemaining}</div>
+                          <div className="text-xs uppercase mt-1">Hours</div>
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="bg-gradient-to-br from-green-500 to-emerald-500 text-white rounded-lg p-3">
+                          <div className="text-3xl font-bold">{minutesRemaining}</div>
+                          <div className="text-xs uppercase mt-1">Minutes</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                      <strong>Important:</strong> Requesting a refund will permanently delete your account and all data. This cannot be undone.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* WARNING: Subscription Ending */}
           {subscriptionEnding && effectiveUser?.currentPeriodEnd && (
             <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-400 rounded-2xl p-6 mb-6 shadow-lg">
               <div className="flex items-start gap-3">
@@ -672,7 +833,7 @@ const SettingsPage = () => {
               </div>
             </div>
 
-            {/* ✅ AUTO-RENEWAL TOGGLE */}
+            {/* AUTO-RENEWAL TOGGLE */}
             {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border-2 border-blue-200 shadow-lg">
                 <div className="flex items-center justify-between">
@@ -774,23 +935,23 @@ const SettingsPage = () => {
               </ul>
             </div>
 
-            {/* ✅ CANCEL SUBSCRIPTION BUTTON */}
+            {/* ✅ ENHANCED: Cancel Button with Dynamic Text */}
             {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <button
                   onClick={handleCancelSubscription}
                   disabled={cancelingSubscription}
-                  className="px-6 py-3 border-2 border-red-500 text-red-600 rounded-xl font-semibold hover:bg-red-50 transition-all flex items-center gap-2 justify-center disabled:opacity-50"
+                  className={`px-6 py-3 border-2 ${refundEligible ? 'border-green-500 text-green-600 hover:bg-green-50' : 'border-red-500 text-red-600 hover:bg-red-50'} rounded-xl font-semibold transition-all flex items-center gap-2 justify-center disabled:opacity-50`}
                 >
                   {cancelingSubscription ? (
                     <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-red-600"></div>
-                      Canceling...
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div>
+                      Processing...
                     </>
                   ) : (
                     <>
                       <Trash2 size={18} />
-                      Cancel Subscription & Get Refund
+                      {refundEligible ? 'Cancel Subscription & Get Refund' : 'Cancel Subscription'}
                     </>
                   )}
                 </button>
