@@ -89,10 +89,24 @@ const toggleAutoRenewal = async (req, res) => {
         email: true,
         name: true,
         role: true,
+        photo: true,
         subscriptionStatus: true,
+        subscriptionId: true,
+        stripeCustomerId: true,
+        priceId: true,
+        currentPeriodStart: true,
         currentPeriodEnd: true,
         storageUsed: true,
         storageLimit: true,
+        isTeamMember: true,
+        teamRole: true,
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          }
+        },
       }
     });
 
@@ -292,7 +306,7 @@ const cancelSubscription = async (req, res) => {
       console.error('❌ Failed to send cancellation email:', emailError.message);
     }
 
-    // Get updated user data
+    // Get updated user data with ALL necessary fields
     const updatedUser = await prisma.user.findUnique({
       where: { id: user.id },
       select: {
@@ -300,19 +314,35 @@ const cancelSubscription = async (req, res) => {
         email: true,
         name: true,
         role: true,
+        photo: true,
         subscriptionStatus: true,
+        subscriptionId: true,
+        stripeCustomerId: true,
+        priceId: true,
+        currentPeriodStart: true,
         currentPeriodEnd: true,
         storageUsed: true,
         storageLimit: true,
+        isTeamMember: true,
+        teamRole: true,
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          }
+        },
       }
     });
 
     console.log('✅ Cancellation complete:', user.email);
+    console.log('   Updated status:', updatedUser.subscriptionStatus);
 
     res.json({
       status: 'success',
       message: cancellationMessage,
       isRefundEligible: isRefundEligible,
+      daysSinceStart: daysSinceStart,
       user: {
         ...updatedUser,
         storageUsed: updatedUser.storageUsed.toString(),

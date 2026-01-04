@@ -8,6 +8,9 @@ const SubscriptionBlockedModal = ({ user, onReactivateSuccess }) => {
   const [reactivating, setReactivating] = useState(false);
   const [error, setError] = useState('');
 
+  // ✅ Check if user is organization owner (not a team member)
+  const isOrganizationOwner = !user?.isTeamMember;
+
   const handleReactivate = async () => {
     try {
       setReactivating(true);
@@ -45,7 +48,9 @@ const SubscriptionBlockedModal = ({ user, onReactivateSuccess }) => {
               <AlertTriangle size={24} className="sm:w-8 sm:h-8" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-lg sm:text-2xl font-bold leading-tight">Subscription Canceled</h2>
+              <h2 className="text-lg sm:text-2xl font-bold leading-tight">
+                {isOrganizationOwner ? 'Subscription Canceled' : 'Organization Access Blocked'}
+              </h2>
               <p className="text-red-100 text-xs sm:text-sm mt-1">Access Restricted</p>
             </div>
           </div>
@@ -55,33 +60,68 @@ const SubscriptionBlockedModal = ({ user, onReactivateSuccess }) => {
         <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-h-[calc(100vh-200px)] overflow-y-auto">
           {/* Message */}
           <div className="bg-red-50 border-2 border-red-200 rounded-xl p-3 sm:p-4">
-            <p className="text-red-900 font-medium mb-2 text-sm sm:text-base">
-              Your subscription has been canceled.
-            </p>
-            <p className="text-red-800 text-xs sm:text-sm">
-              You no longer have access to premium features. To continue using Outbound Impact, 
-              please reactivate your subscription.
-            </p>
+            {isOrganizationOwner ? (
+              <>
+                <p className="text-red-900 font-medium mb-2 text-sm sm:text-base">
+                  Your subscription has been canceled.
+                </p>
+                <p className="text-red-800 text-xs sm:text-sm">
+                  You no longer have access to premium features. To continue using Outbound Impact, 
+                  please reactivate your subscription.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-red-900 font-medium mb-2 text-sm sm:text-base">
+                  Organization subscription has been canceled.
+                </p>
+                <p className="text-red-800 text-xs sm:text-sm">
+                  The organization owner has canceled the subscription. You no longer have access to this organization's features. 
+                  Please contact the organization owner to reactivate.
+                </p>
+              </>
+            )}
           </div>
 
           {/* Account Info */}
           <div className="bg-gray-50 rounded-xl p-3 sm:p-4 border border-gray-200">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="min-w-0">
-                <p className="text-xs text-gray-600 mb-1">Account</p>
+                <p className="text-xs text-gray-600 mb-1">
+                  {isOrganizationOwner ? 'Account' : 'Your Email'}
+                </p>
                 <p className="text-gray-900 font-semibold text-xs sm:text-sm truncate" title={user?.email}>
                   {user?.email}
                 </p>
               </div>
               <div className="min-w-0">
-                <p className="text-xs text-gray-600 mb-1">Previous Plan</p>
+                <p className="text-xs text-gray-600 mb-1">
+                  {isOrganizationOwner ? 'Previous Plan' : 'Your Role'}
+                </p>
                 <p className="text-gray-900 font-semibold text-xs sm:text-sm">
-                  {user?.role === 'ORG_SMALL' ? 'Small Organization' :
-                   user?.role === 'ORG_MEDIUM' ? 'Medium Organization' :
-                   user?.role === 'ORG_ENTERPRISE' ? 'Enterprise' : 'Individual'}
+                  {isOrganizationOwner ? (
+                    user?.role === 'ORG_SMALL' ? 'Small Organization' :
+                    user?.role === 'ORG_MEDIUM' ? 'Medium Organization' :
+                    user?.role === 'ORG_ENTERPRISE' ? 'Enterprise' : 'Individual'
+                  ) : (
+                    user?.teamRole || 'Team Member'
+                  )}
                 </p>
               </div>
             </div>
+            
+            {/* Show organization info for team members */}
+            {!isOrganizationOwner && user?.organization && (
+              <div className="mt-3 pt-3 border-t border-gray-200">
+                <p className="text-xs text-gray-600 mb-1">Organization</p>
+                <p className="text-gray-900 font-semibold text-xs sm:text-sm">
+                  {user.organization.name}
+                </p>
+                <p className="text-gray-600 text-xs mt-1">
+                  Contact: {user.organization.email}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* What You Lost */}
@@ -100,7 +140,7 @@ const SubscriptionBlockedModal = ({ user, onReactivateSuccess }) => {
                 <span className="text-red-500 mt-0.5 flex-shrink-0">✗</span>
                 <span>Analytics and tracking</span>
               </li>
-              {(user?.role === 'ORG_SMALL' || user?.role === 'ORG_MEDIUM' || user?.role === 'ORG_ENTERPRISE') && (
+              {((user?.role === 'ORG_SMALL' || user?.role === 'ORG_MEDIUM' || user?.role === 'ORG_ENTERPRISE') || !isOrganizationOwner) && (
                 <li className="flex items-start gap-2 text-gray-700 text-xs sm:text-sm">
                   <span className="text-red-500 mt-0.5 flex-shrink-0">✗</span>
                   <span>Team collaboration features</span>
@@ -118,26 +158,40 @@ const SubscriptionBlockedModal = ({ user, onReactivateSuccess }) => {
 
           {/* Action Buttons */}
           <div className="space-y-3">
-            {/* Reactivate Button */}
-            <button
-              onClick={handleReactivate}
-              disabled={reactivating}
-              className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2 sm:gap-3 text-sm sm:text-base"
-            >
-              {reactivating ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white"></div>
-                  <span className="text-xs sm:text-base">Redirecting to Checkout...</span>
-                </>
-              ) : (
-                <>
-                  <RefreshCw size={18} className="sm:w-5 sm:h-5 flex-shrink-0" />
-                  <span>Reactivate Subscription</span>
-                </>
-              )}
-            </button>
+            {/* ✅ ONLY show Reactivate button to ORGANIZATION OWNERS */}
+            {isOrganizationOwner && (
+              <button
+                onClick={handleReactivate}
+                disabled={reactivating}
+                className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2 sm:gap-3 text-sm sm:text-base"
+              >
+                {reactivating ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white"></div>
+                    <span className="text-xs sm:text-base">Redirecting to Checkout...</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw size={18} className="sm:w-5 sm:h-5 flex-shrink-0" />
+                    <span>Reactivate Subscription</span>
+                  </>
+                )}
+              </button>
+            )}
 
-            {/* Logout Button */}
+            {/* ✅ Team members see message instead of reactivate button */}
+            {!isOrganizationOwner && (
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+                <p className="text-blue-900 text-sm font-medium mb-2">
+                  ⓘ Only the organization owner can reactivate
+                </p>
+                <p className="text-blue-800 text-xs">
+                  Please contact <strong>{user?.organization?.email}</strong> to reactivate the subscription.
+                </p>
+              </div>
+            )}
+
+            {/* Logout Button - EVERYONE sees this */}
             <button
               onClick={handleLogout}
               disabled={reactivating}
