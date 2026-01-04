@@ -341,18 +341,3 @@ const getRefundStatus = async (req, res) => {
     });
   }
 };
-
-console.log('✅ [REFUND] All functions defined successfully');
-console.log('✅ [REFUND] Exporting:', {
-  checkRefundEligibility: typeof checkRefundEligibility,
-  requestRefund: typeof requestRefund,
-  getRefundStatus: typeof getRefundStatus,
-});
-
-module.exports = {
-  checkRefundEligibility,
-  requestRefund,
-  getRefundStatus,
-};
-
-console.log('✅ [REFUND] refundController.js loaded completely!');
