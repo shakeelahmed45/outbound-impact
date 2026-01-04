@@ -34,6 +34,7 @@ const SettingsPage = () => {
   
   // ✅ NEW: 7-day refund policy state
   const [refundEligible, setRefundEligible] = useState(false);
+  const [showRefundPolicy, setShowRefundPolicy] = useState(false);
   
   // Email change states
   const [showEmailChange, setShowEmailChange] = useState(false);
@@ -809,7 +810,7 @@ const SettingsPage = () => {
 
             {/* ✅ ENHANCED: Cancel Button with Dynamic Text */}
             {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
-              <div className="flex flex-col sm:flex-row gap-4 pt-4">
+              <div className="flex flex-col gap-4 pt-4">
                 <button
                   onClick={handleCancelSubscription}
                   disabled={cancelingSubscription}
@@ -826,6 +827,15 @@ const SettingsPage = () => {
                       Cancel Subscription
                     </>
                   )}
+                </button>
+                
+                {/* Read Refund Policy Button */}
+                <button
+                  onClick={() => setShowRefundPolicy(true)}
+                  className="text-sm text-purple-600 hover:text-purple-800 font-medium flex items-center gap-2 justify-center transition-colors"
+                >
+                  <BookOpen size={16} />
+                  Read Refund Policy
                 </button>
               </div>
             )}
@@ -1235,6 +1245,201 @@ const SettingsPage = () => {
           </div>
         </div>
       )}
+
+      {/* Refund Policy Modal */}
+      {showRefundPolicy && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-violet-600 text-white p-6 rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <h3 className="text-2xl font-bold flex items-center gap-2">
+                  <BookOpen size={24} />
+                  7-Day Refund Policy
+                </h3>
+                <button
+                  onClick={() => setShowRefundPolicy(false)}
+                  className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Policy Overview */}
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-400 rounded-xl p-6">
+                <h4 className="font-bold text-green-900 text-lg mb-3 flex items-center gap-2">
+                  <Check className="text-green-600" size={20} />
+                  100% Money-Back Guarantee
+                </h4>
+                <p className="text-green-800">
+                  We offer a <strong>full refund within 7 days</strong> of your subscription purchase. 
+                  No questions asked, no hassles. If you're not completely satisfied with Outbound Impact, 
+                  we'll refund your entire payment.
+                </p>
+              </div>
+
+              {/* How It Works */}
+              <div>
+                <h4 className="font-bold text-gray-800 text-lg mb-4">How It Works</h4>
+                <div className="space-y-4">
+                  <div className="flex gap-4">
+                    <div className="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold">
+                      1
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-gray-800 mb-1">Subscribe to Any Plan</h5>
+                      <p className="text-gray-600 text-sm">
+                        Choose any paid plan (Individual, Small Organization, Medium Organization, or Enterprise)
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <div className="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold">
+                      2
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-gray-800 mb-1">Try Outbound Impact Risk-Free</h5>
+                      <p className="text-gray-600 text-sm">
+                        Use all features for up to 7 days. Create campaigns, upload media, generate QR codes, 
+                        and explore everything the platform offers.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <div className="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold">
+                      3
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-gray-800 mb-1">Request Refund if Not Satisfied</h5>
+                      <p className="text-gray-600 text-sm">
+                        If you're not happy, click "Cancel Subscription" in your settings within 7 days. 
+                        You'll receive a full refund to your original payment method.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Important Details */}
+              <div>
+                <h4 className="font-bold text-gray-800 text-lg mb-4">Important Details</h4>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
+                    <Clock className="text-blue-600 flex-shrink-0 mt-0.5" size={18} />
+                    <div>
+                      <p className="text-sm text-gray-700">
+                        <strong>7-Day Window:</strong> The refund period starts from the moment your payment is processed, 
+                        not from when you start using the platform.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
+                    <CreditCard className="text-blue-600 flex-shrink-0 mt-0.5" size={18} />
+                    <div>
+                      <p className="text-sm text-gray-700">
+                        <strong>Refund Processing:</strong> Once approved, refunds are processed immediately to your 
+                        original payment method. It may take 5-10 business days for the refund to appear in your account, 
+                        depending on your bank or card issuer.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <AlertTriangle className="text-yellow-600 flex-shrink-0 mt-0.5" size={18} />
+                    <div>
+                      <p className="text-sm text-gray-700">
+                        <strong>After 7 Days:</strong> After the 7-day window, you can still cancel your subscription, 
+                        but no refund will be issued. Your subscription will remain active until the end of your current 
+                        billing period.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 p-3 bg-purple-50 rounded-lg">
+                    <Mail className="text-purple-600 flex-shrink-0 mt-0.5" size={18} />
+                    <div>
+                      <p className="text-sm text-gray-700">
+                        <strong>Confirmation:</strong> You'll receive an email confirmation when your refund is processed. 
+                        Keep this for your records.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* What Happens After Refund */}
+              <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6">
+                <h4 className="font-bold text-red-900 text-lg mb-3 flex items-center gap-2">
+                  <AlertTriangle className="text-red-600" size={20} />
+                  What Happens After a Refund?
+                </h4>
+                <ul className="space-y-2 text-sm text-red-800">
+                  <li className="flex items-start gap-2">
+                    <span className="text-red-600 mt-1">•</span>
+                    <span>Your subscription is canceled immediately</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-red-600 mt-1">•</span>
+                    <span>You lose access to all premium features</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-red-600 mt-1">•</span>
+                    <span>All QR codes are deactivated</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-red-600 mt-1">•</span>
+                    <span>All uploaded media and campaigns are preserved for 30 days in case you want to reactivate</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Contact Support */}
+              <div className="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-6">
+                <h4 className="font-bold text-purple-900 text-lg mb-3">Need Help?</h4>
+                <p className="text-purple-800 mb-3">
+                  Have questions about our refund policy or need assistance? Our support team is here to help!
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <a
+                    href="mailto:support@outboundimpact.net"
+                    className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors justify-center"
+                  >
+                    <Mail size={18} />
+                    support@outboundimpact.net
+                  </a>
+                  <button
+                    onClick={() => {
+                      setShowRefundPolicy(false);
+                      setActiveTab('live-chat');
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-purple-600 text-purple-600 rounded-lg font-semibold hover:bg-purple-50 transition-colors justify-center"
+                  >
+                    <MessagesSquare size={18} />
+                    Live Chat Support
+                  </button>
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <div className="flex justify-end pt-4 border-t-2 border-gray-200">
+                <button
+                  onClick={() => setShowRefundPolicy(false)}
+                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition-all"
+                >
+                  Got It
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </DashboardLayout>
   );
 };
