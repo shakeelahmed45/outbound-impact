@@ -32,6 +32,9 @@ const SettingsPage = () => {
   const [togglingRenewal, setTogglingRenewal] = useState(false);
   const [cancelingSubscription, setCancelingSubscription] = useState(false);
   
+  // ✅ Refund policy modal state
+  const [showRefundPolicy, setShowRefundPolicy] = useState(false);
+  
   // Email change states
   const [showEmailChange, setShowEmailChange] = useState(false);
   const [newEmail, setNewEmail] = useState('');
@@ -298,7 +301,7 @@ const SettingsPage = () => {
         
         // Redirect to plans page after 3 seconds
         setTimeout(() => {
-          navigate('/dashboard');
+          navigate('/plans');
         }, 3000);
       }
     } catch (error) {
@@ -776,11 +779,11 @@ const SettingsPage = () => {
 
             {/* ✅ CANCEL SUBSCRIPTION BUTTON */}
             {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
-              <div className="flex flex-col sm:flex-row gap-4 pt-4">
+              <div className="pt-4 space-y-3">
                 <button
                   onClick={handleCancelSubscription}
                   disabled={cancelingSubscription}
-                  className="px-6 py-3 border-2 border-red-500 text-red-600 rounded-xl font-semibold hover:bg-red-50 transition-all flex items-center gap-2 justify-center disabled:opacity-50"
+                  className="w-full px-6 py-3 border-2 border-red-500 text-red-600 rounded-xl font-semibold hover:bg-red-50 transition-all flex items-center gap-2 justify-center disabled:opacity-50"
                 >
                   {cancelingSubscription ? (
                     <>
@@ -793,6 +796,15 @@ const SettingsPage = () => {
                       Cancel Subscription & Get Refund
                     </>
                   )}
+                </button>
+                
+                {/* ✅ READ REFUND POLICY BUTTON */}
+                <button
+                  onClick={() => setShowRefundPolicy(true)}
+                  className="w-full px-4 py-2.5 bg-gradient-to-r from-purple-50 to-violet-50 border-2 border-purple-200 text-purple-700 rounded-xl font-medium hover:from-purple-100 hover:to-violet-100 transition-all flex items-center gap-2 justify-center"
+                >
+                  <BookOpen size={16} />
+                  Read Refund Policy
                 </button>
               </div>
             )}
@@ -1198,6 +1210,203 @@ const SettingsPage = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ REFUND POLICY MODAL */}
+      {showRefundPolicy && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-violet-600 text-white p-6 rounded-t-2xl z-10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-white/20 p-3 rounded-full">
+                    <BookOpen size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">Refund Policy</h2>
+                    <p className="text-purple-100 text-sm mt-1">7-Day Money-Back Guarantee</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowRefundPolicy(false)}
+                  className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-full transition-all"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-6">
+              {/* 7-Day Guarantee */}
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-6">
+                <div className="flex items-start gap-4">
+                  <div className="bg-green-500 text-white p-3 rounded-full flex-shrink-0">
+                    <Check size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-green-900 mb-2">
+                      7-Day Money-Back Guarantee
+                    </h3>
+                    <p className="text-green-800 leading-relaxed">
+                      We're confident you'll love our service! If you're not completely satisfied within the first <strong>7 days</strong> of your subscription, simply cancel and receive a <strong>full refund</strong> of your subscription fee.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* How to Get a Refund */}
+              <div className="bg-white border-2 border-gray-200 rounded-xl p-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <span className="bg-purple-100 text-purple-600 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">1</span>
+                  How to Cancel & Get Your Refund
+                </h3>
+                <div className="space-y-3 ml-10">
+                  <div className="flex items-start gap-3">
+                    <div className="bg-purple-100 text-purple-600 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                      </svg>
+                    </div>
+                    <p className="text-gray-700">Go to <strong>Settings → Subscription</strong></p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="bg-purple-100 text-purple-600 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                      </svg>
+                    </div>
+                    <p className="text-gray-700">Click <strong>"Cancel Subscription & Get Refund"</strong> button</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="bg-purple-100 text-purple-600 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                      </svg>
+                    </div>
+                    <p className="text-gray-700">Confirm your cancellation</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="bg-purple-100 text-purple-600 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                      </svg>
+                    </div>
+                    <p className="text-gray-700">Your refund will be processed automatically within <strong>5-10 business days</strong></p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Refund Eligibility */}
+              <div className="bg-white border-2 border-gray-200 rounded-xl p-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <span className="bg-purple-100 text-purple-600 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">2</span>
+                  Refund Eligibility
+                </h3>
+                <div className="space-y-3 ml-10">
+                  <div className="flex items-start gap-3">
+                    <Check className="text-green-500 flex-shrink-0 mt-1" size={20} />
+                    <p className="text-gray-700"><strong>Within 7 days:</strong> Full refund, no questions asked</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    <p className="text-gray-700"><strong>After 7 days:</strong> No refund available (subscription canceled immediately)</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* CRITICAL WARNING: Account Deletion */}
+              <div className="bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-300 rounded-xl p-6">
+                <div className="flex items-start gap-4">
+                  <div className="bg-red-500 text-white p-3 rounded-full flex-shrink-0">
+                    <AlertTriangle size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-red-900 mb-3">
+                      ⚠️ IMPORTANT: Do NOT Delete Your Account Directly!
+                    </h3>
+                    <div className="space-y-3 text-red-800">
+                      <p className="leading-relaxed">
+                        <strong>Never delete your account from Settings → Security → Delete Account</strong> if you want to cancel your subscription and get a refund.
+                      </p>
+                      <div className="bg-white/60 border-2 border-red-200 rounded-lg p-4 space-y-2">
+                        <p className="font-semibold text-red-900">❌ If you delete your account directly:</p>
+                        <ul className="space-y-1 ml-5 list-disc">
+                          <li><strong>You will NOT receive any refund</strong></li>
+                          <li><strong>All your data will be permanently deleted</strong></li>
+                          <li><strong>All uploaded content will be lost forever</strong></li>
+                          <li><strong>Your QR codes will stop working</strong></li>
+                          <li><strong>This action CANNOT be undone</strong></li>
+                        </ul>
+                      </div>
+                      <div className="bg-green-500/10 border-2 border-green-400 rounded-lg p-4">
+                        <p className="font-semibold text-green-900 mb-2">✅ Correct Way to Cancel:</p>
+                        <p className="text-green-800">Always use the <strong>"Cancel Subscription & Get Refund"</strong> button in the Subscription section above. This ensures you get your refund (if eligible) and your data is handled properly.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Processing Time */}
+              <div className="bg-white border-2 border-gray-200 rounded-xl p-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <span className="bg-purple-100 text-purple-600 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">3</span>
+                  Refund Processing Time
+                </h3>
+                <div className="ml-10 space-y-3">
+                  <p className="text-gray-700">
+                    Refunds are processed automatically when you cancel within the 7-day window.
+                  </p>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-blue-900 text-sm">
+                      <strong>Timeline:</strong> Refunds typically appear in your account within <strong>5-10 business days</strong>, depending on your bank or payment provider.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact Support */}
+              <div className="bg-gradient-to-br from-purple-50 to-violet-50 border-2 border-purple-200 rounded-xl p-6">
+                <div className="flex items-start gap-4">
+                  <div className="bg-purple-500 text-white p-3 rounded-full flex-shrink-0">
+                    <Mail size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-purple-900 mb-2">
+                      Need Help?
+                    </h3>
+                    <p className="text-purple-800 leading-relaxed mb-3">
+                      If you have any questions about our refund policy or need assistance with cancellation, our support team is here to help!
+                    </p>
+                    <a
+                      href="mailto:support@outboundimpact.com"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-all"
+                    >
+                      <Mail size={18} />
+                      Contact Support
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="sticky bottom-0 bg-gray-50 px-6 py-4 rounded-b-2xl border-t-2 border-gray-200">
+              <button
+                onClick={() => setShowRefundPolicy(false)}
+                className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-violet-700 transition-all shadow-lg"
+              >
+                I Understand
+              </button>
             </div>
           </div>
         </div>
