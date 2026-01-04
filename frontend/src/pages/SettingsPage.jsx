@@ -708,7 +708,7 @@ const SettingsPage = () => {
             </div>
 
             {/* AUTO-RENEWAL TOGGLE */}
-            {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
+            {!userIsTeamMember && (
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border-2 border-blue-200 shadow-lg">
                 <div className="flex items-center justify-between">
                   <div>
@@ -810,7 +810,7 @@ const SettingsPage = () => {
             </div>
 
             {/* ✅ ENHANCED: Cancel Button with Dynamic Text */}
-            {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
+            {!userIsTeamMember && (
               <div className="flex flex-col gap-4 pt-4">
                 <button
                   onClick={handleCancelSubscription}

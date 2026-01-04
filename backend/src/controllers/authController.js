@@ -476,6 +476,11 @@ const signIn = async (req, res) => {
         role: user.role,
         storageUsed: user.storageUsed.toString(),
         storageLimit: user.storageLimit.toString(),
+        subscriptionStatus: user.subscriptionStatus,  // ✅ Added
+        subscriptionId: user.subscriptionId,          // ✅ Added
+        currentPeriodStart: user.currentPeriodStart,  // ✅ Added
+        currentPeriodEnd: user.currentPeriodEnd,      // ✅ Added
+        priceId: user.priceId,                        // ✅ Added
         isTeamMember: false,
       }
     });

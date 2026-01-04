@@ -15,10 +15,7 @@ const DashboardLayout = ({ children }) => {
     // Don't block team members (they use organization's subscription)
     if (user.isTeamMember) return false;
 
-    // Don't block free tier users (INDIVIDUAL plan)
-    if (user.role === 'INDIVIDUAL') return false;
-
-    // Block if subscription status is 'canceled'
+    // ✅ Block ANY user with canceled status (regardless of role)
     // Note: 'canceling' means it will cancel at period end, so they still have access
     if (user.subscriptionStatus === 'canceled') return true;
 

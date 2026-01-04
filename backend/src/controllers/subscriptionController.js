@@ -101,7 +101,21 @@ const toggleAutoRenewal = async (req, res) => {
       }
     });
 
+    // ✅ Get memberOf relation to check if team member
+    const userWithRelations = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        memberOf: {
+          select: { id: true }
+        }
+      }
+    });
+
+    // ✅ Compute if user is a team member
+    const isTeamMember = userWithRelations.memberOf && userWithRelations.memberOf.length > 0;
+
     console.log('✅ User updated:', user.email, '- Status:', updatedUser.subscriptionStatus);
+    console.log('   Is team member:', isTeamMember);
 
     res.json({
       status: 'success',
@@ -110,6 +124,7 @@ const toggleAutoRenewal = async (req, res) => {
         : 'Auto-renewal disabled. Subscription will end on ' + new Date(subscription.current_period_end * 1000).toLocaleDateString(),
       user: {
         ...updatedUser,
+        isTeamMember: isTeamMember,  // ✅ Add team member flag
         storageUsed: updatedUser.storageUsed.toString(),
         storageLimit: updatedUser.storageLimit.toString(),
       },
@@ -153,6 +168,11 @@ const cancelSubscription = async (req, res) => {
         currentPeriodStart: true,
         currentPeriodEnd: true,
         priceId: true,
+      },
+      include: {
+        memberOf: {
+          select: { id: true }  // Check if user is a team member
+        }
       }
     });
 
@@ -298,11 +318,20 @@ const cancelSubscription = async (req, res) => {
         currentPeriodEnd: true,
         storageUsed: true,
         storageLimit: true,
+      },
+      include: {
+        memberOf: {
+          select: { id: true }  // Check if user is a team member
+        }
       }
     });
 
+    // ✅ Compute if user is a team member
+    const isTeamMember = updatedUser.memberOf && updatedUser.memberOf.length > 0;
+
     console.log('✅ Cancellation complete:', user.email);
     console.log('   Updated status:', updatedUser.subscriptionStatus);
+    console.log('   Is team member:', isTeamMember);
 
     res.json({
       status: 'success',
@@ -311,6 +340,8 @@ const cancelSubscription = async (req, res) => {
       daysSinceStart: daysSinceStart,
       user: {
         ...updatedUser,
+        isTeamMember: isTeamMember,  // ✅ Add team member flag
+        memberOf: undefined,  // Remove relation object
         storageUsed: updatedUser.storageUsed.toString(),
         storageLimit: updatedUser.storageLimit.toString(),
       },
