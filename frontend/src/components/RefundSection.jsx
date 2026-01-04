@@ -15,8 +15,8 @@ const RefundSection = () => {
   const checkEligibility = async () => {
     try {
       setLoading(true);
-      // ✅ FIXED: Remove /api prefix since api.js already includes it
-      const response = await api.get('/refund/check-eligibility');
+      // ✅ CORRECT PATH: /user/refund/check-eligibility
+      const response = await api.get('/user/refund/check-eligibility');
       setEligibility(response.data);
     } catch (error) {
       console.error('Error checking eligibility:', error);
@@ -42,8 +42,8 @@ const RefundSection = () => {
 
     try {
       setProcessing(true);
-      // ✅ FIXED: Remove /api prefix
-      const response = await api.post('/refund/request', {
+      // ✅ CORRECT PATH: /user/refund/request
+      const response = await api.post('/user/refund/request', {
         reason: refundReason
       });
 
