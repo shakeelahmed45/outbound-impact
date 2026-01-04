@@ -255,4 +255,4 @@ if (process.env.VERCEL) {
     console.log('🔍 Debug routes active at /api/debug');
     console.log('═══════════════════════════════════════════════\n');
   });
-}
+}// Force rebuild Sun Jan  4 08:46:55 PKT 2026
