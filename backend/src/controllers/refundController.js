@@ -1,15 +1,18 @@
-const prisma = require('../lib/prisma');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+// ✅ REFUND CONTROLLER - COMPLETE WITH DIAGNOSTICS
+console.log('🔍 [REFUND] Loading refundController.js...');
 
-/**
- * 🔄 REFUND CONTROLLER - WITH ACCOUNT DELETION
- * Handles 7-day refund requests with complete account deletion
- */
+const prisma = require('../lib/prisma');
+console.log('✅ [REFUND] Prisma loaded');
+
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+console.log('✅ [REFUND] Stripe loaded');
 
 /**
  * Check if user is eligible for refund
  */
 const checkRefundEligibility = async (req, res) => {
+  console.log('🔍 [REFUND] checkRefundEligibility called for user:', req.user?.userId);
+  
   try {
     const userId = req.user.userId;
 
@@ -29,14 +32,15 @@ const checkRefundEligibility = async (req, res) => {
     });
 
     if (!user) {
+      console.log('❌ [REFUND] User not found:', userId);
       return res.status(404).json({
         status: 'error',
         message: 'User not found'
       });
     }
 
-    // Check if already requested refund
     if (user.refundRequested) {
+      console.log('⚠️ [REFUND] User already requested refund:', user.email);
       return res.json({
         status: 'success',
         eligible: false,
@@ -47,8 +51,8 @@ const checkRefundEligibility = async (req, res) => {
       });
     }
 
-    // Check if has subscription
     if (!user.subscriptionId) {
+      console.log('⚠️ [REFUND] No subscription found:', user.email);
       return res.json({
         status: 'success',
         eligible: false,
@@ -57,8 +61,8 @@ const checkRefundEligibility = async (req, res) => {
       });
     }
 
-    // Check if within 7 days
     if (!user.currentPeriodStart) {
+      console.log('⚠️ [REFUND] No subscription start date:', user.email);
       return res.json({
         status: 'success',
         eligible: false,
@@ -74,6 +78,13 @@ const checkRefundEligibility = async (req, res) => {
     const eligible = daysSinceSubscription <= 7;
     const daysRemaining = Math.max(0, 7 - daysSinceSubscription);
 
+    console.log('✅ [REFUND] Eligibility check:', { 
+      email: user.email, 
+      eligible, 
+      daysSinceSubscription,
+      daysRemaining 
+    });
+
     res.json({
       status: 'success',
       eligible: eligible,
@@ -87,7 +98,7 @@ const checkRefundEligibility = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Check refund eligibility error:', error);
+    console.error('❌ [REFUND] Check eligibility error:', error);
     res.status(500).json({
       status: 'error',
       message: 'Failed to check refund eligibility'
@@ -99,11 +110,14 @@ const checkRefundEligibility = async (req, res) => {
  * Request a refund - DELETES ACCOUNT AND ALL DATA
  */
 const requestRefund = async (req, res) => {
+  console.log('💰 [REFUND] requestRefund called for user:', req.user?.userId);
+  
   try {
     const userId = req.user.userId;
     const { reason } = req.body;
 
     if (!reason || reason.trim().length < 10) {
+      console.log('❌ [REFUND] Invalid reason provided');
       return res.status(400).json({
         status: 'error',
         message: 'Please provide a reason for the refund (minimum 10 characters)'
@@ -125,30 +139,31 @@ const requestRefund = async (req, res) => {
     });
 
     if (!user) {
+      console.log('❌ [REFUND] User not found:', userId);
       return res.status(404).json({
         status: 'error',
         message: 'User not found'
       });
     }
 
-    // Check if already requested
     if (user.refundRequested) {
+      console.log('⚠️ [REFUND] Duplicate refund request:', user.email);
       return res.status(400).json({
         status: 'error',
         message: 'You have already requested a refund'
       });
     }
 
-    // Check if has subscription
     if (!user.subscriptionId || !user.stripeCustomerId) {
+      console.log('❌ [REFUND] No active subscription:', user.email);
       return res.status(400).json({
         status: 'error',
         message: 'No active subscription found'
       });
     }
 
-    // Check if within 7 days
     if (!user.currentPeriodStart) {
+      console.log('❌ [REFUND] No subscription start date:', user.email);
       return res.status(400).json({
         status: 'error',
         message: 'Subscription start date not found'
@@ -160,19 +175,21 @@ const requestRefund = async (req, res) => {
     );
 
     if (daysSinceSubscription > 7) {
+      console.log('❌ [REFUND] Outside 7-day window:', user.email, daysSinceSubscription, 'days');
       return res.status(400).json({
         status: 'error',
         message: 'Refund period has expired. Refunds are only available within 7 days of subscription.'
       });
     }
 
-    // Get the latest invoice to find the charge
+    console.log('📄 [REFUND] Fetching invoice from Stripe...');
     const invoices = await stripe.invoices.list({
       subscription: user.subscriptionId,
       limit: 1
     });
 
     if (!invoices.data.length) {
+      console.log('❌ [REFUND] No invoice found:', user.email);
       return res.status(400).json({
         status: 'error',
         message: 'No invoice found for this subscription'
@@ -183,14 +200,15 @@ const requestRefund = async (req, res) => {
     const chargeId = invoice.charge;
 
     if (!chargeId) {
+      console.log('❌ [REFUND] No charge found:', user.email);
       return res.status(400).json({
         status: 'error',
         message: 'No charge found for this subscription'
       });
     }
 
-    // Process the refund through Stripe
-    console.log('💰 Processing refund for user:', user.email);
+    console.log('💳 [REFUND] Creating Stripe refund...');
+    console.log('   User:', user.email);
     console.log('   Charge ID:', chargeId);
     console.log('   Amount:', invoice.amount_paid / 100);
 
@@ -204,68 +222,44 @@ const requestRefund = async (req, res) => {
       }
     });
 
-    console.log('✅ Stripe refund created:', refund.id);
+    console.log('✅ [REFUND] Stripe refund created:', refund.id);
 
-    // Cancel the subscription
+    console.log('🚫 [REFUND] Canceling subscription...');
     await stripe.subscriptions.cancel(user.subscriptionId);
-    console.log('✅ Subscription canceled');
+    console.log('✅ [REFUND] Subscription canceled');
 
-    // Store refund info before deleting user
-    const refundData = {
-      userName: user.name,
-      userEmail: user.email,
-      refundAmount: refund.amount / 100,
-      refundId: refund.id,
-      refundReason: reason,
-      userRole: user.role,
-    };
-
-    // Send emails BEFORE deleting account
-    const emailPromises = [];
-
-    // Send confirmation to user
+    console.log('📧 [REFUND] Sending emails...');
     const emailService = require('../services/emailService');
-    emailPromises.push(
-      emailService.sendRefundAccountDeletionEmail({
+    
+    try {
+      await emailService.sendRefundAccountDeletionEmail({
         userEmail: user.email,
         userName: user.name,
         refundAmount: refund.amount / 100,
         refundId: refund.id,
-      })
-    );
+      });
+      console.log('✅ [REFUND] User email sent');
 
-    // Wait 1 second for rate limit
-    await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Send notification to admin
-    emailPromises.push(
-      emailService.sendAdminRefundNotification({
+      await emailService.sendAdminRefundNotification({
         userName: user.name,
         userEmail: user.email,
         refundAmount: refund.amount / 100,
         refundReason: reason,
         refundId: refund.id,
         userRole: user.role,
-      })
-    );
-
-    // Wait for emails to send
-    try {
-      await Promise.all(emailPromises);
-      console.log('✅ Refund emails sent');
+      });
+      console.log('✅ [REFUND] Admin email sent');
     } catch (emailError) {
-      console.error('❌ Failed to send refund emails:', emailError.message);
+      console.error('⚠️ [REFUND] Email error:', emailError.message);
     }
 
-    // ⚠️ CRITICAL: DELETE USER ACCOUNT AND ALL DATA
-    // Prisma will cascade delete all related data automatically
-    console.log('🗑️ Deleting user account and all data...');
-    
+    console.log('🗑️ [REFUND] Deleting user account...');
     await prisma.user.delete({
       where: { id: user.id }
     });
-
-    console.log('✅ User account and all data deleted successfully');
+    console.log('✅ [REFUND] Account deleted successfully');
 
     res.json({
       status: 'success',
@@ -280,9 +274,8 @@ const requestRefund = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Request refund error:', error);
+    console.error('❌ [REFUND] Request refund error:', error);
     
-    // Check if it's a Stripe error
     if (error.type === 'StripeCardError' || error.type === 'StripeInvalidRequestError') {
       return res.status(400).json({
         status: 'error',
@@ -301,6 +294,8 @@ const requestRefund = async (req, res) => {
  * Get refund status
  */
 const getRefundStatus = async (req, res) => {
+  console.log('📊 [REFUND] getRefundStatus called for user:', req.user?.userId);
+  
   try {
     const userId = req.user.userId;
 
@@ -317,11 +312,14 @@ const getRefundStatus = async (req, res) => {
     });
 
     if (!user) {
+      console.log('❌ [REFUND] User not found:', userId);
       return res.status(404).json({
         status: 'error',
         message: 'User not found'
       });
     }
+
+    console.log('✅ [REFUND] Status retrieved for user');
 
     res.json({
       status: 'success',
@@ -336,7 +334,7 @@ const getRefundStatus = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get refund status error:', error);
+    console.error('❌ [REFUND] Get refund status error:', error);
     res.status(500).json({
       status: 'error',
       message: 'Failed to get refund status'
@@ -344,8 +342,17 @@ const getRefundStatus = async (req, res) => {
   }
 };
 
+console.log('✅ [REFUND] All functions defined successfully');
+console.log('✅ [REFUND] Exporting:', {
+  checkRefundEligibility: typeof checkRefundEligibility,
+  requestRefund: typeof requestRefund,
+  getRefundStatus: typeof getRefundStatus,
+});
+
 module.exports = {
   checkRefundEligibility,
   requestRefund,
   getRefundStatus,
 };
+
+console.log('✅ [REFUND] refundController.js loaded completely!');
