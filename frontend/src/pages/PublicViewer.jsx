@@ -102,6 +102,8 @@ const PublicViewer = () => {
   const convertToEmbedUrl = (url) => {
     if (!url) return url;
 
+    // ========== YOUTUBE ==========
+    // YouTube Shorts
     if (url.includes('youtube.com/shorts/') || url.includes('youtu.be/shorts/')) {
       const videoId = url.split('/shorts/')[1]?.split('?')[0]?.split('&')[0];
       if (videoId) {
@@ -109,6 +111,7 @@ const PublicViewer = () => {
       }
     }
 
+    // YouTube short URLs (youtu.be)
     if (url.includes('youtu.be/') && !url.includes('/shorts/')) {
       const videoId = url.split('youtu.be/')[1]?.split('?')[0]?.split('&')[0];
       if (videoId) {
@@ -116,6 +119,7 @@ const PublicViewer = () => {
       }
     }
 
+    // YouTube watch URLs
     if (url.includes('youtube.com/watch')) {
       const urlParams = new URLSearchParams(url.split('?')[1]);
       const videoId = urlParams.get('v');
@@ -124,10 +128,12 @@ const PublicViewer = () => {
       }
     }
 
+    // Already embed URL
     if (url.includes('youtube.com/embed/')) {
       return url;
     }
 
+    // ========== VIMEO ==========
     if (url.includes('vimeo.com/') && !url.includes('player.vimeo.com')) {
       const videoId = url.split('vimeo.com/')[1]?.split('?')[0]?.split('/')[0];
       if (videoId) {
@@ -135,6 +141,8 @@ const PublicViewer = () => {
       }
     }
 
+    // ========== GOOGLE DRIVE ==========
+    // Handle: https://drive.google.com/file/d/FILE_ID/view
     if (url.includes('drive.google.com/file/d/')) {
       const fileId = url.split('/d/')[1]?.split('/')[0];
       if (fileId) {
@@ -142,6 +150,16 @@ const PublicViewer = () => {
       }
     }
 
+    // Handle: https://drive.google.com/open?id=FILE_ID
+    if (url.includes('drive.google.com/open?id=')) {
+      const urlParams = new URLSearchParams(url.split('?')[1]);
+      const fileId = urlParams.get('id');
+      if (fileId) {
+        return `https://drive.google.com/file/d/${fileId}/preview`;
+      }
+    }
+
+    // ========== GOOGLE DOCS ==========
     if (url.includes('docs.google.com/document/d/') && !url.includes('/preview')) {
       const docId = url.split('/d/')[1]?.split('/')[0];
       if (docId) {
@@ -149,6 +167,7 @@ const PublicViewer = () => {
       }
     }
 
+    // ========== GOOGLE SHEETS ==========
     if (url.includes('docs.google.com/spreadsheets/d/') && !url.includes('/preview')) {
       const sheetId = url.split('/d/')[1]?.split('/')[0];
       if (sheetId) {
@@ -156,6 +175,74 @@ const PublicViewer = () => {
       }
     }
 
+    // ========== GOOGLE SLIDES ==========
+    if (url.includes('docs.google.com/presentation/d/') && !url.includes('/preview')) {
+      const slideId = url.split('/d/')[1]?.split('/')[0];
+      if (slideId) {
+        return `https://docs.google.com/presentation/d/${slideId}/preview`;
+      }
+    }
+
+    // ========== SOUNDCLOUD ==========
+    // Handle: https://soundcloud.com/artist/track
+    if (url.includes('soundcloud.com/') && !url.includes('api.soundcloud.com')) {
+      return `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&color=%23ff5500&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true&visual=true`;
+    }
+
+    // ========== SPOTIFY ==========
+    // Handle: https://open.spotify.com/track/TRACK_ID or /playlist/PLAYLIST_ID or /album/ALBUM_ID
+    if (url.includes('open.spotify.com/')) {
+      // Extract the type (track, playlist, album, etc.) and ID
+      const match = url.match(/open\.spotify\.com\/(track|playlist|album|episode|show)\/([a-zA-Z0-9]+)/);
+      if (match) {
+        const [, type, id] = match;
+        return `https://open.spotify.com/embed/${type}/${id}`;
+      }
+    }
+
+    // ========== FACEBOOK ==========
+    // Handle Facebook videos: https://www.facebook.com/watch/?v=VIDEO_ID
+    if (url.includes('facebook.com/watch') || url.includes('fb.watch/')) {
+      // Facebook doesn't allow iframe embedding of videos anymore
+      // We'll return the URL as-is and let it open in new tab via the button
+      return url;
+    }
+
+    // Handle Facebook posts/videos: https://www.facebook.com/USERNAME/videos/VIDEO_ID/
+    if (url.includes('facebook.com/') && url.includes('/videos/')) {
+      const videoId = url.split('/videos/')[1]?.split('/')[0]?.split('?')[0];
+      if (videoId) {
+        // Use Facebook's embed player
+        return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=false&width=734`;
+      }
+    }
+
+    // ========== DAILYMOTION ==========
+    if (url.includes('dailymotion.com/video/')) {
+      const videoId = url.split('/video/')[1]?.split('?')[0]?.split('_')[0];
+      if (videoId) {
+        return `https://www.dailymotion.com/embed/video/${videoId}`;
+      }
+    }
+
+    // ========== TWITCH ==========
+    // Handle Twitch videos and clips
+    if (url.includes('twitch.tv/videos/')) {
+      const videoId = url.split('/videos/')[1]?.split('?')[0];
+      if (videoId) {
+        return `https://player.twitch.tv/?video=${videoId}&parent=${window.location.hostname}`;
+      }
+    }
+
+    if (url.includes('twitch.tv/') && url.includes('/clip/')) {
+      const clipId = url.split('/clip/')[1]?.split('?')[0];
+      if (clipId) {
+        return `https://clips.twitch.tv/embed?clip=${clipId}&parent=${window.location.hostname}`;
+      }
+    }
+
+    // ========== RETURN ORIGINAL ==========
+    // For custom iframes and other URLs, return as-is
     return url;
   };
 
@@ -502,8 +589,10 @@ const PublicViewer = () => {
                 <iframe
                   src={convertToEmbedUrl(item.mediaUrl)}
                   className="absolute top-0 left-0 w-full h-full border-0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share"
                   allowFullScreen={true}
+                  referrerPolicy="no-referrer-when-downgrade"
+                  sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
                   title={item.title}
                   loading="lazy"
                 />
