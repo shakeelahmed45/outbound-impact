@@ -99,6 +99,28 @@ const PublicViewer = () => {
     setSelectedDocument(null);
   };
 
+  // Check if URL is from a platform that blocks embedding
+  const isNonEmbeddablePlatform = (url) => {
+    if (!url) return false;
+    
+    // Facebook blocks all iframe embedding with X-Frame-Options: deny
+    if (url.includes('facebook.com') || url.includes('fb.watch') || url.includes('fb.me')) {
+      return { platform: 'Facebook', blocked: true };
+    }
+    
+    // Instagram blocks embedding
+    if (url.includes('instagram.com')) {
+      return { platform: 'Instagram', blocked: true };
+    }
+    
+    // Twitter/X only allows their official embed code
+    if (url.includes('twitter.com') || url.includes('x.com')) {
+      return { platform: 'Twitter/X', blocked: true };
+    }
+    
+    return { blocked: false };
+  };
+
   const convertToEmbedUrl = (url) => {
     if (!url) return url;
 
@@ -197,23 +219,6 @@ const PublicViewer = () => {
       if (match) {
         const [, type, id] = match;
         return `https://open.spotify.com/embed/${type}/${id}`;
-      }
-    }
-
-    // ========== FACEBOOK ==========
-    // Handle Facebook videos: https://www.facebook.com/watch/?v=VIDEO_ID
-    if (url.includes('facebook.com/watch') || url.includes('fb.watch/')) {
-      // Facebook doesn't allow iframe embedding of videos anymore
-      // We'll return the URL as-is and let it open in new tab via the button
-      return url;
-    }
-
-    // Handle Facebook posts/videos: https://www.facebook.com/USERNAME/videos/VIDEO_ID/
-    if (url.includes('facebook.com/') && url.includes('/videos/')) {
-      const videoId = url.split('/videos/')[1]?.split('/')[0]?.split('?')[0];
-      if (videoId) {
-        // Use Facebook's embed player
-        return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=false&width=734`;
       }
     }
 
@@ -584,20 +589,64 @@ const PublicViewer = () => {
                 </p>
               )}
               
-              <div className="relative w-full bg-gray-100 rounded-xl sm:rounded-2xl overflow-hidden mb-4 sm:mb-6" 
-                   style={{ paddingBottom: '56.25%' }}>
-                <iframe
-                  src={convertToEmbedUrl(item.mediaUrl)}
-                  className="absolute top-0 left-0 w-full h-full border-0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share"
-                  allowFullScreen={true}
-                  referrerPolicy="no-referrer-when-downgrade"
-                  sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
-                  title={item.title}
-                  loading="lazy"
-                />
-              </div>
+              {/* Check if platform blocks embedding */}
+              {(() => {
+                const embedCheck = isNonEmbeddablePlatform(item.mediaUrl);
+                
+                if (embedCheck.blocked) {
+                  // Show fallback UI for blocked platforms
+                  return (
+                    <div className="relative w-full bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl sm:rounded-2xl overflow-hidden mb-4 sm:mb-6 p-8 sm:p-12 text-center" 
+                         style={{ minHeight: '400px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                      
+                      {/* Icon */}
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center mb-6" 
+                           style={{ background: 'linear-gradient(to bottom right, var(--brand-primary), var(--brand-secondary))' }}>
+                        <ExternalLink size={40} className="text-white" />
+                      </div>
+                      
+                      {/* Message */}
+                      <h3 className="text-xl sm:text-2xl font-bold text-gray-800 mb-3">
+                        {embedCheck.platform} Content
+                      </h3>
+                      <p className="text-sm sm:text-base text-gray-600 mb-6 max-w-md">
+                        {embedCheck.platform} doesn't allow embedding their content on external websites. Click the button below to view this content on {embedCheck.platform}.
+                      </p>
+                      
+                      {/* Large CTA Button */}
+                      <a
+                        href={item.mediaUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-3 px-8 py-4 text-white rounded-xl font-bold text-lg shadow-xl hover:shadow-2xl transition-all transform hover:scale-105 text-sm sm:text-base"
+                        style={{ background: `linear-gradient(to right, var(--brand-primary), var(--brand-secondary))` }}
+                      >
+                        <ExternalLink size={24} />
+                        View on {embedCheck.platform}
+                      </a>
+                    </div>
+                  );
+                } else {
+                  // Show normal iframe for embeddable platforms
+                  return (
+                    <div className="relative w-full bg-gray-100 rounded-xl sm:rounded-2xl overflow-hidden mb-4 sm:mb-6" 
+                         style={{ paddingBottom: '56.25%' }}>
+                      <iframe
+                        src={convertToEmbedUrl(item.mediaUrl)}
+                        className="absolute top-0 left-0 w-full h-full border-0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share"
+                        allowFullScreen={true}
+                        referrerPolicy="no-referrer-when-downgrade"
+                        sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
+                        title={item.title}
+                        loading="lazy"
+                      />
+                    </div>
+                  );
+                }
+              })()}
 
+              {/* Always show "Open in New Tab" button for all embeds */}
               <div className="flex justify-center pt-2">
                 <a
                   href={item.mediaUrl}
