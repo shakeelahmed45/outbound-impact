@@ -64,8 +64,8 @@ const sendWelcomeEmail = async (userEmail, userName, userRole) => {
         <body>
           <div class="container">
             <div class="header">
-              <h1 style="margin: 0; font-size: 32px;">Welcome to Outbound Impact!</h1>
-              <p style="margin: 10px 0 0 0; font-size: 18px;">Your account is ready to go 🚀</p>
+              <h1 style="margin: 0; font-size: 32px; color: white;">Welcome to Outbound Impact!</h1>
+              <p style="margin: 10px 0 0 0; font-size: 18px; color: white;">Your account is ready to go 🚀</p>
             </div>
             
             <div class="content">
@@ -136,7 +136,7 @@ const sendWelcomeEmail = async (userEmail, userName, userRole) => {
   }
 };
 
-// Send admin notification
+// 🎨 FIXED: Send admin notification - NOW WITH PURPLE GRADIENT!
 const sendAdminNotification = async (userData) => {
   try {
     if (!process.env.RESEND_API_KEY) {
@@ -171,8 +171,8 @@ const sendAdminNotification = async (userData) => {
           <style>
             body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
-            .header { background: #800080; color: white; padding: 20px; text-align: center; }
-            .content { background: white; padding: 30px; margin-top: 0; }
+            .header { background: linear-gradient(135deg, #800080 0%, #9333EA 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: white; padding: 30px; margin-top: 0; border-radius: 0 0 10px 10px; }
             .info-row { padding: 12px; margin: 8px 0; background: #f8f9fa; border-left: 3px solid #800080; }
             .label { font-weight: bold; color: #800080; }
           </style>
@@ -180,7 +180,7 @@ const sendAdminNotification = async (userData) => {
         <body>
           <div class="container">
             <div class="header">
-              <h2 style="margin: 0;">🎉 New User Signed Up!</h2>
+              <h2 style="margin: 0; color: white;">🎉 New User Signed Up!</h2>
             </div>
             
             <div class="content">
@@ -233,7 +233,7 @@ const sendAdminNotification = async (userData) => {
   }
 };
 
-// ✅ NEW: Send payment receipt email after successful payment
+// ✅ Send payment receipt email after successful payment
 const sendPaymentReceiptEmail = async (email, name, amount, currency, plan) => {
   try {
     if (!process.env.RESEND_API_KEY) {
@@ -265,8 +265,8 @@ const sendPaymentReceiptEmail = async (email, name, amount, currency, plan) => {
         <body>
           <div class="container">
             <div class="header">
-              <h1 style="margin: 0; font-size: 32px;">✅ Payment Received!</h1>
-              <p style="margin: 10px 0 0 0; font-size: 16px;">Thank you for your payment</p>
+              <h1 style="margin: 0; font-size: 32px; color: white;">✅ Payment Received!</h1>
+              <p style="margin: 10px 0 0 0; font-size: 16px; color: white;">Thank you for your payment</p>
             </div>
             
             <div class="content">
@@ -324,7 +324,7 @@ const sendPaymentReceiptEmail = async (email, name, amount, currency, plan) => {
   }
 };
 
-// ✅ NEW: Send payment failed notification email
+// 🎨 FIXED: Send payment failed notification - NOW WITH PURPLE GRADIENT!
 const sendPaymentFailedEmail = async (email, name, amount, currency, reason) => {
   try {
     if (!process.env.RESEND_API_KEY) {
@@ -346,7 +346,7 @@ const sendPaymentFailedEmail = async (email, name, amount, currency, reason) => 
           <style>
             body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 10px 10px 0 0; }
+            .header { background: linear-gradient(135deg, #800080 0%, #9333EA 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 10px 10px 0 0; }
             .content { background: #ffffff; padding: 40px 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; }
             .warning-box { background: #FEF2F2; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #EF4444; }
             .button { display: inline-block; padding: 14px 30px; background: linear-gradient(135deg, #800080 0%, #9333EA 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: bold; }
@@ -356,8 +356,8 @@ const sendPaymentFailedEmail = async (email, name, amount, currency, reason) => 
         <body>
           <div class="container">
             <div class="header">
-              <h1 style="margin: 0; font-size: 32px;">⚠️ Payment Failed</h1>
-              <p style="margin: 10px 0 0 0; font-size: 16px;">We couldn't process your payment</p>
+              <h1 style="margin: 0; font-size: 32px; color: white;">⚠️ Payment Failed</h1>
+              <p style="margin: 10px 0 0 0; font-size: 16px; color: white;">We couldn't process your payment</p>
             </div>
             
             <div class="content">
@@ -418,7 +418,7 @@ const sendPaymentFailedEmail = async (email, name, amount, currency, reason) => 
   }
 };
 
-// ✅ NEW: Send cancellation confirmation email
+// 🎨 FIXED: Send cancellation confirmation - NOW WITH PURPLE GRADIENT!
 const sendCancellationEmail = async (email, name) => {
   try {
     if (!process.env.RESEND_API_KEY) {
@@ -440,9 +440,9 @@ const sendCancellationEmail = async (email, name) => {
           <style>
             body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #6B7280 0%, #4B5563 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 10px 10px 0 0; }
+            .header { background: linear-gradient(135deg, #800080 0%, #9333EA 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 10px 10px 0 0; }
             .content { background: #ffffff; padding: 40px 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; }
-            .info-box { background: #F9FAFB; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #6B7280; }
+            .info-box { background: #F9FAFB; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #800080; }
             .button { display: inline-block; padding: 14px 30px; background: linear-gradient(135deg, #800080 0%, #9333EA 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: bold; }
             .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; padding: 20px; }
           </style>
@@ -450,8 +450,8 @@ const sendCancellationEmail = async (email, name) => {
         <body>
           <div class="container">
             <div class="header">
-              <h1 style="margin: 0; font-size: 32px;">Subscription Canceled</h1>
-              <p style="margin: 10px 0 0 0; font-size: 16px;">We're sorry to see you go</p>
+              <h1 style="margin: 0; font-size: 32px; color: white;">Subscription Canceled</h1>
+              <p style="margin: 10px 0 0 0; font-size: 16px; color: white;">We're sorry to see you go</p>
             </div>
             
             <div class="content">
@@ -460,7 +460,7 @@ const sendCancellationEmail = async (email, name) => {
               <p style="font-size: 16px; margin: 0 0 25px;">Your subscription has been canceled as requested.</p>
               
               <div class="info-box">
-                <h3 style="color: #374151; margin: 0 0 15px;">📋 What This Means</h3>
+                <h3 style="color: #800080; margin: 0 0 15px;">📋 What This Means</h3>
                 <ul style="margin: 0; padding-left: 20px; color: #6B7280;">
                   <li style="margin: 10px 0;">You'll have access until the end of your current billing period</li>
                   <li style="margin: 10px 0;">No further charges will be made to your account</li>
@@ -555,7 +555,7 @@ const sendTeamInvitationEmail = async (invitationData) => {
                   
                   <!-- Header with Purple Gradient -->
                   <tr>
-                    <td style="background: linear-gradient(135deg, #800080 0%, #EE82EE 100%); padding: 40px 40px 30px; text-align: center;">
+                    <td style="background: linear-gradient(135deg, #800080 0%, #9333EA 100%); padding: 40px 40px 30px; text-align: center;">
                       <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">You're Invited! 🎉</h1>
                       <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Join the Outbound Impact team</p>
                     </td>
@@ -575,7 +575,7 @@ const sendTeamInvitationEmail = async (invitationData) => {
                       <!-- Role Badge -->
                       <table cellpadding="0" cellspacing="0" style="margin: 30px 0;">
                         <tr>
-                          <td style="background: linear-gradient(135deg, #800080 0%, #EE82EE 100%); color: #ffffff; padding: 12px 24px; border-radius: 8px; font-weight: bold; font-size: 14px;">
+                          <td style="background: linear-gradient(135deg, #800080 0%, #9333EA 100%); color: #ffffff; padding: 12px 24px; border-radius: 8px; font-weight: bold; font-size: 14px;">
                             🎯 Your Role: ${role}
                           </td>
                         </tr>
@@ -587,7 +587,7 @@ const sendTeamInvitationEmail = async (invitationData) => {
                       
                       ${message ? `
                       <!-- ✨ Personal Message from Inviter -->
-                      <div style="background: linear-gradient(135deg, #fff5f5 0%, #ffe5ff 100%); border: 2px solid #EE82EE; border-radius: 12px; padding: 20px; margin: 0 0 30px;">
+                      <div style="background: linear-gradient(135deg, #fff5f5 0%, #ffe5ff 100%); border: 2px solid #9333EA; border-radius: 12px; padding: 20px; margin: 0 0 30px;">
                         <p style="color: #800080; font-size: 13px; font-weight: bold; margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.5px;">
                           💌 Personal Message
                         </p>
@@ -604,7 +604,7 @@ const sendTeamInvitationEmail = async (invitationData) => {
                       <table width="100%" cellpadding="0" cellspacing="0">
                         <tr>
                           <td align="center" style="padding: 20px 0;">
-                            <a href="${invitationLink}" style="background: linear-gradient(135deg, #800080 0%, #EE82EE 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 12px rgba(128, 0, 128, 0.3);">
+                            <a href="${invitationLink}" style="background: linear-gradient(135deg, #800080 0%, #9333EA 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 12px rgba(128, 0, 128, 0.3);">
                               Accept Invitation →
                             </a>
                           </td>
@@ -625,13 +625,13 @@ const sendTeamInvitationEmail = async (invitationData) => {
                   <!-- Footer -->
                   <tr>
                     <td style="background-color: #f9f9f9; padding: 30px 40px; text-align: center; border-top: 1px solid #eeeeee;">
-                      <p style="color: #999999; font-size: 13px; margin: 0 0 10px;">
+                      <p style="margin: 0; font-size: 14px; color: #6b7280;">
                         <strong style="color: #800080;">Outbound Impact</strong> - Share Content. Track Analytics. Grow Your Reach.
                       </p>
-                      <p style="color: #cccccc; font-size: 12px; margin: 0;">
+                      <p style="margin: 10px 0 0 0; font-size: 12px; color: #cccccc;">
                         © ${new Date().getFullYear()} Outbound Impact. All rights reserved.
                       </p>
-                      <p style="color: #cccccc; font-size: 11px; margin: 10px 0 0;">
+                      <p style="margin: 10px 0 0 0; font-size: 11px; color: #cccccc;">
                         If you didn't expect this invitation, you can safely ignore this email.
                       </p>
                     </td>
@@ -686,7 +686,7 @@ const sendInvitationReminderEmail = async (reminderData) => {
               <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                   <tr>
-                    <td style="background: linear-gradient(135deg, #800080 0%, #EE82EE 100%); padding: 40px; text-align: center; border-radius: 16px 16px 0 0;">
+                    <td style="background: linear-gradient(135deg, #800080 0%, #9333EA 100%); padding: 40px; text-align: center; border-radius: 16px 16px 0 0;">
                       <h1 style="color: #ffffff; margin: 0; font-size: 24px;">⏰ Invitation Expiring Soon</h1>
                     </td>
                   </tr>
@@ -704,7 +704,7 @@ const sendInvitationReminderEmail = async (reminderData) => {
                       <table width="100%" cellpadding="0" cellspacing="0">
                         <tr>
                           <td align="center" style="padding: 20px 0;">
-                            <a href="${invitationLink}" style="background: linear-gradient(135deg, #800080 0%, #EE82EE 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">
+                            <a href="${invitationLink}" style="background: linear-gradient(135deg, #800080 0%, #9333EA 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">
                               Accept Invitation Now →
                             </a>
                           </td>
@@ -771,7 +771,7 @@ const sendPasswordResetEmail = async (resetData) => {
                   
                   <!-- Header -->
                   <tr>
-                    <td style="background: linear-gradient(135deg, #800080 0%, #EE82EE 100%); padding: 40px; text-align: center; border-radius: 16px 16px 0 0;">
+                    <td style="background: linear-gradient(135deg, #800080 0%, #9333EA 100%); padding: 40px; text-align: center; border-radius: 16px 16px 0 0;">
                       <h1 style="color: #ffffff; margin: 0; font-size: 28px;">🔒 Password Reset</h1>
                       <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Reset your Outbound Impact password</p>
                     </td>
@@ -799,7 +799,7 @@ const sendPasswordResetEmail = async (resetData) => {
                       <table width="100%" cellpadding="0" cellspacing="0">
                         <tr>
                           <td align="center" style="padding: 30px 0;">
-                            <a href="${resetLink}" style="background: linear-gradient(135deg, #800080 0%, #EE82EE 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 12px rgba(128, 0, 128, 0.3);">
+                            <a href="${resetLink}" style="background: linear-gradient(135deg, #800080 0%, #9333EA 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 12px rgba(128, 0, 128, 0.3);">
                               Reset Password →
                             </a>
                           </td>
@@ -824,13 +824,13 @@ const sendPasswordResetEmail = async (resetData) => {
                   <!-- Footer -->
                   <tr>
                     <td style="background-color: #f9f9f9; padding: 30px 40px; text-align: center; border-top: 1px solid #eeeeee;">
-                      <p style="color: #999999; font-size: 13px; margin: 0 0 10px;">
+                      <p style="margin: 0; font-size: 14px; color: #6b7280;">
                         <strong style="color: #800080;">Outbound Impact</strong> - Share Content. Track Analytics. Grow Your Reach.
                       </p>
-                      <p style="color: #cccccc; font-size: 12px; margin: 0;">
+                      <p style="margin: 10px 0 0 0; font-size: 12px; color: #cccccc;">
                         © ${new Date().getFullYear()} Outbound Impact. All rights reserved.
                       </p>
-                      <p style="color: #cccccc; font-size: 11px; margin: 10px 0 0;">
+                      <p style="margin: 10px 0 0 0; font-size: 11px; color: #cccccc;">
                         You received this email because a password reset was requested for your account.
                       </p>
                     </td>
@@ -858,7 +858,7 @@ const sendPasswordResetEmail = async (resetData) => {
   }
 };
 
-// ✅ NEW: Send refund confirmation with account deletion notice
+// ✅ Send refund confirmation with account deletion notice
 const sendRefundAccountDeletionEmail = async ({ userEmail, userName, refundAmount, refundId }) => {
   try {
     if (!process.env.RESEND_API_KEY) {
@@ -892,14 +892,10 @@ const sendRefundAccountDeletionEmail = async ({ userEmail, userName, refundAmoun
               box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
             }
             .header { 
-              background: linear-gradient(135deg, #800080 0%, #EE82EE 100%); 
+              background: linear-gradient(135deg, #800080 0%, #9333EA 100%); 
               color: white; 
               padding: 40px 30px; 
               text-align: center; 
-            }
-            .header h1 { 
-              margin: 0; 
-              font-size: 28px; 
             }
             .content { 
               padding: 40px 30px; 
@@ -942,7 +938,7 @@ const sendRefundAccountDeletionEmail = async ({ userEmail, userName, refundAmoun
         <body>
           <div class="container">
             <div class="header">
-              <h1>✅ Refund Processed</h1>
+              <h1 style="margin: 0; color: white;">✅ Refund Processed</h1>
             </div>
             
             <div class="content">
@@ -1020,7 +1016,7 @@ const sendRefundAccountDeletionEmail = async ({ userEmail, userName, refundAmoun
   }
 };
 
-// ✅ NEW: Send refund notification to admin
+// 🎨 FIXED: Send refund notification to admin - NOW WITH PURPLE GRADIENT!
 const sendAdminRefundNotification = async ({ userName, userEmail, refundAmount, refundReason, refundId, userRole }) => {
   try {
     if (!process.env.RESEND_API_KEY) {
@@ -1055,7 +1051,7 @@ const sendAdminRefundNotification = async ({ userName, userEmail, refundAmount, 
               box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
             }
             .header { 
-              background: linear-gradient(135deg, #dc3545 0%, #ff6b6b 100%); 
+              background: linear-gradient(135deg, #800080 0%, #9333EA 100%); 
               color: white; 
               padding: 30px; 
               text-align: center; 
@@ -1065,7 +1061,7 @@ const sendAdminRefundNotification = async ({ userName, userEmail, refundAmount, 
             }
             .info-box { 
               background: #f8f9fa; 
-              border-left: 4px solid #dc3545; 
+              border-left: 4px solid #800080; 
               padding: 15px; 
               margin: 15px 0; 
               border-radius: 4px; 
@@ -1098,8 +1094,8 @@ const sendAdminRefundNotification = async ({ userName, userEmail, refundAmount, 
         <body>
           <div class="container">
             <div class="header">
-              <h1>💸 Refund Processed</h1>
-              <p style="margin: 10px 0 0;">Account Permanently Deleted</p>
+              <h1 style="margin: 0; color: white;">💸 Refund Processed</h1>
+              <p style="margin: 10px 0 0; color: white;">Account Permanently Deleted</p>
             </div>
             
             <div class="content">
@@ -1186,7 +1182,7 @@ module.exports = {
   sendTeamInvitationEmail,
   sendInvitationReminderEmail,
   sendPasswordResetEmail,
-  sendRefundAccountDeletionEmail,      // ✅ NEW
-  sendAdminRefundNotification,         // ✅ NEW
+  sendRefundAccountDeletionEmail,
+  sendAdminRefundNotification,
   testConnection
 };
