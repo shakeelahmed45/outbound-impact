@@ -301,7 +301,7 @@ const SettingsPage = () => {
         
         // Redirect to plans page after 3 seconds
         setTimeout(() => {
-          navigate('/signin');
+          navigate('/dashboard');
         }, 3000);
       }
     } catch (error) {
