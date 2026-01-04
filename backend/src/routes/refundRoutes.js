@@ -29,5 +29,3 @@ router.get('/status', authenticateToken, refundController.getRefundStatus);
 console.log('✅ [ROUTES] GET /status registered');
 
 console.log('✅ [ROUTES] refundRoutes.js loaded completely!');
-
-module.exports = router;
