@@ -299,10 +299,10 @@ const SettingsPage = () => {
         
         setUser(response.data.user);
         
-        // ✅ Redirect to dashboard to trigger blocking modal
+        // ✅ Refresh browser to trigger blocking modal
         setTimeout(() => {
-          navigate('/dashboard');
-        }, 1000); // 1 second for faster modal appearance
+          window.location.href = '/dashboard';
+        }, 1500); // 1.5 seconds to show success message
       }
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Failed to cancel subscription';
