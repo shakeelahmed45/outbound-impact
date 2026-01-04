@@ -16,7 +16,6 @@ const DashboardLayout = ({ children }) => {
     if (user.isTeamMember) return false;
 
     // ✅ Block ANY user with canceled status (regardless of role)
-    // This includes Individual plan users who subscribe and then cancel
     // Note: 'canceling' means it will cancel at period end, so they still have access
     if (user.subscriptionStatus === 'canceled') return true;
 

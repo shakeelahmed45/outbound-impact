@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, CreditCard, Shield, LogOut, Upload, Trash2, MessageSquare, MessagesSquare, BookOpen, TrendingUp, UserCheck, Mail, Check, AlertTriangle, ToggleLeft, ToggleRight, Clock } from 'lucide-react';
+import { User, CreditCard, Shield, LogOut, Upload, Trash2, MessageSquare, MessagesSquare, BookOpen, TrendingUp, UserCheck, Mail, Check, AlertTriangle, ToggleLeft, ToggleRight } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import Tooltip from '../components/common/Tooltip';
 import useAuthStore from '../store/authStore';
@@ -14,8 +14,7 @@ const SettingsPage = () => {
   const { user, logout, setUser } = useAuthStore();
   const { toasts, showToast, removeToast } = useToast();
 
-  // Use user directly (no team member fields exist in User model)
-  const effectiveUser = user;
+  const effectiveUser = user?.isTeamMember ? user.organization : user;
   const userIsTeamMember = user?.isTeamMember === true;
   const effectiveRole = effectiveUser?.role;
 
@@ -33,10 +32,6 @@ const SettingsPage = () => {
   const [togglingRenewal, setTogglingRenewal] = useState(false);
   const [cancelingSubscription, setCancelingSubscription] = useState(false);
   
-  // ✅ NEW: 7-day refund policy state
-  const [refundEligible, setRefundEligible] = useState(false);
-  const [showRefundPolicy, setShowRefundPolicy] = useState(false);
-  
   // Email change states
   const [showEmailChange, setShowEmailChange] = useState(false);
   const [newEmail, setNewEmail] = useState('');
@@ -52,27 +47,14 @@ const SettingsPage = () => {
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState('');
 
-  // ✅ Calculate 7-day refund eligibility (simplified - no timer)
   useEffect(() => {
     document.title = 'Settings | Outbound Impact';
     
-    // Check if subscription has cancel_at_period_end set
+    // ✅ Check if subscription has cancel_at_period_end set
     if (effectiveUser?.subscriptionStatus === 'canceling') {
       setAutoRenewal(false);
     }
-
-    // Calculate 7-day refund eligibility
-    if (effectiveUser?.currentPeriodStart && effectiveRole !== 'INDIVIDUAL') {
-      const subscriptionDate = new Date(effectiveUser.currentPeriodStart);
-      const now = new Date();
-      const diffTime = now - subscriptionDate;
-      const diffDays = diffTime / (1000 * 60 * 60 * 24);
-      
-      setRefundEligible(diffDays <= 7);
-    } else {
-      setRefundEligible(false);
-    }
-  }, [effectiveUser, effectiveRole]);
+  }, [effectiveUser]);
 
   const handleLogout = () => {
     logout();
@@ -240,7 +222,7 @@ const SettingsPage = () => {
     }
   };
 
-  // ✅ Toggle auto-renewal
+  // ✅ FIXED: Toggle auto-renewal (removed frontend validation)
   const handleToggleAutoRenewal = async () => {
     const newState = !autoRenewal;
     
@@ -277,40 +259,25 @@ const SettingsPage = () => {
     }
   };
 
-  // ✅ SIMPLIFIED: Cancel subscription (backend handles refund logic)
+  // ✅ FIXED: Cancel subscription (removed frontend validation)
   const handleCancelSubscription = async () => {
-    // Calculate days since subscription for message
-    let daysSince = 0;
-    if (effectiveUser?.currentPeriodStart) {
-      const subscriptionDate = new Date(effectiveUser.currentPeriodStart);
-      const now = new Date();
-      const diffTime = now - subscriptionDate;
-      daysSince = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    }
+    const confirmed = window.confirm(
+      '⚠️ Cancel Subscription?\n\n' +
+      'Your subscription will be canceled immediately and you will receive a prorated refund for the unused time.\n\n' +
+      'You will lose access to:\n' +
+      '• All uploaded content\n' +
+      '• Team collaboration features\n' +
+      '• Analytics and tracking\n' +
+      '• QR code generation\n\n' +
+      'This action cannot be undone. Are you sure?'
+    );
 
-    const isWithin7Days = daysSince <= 7;
-
-    // ✅ UPDATED: Both cases now cancel immediately
-    const confirmMessage = isWithin7Days
-      ? '⚠️ Cancel Subscription & Get Refund?\n\n' +
-        `You subscribed ${daysSince} day${daysSince === 1 ? '' : 's'} ago.\n\n` +
-        'This will:\n' +
-        '• Process a FULL REFUND to your payment method\n' +
-        '• Cancel your subscription IMMEDIATELY\n' +
-        '• You will lose access to all features RIGHT NOW\n\n' +
-        'Are you sure?'
-      : '⚠️ Cancel Subscription?\n\n' +
-        `You subscribed ${daysSince} days ago (past the 7-day refund window).\n\n` +
-        'This will:\n' +
-        '• Cancel your subscription IMMEDIATELY\n' +
-        '• NO refund will be processed (past 7-day window)\n' +
-        '• You will lose access to all features RIGHT NOW\n\n' +
-        'Are you sure?';
-
-    const confirmed = window.confirm(confirmMessage);
     if (!confirmed) return;
 
-    const doubleConfirm = window.prompt('Type "CANCEL" to confirm:');
+    const doubleConfirm = window.prompt(
+      'Type "CANCEL" to confirm subscription cancellation and refund:'
+    );
+
     if (doubleConfirm !== 'CANCEL') {
       showToast('Cancellation cancelled', 'warning');
       return;
@@ -322,24 +289,17 @@ const SettingsPage = () => {
       const response = await api.post('/subscription/cancel');
 
       if (response.data.status === 'success') {
-        // Show appropriate success message
-        if (response.data.isRefundEligible && response.data.refund) {
-          showToast(
-            `Subscription canceled! ${response.data.message}`,
-            'success'
-          );
-        } else {
-          showToast(response.data.message, 'success');
-        }
+        showToast(
+          `Subscription canceled! ${response.data.refund ? 'Refund of $' + (response.data.refund.amount / 100).toFixed(2) + ' has been processed.' : ''}`,
+          'success'
+        );
         
-        // Update user data
         setUser(response.data.user);
         
-        // ✅ Redirect to dashboard to trigger blocking check
-        // This ensures DashboardLayout sees the updated status and shows modal
+        // Redirect to plans page after 3 seconds
         setTimeout(() => {
-          navigate('/dashboard');
-        }, 1000); // Small delay to show success message
+          navigate('/plans');
+        }, 3000);
       }
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Failed to cancel subscription';
@@ -348,7 +308,6 @@ const SettingsPage = () => {
       setCancelingSubscription(false);
     }
   };
-
 
   const handleDeleteAccount = async () => {
     const confirmed = window.confirm(
@@ -635,7 +594,7 @@ const SettingsPage = () => {
     }
 
     if (activeTab === 'subscription') {
-      // Check if subscription will end (auto-renewal OFF or already canceled)
+      // ✅ Check if subscription will end (auto-renewal OFF or already canceled)
       const subscriptionEnding = !autoRenewal || effectiveUser?.subscriptionStatus === 'canceling';
       
       return (
@@ -669,7 +628,7 @@ const SettingsPage = () => {
             </div>
           )}
 
-          {/* WARNING: Subscription Ending */}
+          {/* ✅ WARNING: Subscription Ending */}
           {subscriptionEnding && effectiveUser?.currentPeriodEnd && (
             <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-400 rounded-2xl p-6 mb-6 shadow-lg">
               <div className="flex items-start gap-3">
@@ -713,8 +672,8 @@ const SettingsPage = () => {
               </div>
             </div>
 
-            {/* AUTO-RENEWAL TOGGLE */}
-            {!userIsTeamMember && (
+            {/* ✅ AUTO-RENEWAL TOGGLE */}
+            {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border-2 border-blue-200 shadow-lg">
                 <div className="flex items-center justify-between">
                   <div>
@@ -815,34 +774,25 @@ const SettingsPage = () => {
               </ul>
             </div>
 
-            {/* ✅ ENHANCED: Cancel Button with Dynamic Text */}
-            {!userIsTeamMember && (
-              <div className="flex flex-col gap-4 pt-4">
+            {/* ✅ CANCEL SUBSCRIPTION BUTTON */}
+            {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
+              <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <button
                   onClick={handleCancelSubscription}
                   disabled={cancelingSubscription}
-                  className="px-6 py-3 border-2 border-red-500 text-red-600 hover:bg-red-50 rounded-xl font-semibold transition-all flex items-center gap-2 justify-center disabled:opacity-50"
+                  className="px-6 py-3 border-2 border-red-500 text-red-600 rounded-xl font-semibold hover:bg-red-50 transition-all flex items-center gap-2 justify-center disabled:opacity-50"
                 >
                   {cancelingSubscription ? (
                     <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div>
-                      Processing...
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-red-600"></div>
+                      Canceling...
                     </>
                   ) : (
                     <>
                       <Trash2 size={18} />
-                      Cancel Subscription
+                      Cancel Subscription & Get Refund
                     </>
                   )}
-                </button>
-                
-                {/* Read Refund Policy Button */}
-                <button
-                  onClick={() => setShowRefundPolicy(true)}
-                  className="text-sm text-purple-600 hover:text-purple-800 font-medium flex items-center gap-2 justify-center transition-colors"
-                >
-                  <BookOpen size={16} />
-                  Read Refund Policy
                 </button>
               </div>
             )}
@@ -1252,201 +1202,6 @@ const SettingsPage = () => {
           </div>
         </div>
       )}
-
-      {/* Refund Policy Modal */}
-      {showRefundPolicy && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-violet-600 text-white p-6 rounded-t-2xl">
-              <div className="flex items-center justify-between">
-                <h3 className="text-2xl font-bold flex items-center gap-2">
-                  <BookOpen size={24} />
-                  7-Day Refund Policy
-                </h3>
-                <button
-                  onClick={() => setShowRefundPolicy(false)}
-                  className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6 space-y-6">
-              {/* Policy Overview */}
-              <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-400 rounded-xl p-6">
-                <h4 className="font-bold text-green-900 text-lg mb-3 flex items-center gap-2">
-                  <Check className="text-green-600" size={20} />
-                  100% Money-Back Guarantee
-                </h4>
-                <p className="text-green-800">
-                  We offer a <strong>full refund within 7 days</strong> of your subscription purchase. 
-                  No questions asked, no hassles. If you're not completely satisfied with Outbound Impact, 
-                  we'll refund your entire payment.
-                </p>
-              </div>
-
-              {/* How It Works */}
-              <div>
-                <h4 className="font-bold text-gray-800 text-lg mb-4">How It Works</h4>
-                <div className="space-y-4">
-                  <div className="flex gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold">
-                      1
-                    </div>
-                    <div>
-                      <h5 className="font-semibold text-gray-800 mb-1">Subscribe to Any Plan</h5>
-                      <p className="text-gray-600 text-sm">
-                        Choose any paid plan (Individual, Small Organization, Medium Organization, or Enterprise)
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold">
-                      2
-                    </div>
-                    <div>
-                      <h5 className="font-semibold text-gray-800 mb-1">Try Outbound Impact Risk-Free</h5>
-                      <p className="text-gray-600 text-sm">
-                        Use all features for up to 7 days. Create campaigns, upload media, generate QR codes, 
-                        and explore everything the platform offers.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold">
-                      3
-                    </div>
-                    <div>
-                      <h5 className="font-semibold text-gray-800 mb-1">Request Refund if Not Satisfied</h5>
-                      <p className="text-gray-600 text-sm">
-                        If you're not happy, click "Cancel Subscription" in your settings within 7 days. 
-                        You'll receive a full refund to your original payment method.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Important Details */}
-              <div>
-                <h4 className="font-bold text-gray-800 text-lg mb-4">Important Details</h4>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
-                    <Clock className="text-blue-600 flex-shrink-0 mt-0.5" size={18} />
-                    <div>
-                      <p className="text-sm text-gray-700">
-                        <strong>7-Day Window:</strong> The refund period starts from the moment your payment is processed, 
-                        not from when you start using the platform.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
-                    <CreditCard className="text-blue-600 flex-shrink-0 mt-0.5" size={18} />
-                    <div>
-                      <p className="text-sm text-gray-700">
-                        <strong>Refund Processing:</strong> Once approved, refunds are processed immediately to your 
-                        original payment method. It may take 5-10 business days for the refund to appear in your account, 
-                        depending on your bank or card issuer.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                    <AlertTriangle className="text-yellow-600 flex-shrink-0 mt-0.5" size={18} />
-                    <div>
-                      <p className="text-sm text-gray-700">
-                        <strong>After 7 Days:</strong> After the 7-day window, you can still cancel your subscription, 
-                        but no refund will be issued. Your subscription will remain active until the end of your current 
-                        billing period.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-3 bg-purple-50 rounded-lg">
-                    <Mail className="text-purple-600 flex-shrink-0 mt-0.5" size={18} />
-                    <div>
-                      <p className="text-sm text-gray-700">
-                        <strong>Confirmation:</strong> You'll receive an email confirmation when your refund is processed. 
-                        Keep this for your records.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* What Happens After Refund */}
-              <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6">
-                <h4 className="font-bold text-red-900 text-lg mb-3 flex items-center gap-2">
-                  <AlertTriangle className="text-red-600" size={20} />
-                  What Happens After a Refund?
-                </h4>
-                <ul className="space-y-2 text-sm text-red-800">
-                  <li className="flex items-start gap-2">
-                    <span className="text-red-600 mt-1">•</span>
-                    <span>Your subscription is canceled immediately</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-red-600 mt-1">•</span>
-                    <span>You lose access to all premium features</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-red-600 mt-1">•</span>
-                    <span>All QR codes are deactivated</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-red-600 mt-1">•</span>
-                    <span>All uploaded media and campaigns are preserved for 30 days in case you want to reactivate</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Contact Support */}
-              <div className="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-6">
-                <h4 className="font-bold text-purple-900 text-lg mb-3">Need Help?</h4>
-                <p className="text-purple-800 mb-3">
-                  Have questions about our refund policy or need assistance? Our support team is here to help!
-                </p>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <a
-                    href="mailto:support@outboundimpact.net"
-                    className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors justify-center"
-                  >
-                    <Mail size={18} />
-                    support@outboundimpact.net
-                  </a>
-                  <button
-                    onClick={() => {
-                      setShowRefundPolicy(false);
-                      setActiveTab('live-chat');
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-purple-600 text-purple-600 rounded-lg font-semibold hover:bg-purple-50 transition-colors justify-center"
-                  >
-                    <MessagesSquare size={18} />
-                    Live Chat Support
-                  </button>
-                </div>
-              </div>
-
-              {/* Close Button */}
-              <div className="flex justify-end pt-4 border-t-2 border-gray-200">
-                <button
-                  onClick={() => setShowRefundPolicy(false)}
-                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition-all"
-                >
-                  Got It
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
     </DashboardLayout>
   );
 };
