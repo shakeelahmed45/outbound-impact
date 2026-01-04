@@ -26,7 +26,7 @@ const platformRoutes = require('./routes/platformIntegrationRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
 
 // 🔄 Refund routes (NEW)
-// const refundRoutes = require('./routes/refundRoutes'); //
+const refundRoutes = require('./routes/refundRoutes');
 
 // 🔍 DEBUG ROUTES
 const debugRoutes = require('./routes/debugRoutes');
@@ -200,7 +200,7 @@ app.use('/api/platforms', platformRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 
 // 🔄 Refund routes (NEW)
-// app.use('/api/refund', refundRoutes); //
+app.use('/api/refund', refundRoutes);
 
 // 🔍 DEBUG ROUTES
 app.use('/api/debug', debugRoutes);
