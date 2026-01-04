@@ -25,6 +25,9 @@ const platformRoutes = require('./routes/platformIntegrationRoutes');
 // 💳 Subscription management routes
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
 
+// 🔄 Refund routes (NEW)
+const refundRoutes = require('./routes/refundRoutes');
+
 // 🔍 DEBUG ROUTES
 const debugRoutes = require('./routes/debugRoutes');
 
@@ -196,6 +199,9 @@ app.use('/api/platforms', platformRoutes);
 // 💳 Subscription management routes
 app.use('/api/subscription', subscriptionRoutes);
 
+// 🔄 Refund routes (NEW)
+app.use('/api/refund', refundRoutes);
+
 // 🔍 DEBUG ROUTES
 app.use('/api/debug', debugRoutes);
 
@@ -244,6 +250,7 @@ if (process.env.VERCEL) {
     console.log('───────────────────────────────────────────────');
     console.log('✨ Enterprise features enabled!');
     console.log('💳 Subscription management enabled!');
+    console.log('🔄 Refund system enabled! (7-day policy)');
     console.log('🛍️ Multi-platform e-commerce integration ready!');
     console.log('🔍 Debug routes active at /api/debug');
     console.log('═══════════════════════════════════════════════\n');

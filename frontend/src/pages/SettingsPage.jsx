@@ -8,6 +8,7 @@ import api from '../services/api';
 import { useToast } from '../hooks/useToast';
 import Toast from '../components/common/Toast';
 import UpgradePlanModal from '../components/UpgradePlanModal';
+import RefundSection from '../components/RefundSection'; // ✅ NEW: Import RefundSection
 
 const SettingsPage = () => {
   const navigate = useNavigate();
@@ -598,230 +599,238 @@ const SettingsPage = () => {
       const subscriptionEnding = !autoRenewal || effectiveUser?.subscriptionStatus === 'canceling';
       
       return (
-        <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 border border-gray-100">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-              <CreditCard className="text-white" size={20} />
-            </div>
-            <h3 className="text-2xl font-bold text-gray-800">Subscription Details</h3>
-          </div>
-          
-          {!userIsTeamMember && effectiveRole !== 'ORG_ENTERPRISE' && (
-            <div className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-2xl p-6 border-2 border-purple-200 mb-6 shadow-lg">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                    <TrendingUp className="text-purple-600" size={24} />
-                    Want More Features?
-                  </h3>
-                  <p className="text-gray-600">
-                    Upgrade your plan to unlock more storage, users, and features with prorated billing!
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowUpgradeModal(true)}
-                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-violet-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all whitespace-nowrap"
-                >
-                  Upgrade Plan
-                </button>
+        <div className="space-y-6">
+          {/* Subscription Details */}
+          <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 border border-gray-100">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                <CreditCard className="text-white" size={20} />
               </div>
+              <h3 className="text-2xl font-bold text-gray-800">Subscription Details</h3>
             </div>
-          )}
-
-          {/* ✅ WARNING: Subscription Ending */}
-          {subscriptionEnding && effectiveUser?.currentPeriodEnd && (
-            <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-400 rounded-2xl p-6 mb-6 shadow-lg">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="text-yellow-600 flex-shrink-0 mt-1" size={24} />
-                <div>
-                  <h4 className="font-bold text-yellow-900 mb-2">Subscription Ending</h4>
-                  <p className="text-yellow-800 mb-3">
-                    Your subscription will end on <strong>{new Date(effectiveUser.currentPeriodEnd).toLocaleDateString()}</strong>. 
-                    You will lose access to all features after this date.
-                  </p>
-                  <button
-                    onClick={handleToggleAutoRenewal}
-                    disabled={togglingRenewal}
-                    className="px-4 py-2 bg-yellow-600 text-white rounded-lg font-semibold hover:bg-yellow-700 transition-all flex items-center gap-2"
-                  >
-                    <ToggleRight size={18} />
-                    {togglingRenewal ? 'Processing...' : 'Reactivate Subscription'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-2xl border border-purple-200">
-                <p className="text-sm text-gray-600 mb-2 flex items-center gap-1">
-                  Current Plan
-                  <Tooltip content="Your active subscription tier" iconSize={14} />
-                </p>
-                <p className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                  {getPlanName(effectiveRole)}
-                </p>
-              </div>
-              <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-2xl border border-green-200">
-                <p className="text-sm text-gray-600 mb-2">Status</p>
-                <span className={`px-4 py-2 ${subscriptionEnding ? 'bg-yellow-500' : 'bg-green-500'} text-white rounded-full font-semibold inline-flex items-center gap-2 shadow-lg`}>
-                  <Check size={18} />
-                  {subscriptionEnding ? 'Ending Soon' : 'Active'}
-                </span>
-              </div>
-            </div>
-
-            {/* ✅ AUTO-RENEWAL TOGGLE */}
-            {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border-2 border-blue-200 shadow-lg">
-                <div className="flex items-center justify-between">
+            
+            {!userIsTeamMember && effectiveRole !== 'ORG_ENTERPRISE' && (
+              <div className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-2xl p-6 border-2 border-purple-200 mb-6 shadow-lg">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div>
-                    <h4 className="font-bold text-gray-800 mb-1 flex items-center gap-2">
-                      Auto-Renewal
-                      <Tooltip content="Automatically renew your subscription at the end of each billing period" />
-                    </h4>
-                    <p className="text-sm text-gray-600">
-                      {autoRenewal 
-                        ? 'Your subscription will automatically renew' 
-                        : 'Your subscription will end on ' + (effectiveUser?.currentPeriodEnd ? new Date(effectiveUser.currentPeriodEnd).toLocaleDateString() : 'period end')
-                      }
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                      <TrendingUp className="text-purple-600" size={24} />
+                      Want More Features?
+                    </h3>
+                    <p className="text-gray-600">
+                      Upgrade your plan to unlock more storage, users, and features with prorated billing!
                     </p>
                   </div>
                   <button
-                    onClick={handleToggleAutoRenewal}
-                    disabled={togglingRenewal}
-                    className={`
-                      relative w-16 h-8 rounded-full transition-all duration-300 flex items-center
-                      ${autoRenewal ? 'bg-green-500' : 'bg-gray-300'}
-                      ${togglingRenewal ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-lg'}
-                    `}
+                    onClick={() => setShowUpgradeModal(true)}
+                    className="px-6 py-3 bg-gradient-to-r from-purple-600 to-violet-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all whitespace-nowrap"
                   >
-                    <div className={`
-                      absolute w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300
-                      ${autoRenewal ? 'right-1' : 'left-1'}
-                    `}>
-                      {togglingRenewal && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                        </div>
-                      )}
-                    </div>
-                    {autoRenewal ? (
-                      <ToggleRight className="absolute right-1 text-white" size={16} />
-                    ) : (
-                      <ToggleLeft className="absolute left-1 text-gray-500" size={16} />
-                    )}
+                    Upgrade Plan
                   </button>
                 </div>
               </div>
             )}
 
-            <div className="border-t-2 border-gray-200 pt-6">
-              <p className="text-sm text-gray-600 mb-3 flex items-center gap-1">
-                Storage Usage
-                <Tooltip content="How much of your plan's storage you're currently using" iconSize={14} />
-              </p>
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <div className="flex justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">
-                      {formatStorage(Number(effectiveUser?.storageUsed || 0))} / {formatStorage(Number(effectiveUser?.storageLimit || 2147483648))}
-                    </span>
-                    <span className="text-sm font-bold text-primary">
-                      {effectiveUser?.storageLimit ? Math.round((Number(effectiveUser.storageUsed) / Number(effectiveUser.storageLimit)) * 100) : 0}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden shadow-inner">
-                    <div
-                      className="bg-gradient-to-r from-primary to-secondary h-4 rounded-full transition-all duration-500 shadow-lg"
-                      style={{
-                        width: effectiveUser?.storageLimit
-                          ? Math.min((Number(effectiveUser.storageUsed) / Number(effectiveUser.storageLimit)) * 100, 100) + '%'
-                          : '0%',
-                      }}
-                    />
+            {/* ✅ WARNING: Subscription Ending */}
+            {subscriptionEnding && effectiveUser?.currentPeriodEnd && (
+              <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-400 rounded-2xl p-6 mb-6 shadow-lg">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="text-yellow-600 flex-shrink-0 mt-1" size={24} />
+                  <div>
+                    <h4 className="font-bold text-yellow-900 mb-2">Subscription Ending</h4>
+                    <p className="text-yellow-800 mb-3">
+                      Your subscription will end on <strong>{new Date(effectiveUser.currentPeriodEnd).toLocaleDateString()}</strong>. 
+                      You will lose access to all features after this date.
+                    </p>
+                    <button
+                      onClick={handleToggleAutoRenewal}
+                      disabled={togglingRenewal}
+                      className="px-4 py-2 bg-yellow-600 text-white rounded-lg font-semibold hover:bg-yellow-700 transition-all flex items-center gap-2"
+                    >
+                      <ToggleRight size={18} />
+                      {togglingRenewal ? 'Processing...' : 'Reactivate Subscription'}
+                    </button>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            <div className="border-t-2 border-gray-200 pt-6">
-              <h4 className="font-bold text-gray-800 mb-4 text-lg">Plan Features</h4>
-              <ul className="space-y-3">
-                <li className="flex items-center gap-3 text-gray-700 bg-gray-50 p-3 rounded-xl">
-                  <Check className="text-green-500 flex-shrink-0" size={20} />
-                  <span className="font-medium">Unlimited QR Codes</span>
-                </li>
-                <li className="flex items-center gap-3 text-gray-700 bg-gray-50 p-3 rounded-xl">
-                  <Check className="text-green-500 flex-shrink-0" size={20} />
-                  <span className="font-medium">{formatStorage(Number(effectiveUser?.storageLimit || 2147483648))} Storage</span>
-                  <Tooltip 
-                    content="Total storage space available in your plan" 
-                    iconSize={12}
-                  />
-                </li>
-                <li className="flex items-center gap-3 text-gray-700 bg-gray-50 p-3 rounded-xl">
-                  <Check className="text-green-500 flex-shrink-0" size={20} />
-                  <span className="font-medium">Analytics & Tracking</span>
-                </li>
-                {(effectiveRole === 'ORG_SMALL' || effectiveRole === 'ORG_MEDIUM' || effectiveRole === 'ORG_ENTERPRISE') && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-2xl border border-purple-200">
+                  <p className="text-sm text-gray-600 mb-2 flex items-center gap-1">
+                    Current Plan
+                    <Tooltip content="Your active subscription tier" iconSize={14} />
+                  </p>
+                  <p className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                    {getPlanName(effectiveRole)}
+                  </p>
+                </div>
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-2xl border border-green-200">
+                  <p className="text-sm text-gray-600 mb-2">Status</p>
+                  <span className={`px-4 py-2 ${subscriptionEnding ? 'bg-yellow-500' : 'bg-green-500'} text-white rounded-full font-semibold inline-flex items-center gap-2 shadow-lg`}>
+                    <Check size={18} />
+                    {subscriptionEnding ? 'Ending Soon' : 'Active'}
+                  </span>
+                </div>
+              </div>
+
+              {/* ✅ AUTO-RENEWAL TOGGLE */}
+              {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border-2 border-blue-200 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-gray-800 mb-1 flex items-center gap-2">
+                        Auto-Renewal
+                        <Tooltip content="Automatically renew your subscription at the end of each billing period" />
+                      </h4>
+                      <p className="text-sm text-gray-600">
+                        {autoRenewal 
+                          ? 'Your subscription will automatically renew' 
+                          : 'Your subscription will end on ' + (effectiveUser?.currentPeriodEnd ? new Date(effectiveUser.currentPeriodEnd).toLocaleDateString() : 'period end')
+                        }
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleToggleAutoRenewal}
+                      disabled={togglingRenewal}
+                      className={`
+                        relative w-16 h-8 rounded-full transition-all duration-300 flex items-center
+                        ${autoRenewal ? 'bg-green-500' : 'bg-gray-300'}
+                        ${togglingRenewal ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-lg'}
+                      `}
+                    >
+                      <div className={`
+                        absolute w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300
+                        ${autoRenewal ? 'right-1' : 'left-1'}
+                      `}>
+                        {togglingRenewal && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                          </div>
+                        )}
+                      </div>
+                      {autoRenewal ? (
+                        <ToggleRight className="absolute right-1 text-white" size={16} />
+                      ) : (
+                        <ToggleLeft className="absolute left-1 text-gray-500" size={16} />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="border-t-2 border-gray-200 pt-6">
+                <p className="text-sm text-gray-600 mb-3 flex items-center gap-1">
+                  Storage Usage
+                  <Tooltip content="How much of your plan's storage you're currently using" iconSize={14} />
+                </p>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <div className="flex justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">
+                        {formatStorage(Number(effectiveUser?.storageUsed || 0))} / {formatStorage(Number(effectiveUser?.storageLimit || 2147483648))}
+                      </span>
+                      <span className="text-sm font-bold text-primary">
+                        {effectiveUser?.storageLimit ? Math.round((Number(effectiveUser.storageUsed) / Number(effectiveUser.storageLimit)) * 100) : 0}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden shadow-inner">
+                      <div
+                        className="bg-gradient-to-r from-primary to-secondary h-4 rounded-full transition-all duration-500 shadow-lg"
+                        style={{
+                          width: effectiveUser?.storageLimit
+                            ? Math.min((Number(effectiveUser.storageUsed) / Number(effectiveUser.storageLimit)) * 100, 100) + '%'
+                            : '0%',
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t-2 border-gray-200 pt-6">
+                <h4 className="font-bold text-gray-800 mb-4 text-lg">Plan Features</h4>
+                <ul className="space-y-3">
                   <li className="flex items-center gap-3 text-gray-700 bg-gray-50 p-3 rounded-xl">
                     <Check className="text-green-500 flex-shrink-0" size={20} />
-                    <span className="font-medium">Team Collaboration</span>
+                    <span className="font-medium">Unlimited QR Codes</span>
                   </li>
-                )}
-              </ul>
-            </div>
-
-            {/* ✅ CANCEL SUBSCRIPTION BUTTON */}
-            {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
-              <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <button
-                  onClick={handleCancelSubscription}
-                  disabled={cancelingSubscription}
-                  className="px-6 py-3 border-2 border-red-500 text-red-600 rounded-xl font-semibold hover:bg-red-50 transition-all flex items-center gap-2 justify-center disabled:opacity-50"
-                >
-                  {cancelingSubscription ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-red-600"></div>
-                      Canceling...
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 size={18} />
-                      Cancel Subscription & Get Refund
-                    </>
+                  <li className="flex items-center gap-3 text-gray-700 bg-gray-50 p-3 rounded-xl">
+                    <Check className="text-green-500 flex-shrink-0" size={20} />
+                    <span className="font-medium">{formatStorage(Number(effectiveUser?.storageLimit || 2147483648))} Storage</span>
+                    <Tooltip 
+                      content="Total storage space available in your plan" 
+                      iconSize={12}
+                    />
+                  </li>
+                  <li className="flex items-center gap-3 text-gray-700 bg-gray-50 p-3 rounded-xl">
+                    <Check className="text-green-500 flex-shrink-0" size={20} />
+                    <span className="font-medium">Analytics & Tracking</span>
+                  </li>
+                  {(effectiveRole === 'ORG_SMALL' || effectiveRole === 'ORG_MEDIUM' || effectiveRole === 'ORG_ENTERPRISE') && (
+                    <li className="flex items-center gap-3 text-gray-700 bg-gray-50 p-3 rounded-xl">
+                      <Check className="text-green-500 flex-shrink-0" size={20} />
+                      <span className="font-medium">Team Collaboration</span>
+                    </li>
                   )}
-                </button>
+                </ul>
               </div>
-            )}
 
-            {userIsTeamMember && (
-              <div className="mt-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl p-6 shadow-lg">
-                <h4 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
-                  <UserCheck size={20} />
-                  Team Member Account
-                </h4>
-                <p className="text-blue-800 text-sm mb-2">
-                  You are viewing <strong>{user.organization.name}</strong> organization account.
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-                  <div className="bg-white/50 p-3 rounded-lg">
-                    <p className="text-xs text-blue-600 mb-1">Your Role</p>
-                    <p className="text-blue-900 font-semibold">{user.teamRole}</p>
-                  </div>
-                  <div className="bg-white/50 p-3 rounded-lg">
-                    <p className="text-xs text-blue-600 mb-1">Organization Contact</p>
-                    <p className="text-blue-900 font-semibold">{user.organization.email}</p>
-                  </div>
+              {/* ✅ CANCEL SUBSCRIPTION BUTTON */}
+              {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
+                <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                  <button
+                    onClick={handleCancelSubscription}
+                    disabled={cancelingSubscription}
+                    className="px-6 py-3 border-2 border-red-500 text-red-600 rounded-xl font-semibold hover:bg-red-50 transition-all flex items-center gap-2 justify-center disabled:opacity-50"
+                  >
+                    {cancelingSubscription ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-red-600"></div>
+                        Canceling...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 size={18} />
+                        Cancel Subscription & Get Refund
+                      </>
+                    )}
+                  </button>
                 </div>
-                <p className="text-xs text-blue-700 mt-4 bg-white/50 p-3 rounded-lg">
-                  Contact your organization administrator to modify subscription settings or access additional features.
-                </p>
-              </div>
-            )}
+              )}
+
+              {userIsTeamMember && (
+                <div className="mt-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl p-6 shadow-lg">
+                  <h4 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                    <UserCheck size={20} />
+                    Team Member Account
+                  </h4>
+                  <p className="text-blue-800 text-sm mb-2">
+                    You are viewing <strong>{user.organization.name}</strong> organization account.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                    <div className="bg-white/50 p-3 rounded-lg">
+                      <p className="text-xs text-blue-600 mb-1">Your Role</p>
+                      <p className="text-blue-900 font-semibold">{user.teamRole}</p>
+                    </div>
+                    <div className="bg-white/50 p-3 rounded-lg">
+                      <p className="text-xs text-blue-600 mb-1">Organization Contact</p>
+                      <p className="text-blue-900 font-semibold">{user.organization.email}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-blue-700 mt-4 bg-white/50 p-3 rounded-lg">
+                    Contact your organization administrator to modify subscription settings or access additional features.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* ✅ NEW: 7-DAY REFUND SECTION - ADD THIS HERE */}
+          {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
+            <RefundSection />
+          )}
         </div>
       );
     }

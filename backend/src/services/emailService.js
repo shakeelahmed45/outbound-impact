@@ -858,17 +858,335 @@ const sendPasswordResetEmail = async (resetData) => {
   }
 };
 
+// ✅ NEW: Send refund confirmation with account deletion notice
+const sendRefundAccountDeletionEmail = async ({ userEmail, userName, refundAmount, refundId }) => {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.log('⚠️ Resend not configured - skipping refund email');
+      return { success: false, error: 'Resend not configured' };
+    }
+
+    const { data, error } = await resend.emails.send({
+      from: 'Outbound Impact <noreply@outboundimpact.org>',
+      to: [userEmail],
+      subject: '✅ Refund Processed & Account Deleted - Outbound Impact',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+              line-height: 1.6; 
+              color: #333; 
+              max-width: 600px; 
+              margin: 0 auto; 
+              padding: 20px;
+            }
+            .container { 
+              background: #ffffff; 
+              border-radius: 12px; 
+              overflow: hidden; 
+              box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+            }
+            .header { 
+              background: linear-gradient(135deg, #800080 0%, #EE82EE 100%); 
+              color: white; 
+              padding: 40px 30px; 
+              text-align: center; 
+            }
+            .header h1 { 
+              margin: 0; 
+              font-size: 28px; 
+            }
+            .content { 
+              padding: 40px 30px; 
+            }
+            .refund-box { 
+              background: #f0f0ff; 
+              border: 2px solid #800080; 
+              border-radius: 8px; 
+              padding: 20px; 
+              margin: 25px 0; 
+              text-align: center; 
+            }
+            .amount { 
+              font-size: 36px; 
+              font-weight: bold; 
+              color: #800080; 
+              margin: 10px 0; 
+            }
+            .warning-box { 
+              background: #FEF2F2; 
+              border-left: 4px solid #EF4444; 
+              padding: 20px; 
+              margin: 25px 0; 
+              border-radius: 6px; 
+            }
+            .info-row { 
+              display: flex; 
+              justify-content: space-between; 
+              padding: 12px 0; 
+              border-bottom: 1px solid #eee; 
+            }
+            .footer { 
+              text-align: center; 
+              padding: 20px; 
+              color: #666; 
+              font-size: 14px; 
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>✅ Refund Processed</h1>
+            </div>
+            
+            <div class="content">
+              <h2>Hi ${userName},</h2>
+              
+              <p>Your refund request has been processed successfully, and your account has been permanently deleted as requested.</p>
+              
+              <div class="refund-box">
+                <div style="color: #666; font-size: 14px;">Refund Amount</div>
+                <div class="amount">$${refundAmount.toFixed(2)}</div>
+                <div style="color: #666; font-size: 14px; margin-top: 5px;">USD</div>
+              </div>
+              
+              <div style="margin: 30px 0;">
+                <div class="info-row">
+                  <span style="font-weight: 600; color: #666;">Status</span>
+                  <span>✅ Processed</span>
+                </div>
+                <div class="info-row">
+                  <span style="font-weight: 600; color: #666;">Refund ID</span>
+                  <span>${refundId}</span>
+                </div>
+                <div class="info-row" style="border-bottom: none;">
+                  <span style="font-weight: 600; color: #666;">Processing Time</span>
+                  <span>5-10 business days</span>
+                </div>
+              </div>
+              
+              <div class="warning-box">
+                <p style="margin: 0; color: #DC2626;"><strong>⚠️ Account Permanently Deleted</strong></p>
+                <ul style="margin: 10px 0 0 0; padding-left: 20px; color: #991B1B;">
+                  <li>Your subscription has been canceled</li>
+                  <li>Your account has been permanently deleted</li>
+                  <li>All your data, campaigns, and media have been permanently removed</li>
+                  <li>You will not be able to log in to this account anymore</li>
+                  <li>The refund will appear on your original payment method within 5-10 business days</li>
+                </ul>
+              </div>
+              
+              <p style="margin-top: 30px;">We're sorry to see you go! If you have any feedback about your experience, we'd love to hear from you.</p>
+              
+              <p style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee; color: #666;">
+                If you'd like to use Outbound Impact again in the future, you're welcome to create a new account anytime at <a href="https://outboundimpact.net" style="color: #800080;">outboundimpact.net</a>
+              </p>
+              
+              <p style="margin-top: 20px;">
+                Thank you for trying Outbound Impact!<br>
+                <strong>The Outbound Impact Team</strong>
+              </p>
+            </div>
+            
+            <div class="footer">
+              <p>Questions? Email us at <a href="mailto:support@outboundimpact.org" style="color: #800080;">support@outboundimpact.org</a></p>
+              <p style="font-size: 12px; color: #999; margin-top: 10px;">
+                © ${new Date().getFullYear()} Outbound Impact. All rights reserved.
+              </p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Failed to send refund email:', error);
+      return { success: false, error };
+    }
+
+    console.log('✅ Refund confirmation email sent:', data.id);
+    return { success: true, data };
+
+  } catch (error) {
+    console.error('❌ Refund email error:', error);
+    return { success: false, error };
+  }
+};
+
+// ✅ NEW: Send refund notification to admin
+const sendAdminRefundNotification = async ({ userName, userEmail, refundAmount, refundReason, refundId, userRole }) => {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.log('⚠️ Resend not configured - skipping admin refund notification');
+      return { success: false };
+    }
+
+    const adminEmail = process.env.ADMIN_EMAIL || 'business.shakeelahmed@gmail.com';
+
+    const { data, error } = await resend.emails.send({
+      from: 'Outbound Impact <noreply@outboundimpact.org>',
+      to: [adminEmail],
+      subject: `💸 Refund Processed & Account Deleted - ${userName}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+              line-height: 1.6; 
+              color: #333; 
+              max-width: 600px; 
+              margin: 0 auto; 
+              padding: 20px;
+            }
+            .container { 
+              background: #ffffff; 
+              border-radius: 12px; 
+              overflow: hidden; 
+              box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+            }
+            .header { 
+              background: linear-gradient(135deg, #dc3545 0%, #ff6b6b 100%); 
+              color: white; 
+              padding: 30px; 
+              text-align: center; 
+            }
+            .content { 
+              padding: 30px; 
+            }
+            .info-box { 
+              background: #f8f9fa; 
+              border-left: 4px solid #dc3545; 
+              padding: 15px; 
+              margin: 15px 0; 
+              border-radius: 4px; 
+            }
+            .info-row { 
+              display: flex; 
+              justify-content: space-between; 
+              padding: 8px 0; 
+              border-bottom: 1px solid #dee2e6; 
+            }
+            .info-row:last-child { 
+              border-bottom: none; 
+            }
+            .label { 
+              font-weight: 600; 
+              color: #495057; 
+            }
+            .value { 
+              color: #212529; 
+            }
+            .reason-box { 
+              background: #fff3cd; 
+              border: 1px solid #ffc107; 
+              padding: 15px; 
+              margin: 20px 0; 
+              border-radius: 6px; 
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>💸 Refund Processed</h1>
+              <p style="margin: 10px 0 0;">Account Permanently Deleted</p>
+            </div>
+            
+            <div class="content">
+              <h2>Refund Details</h2>
+              
+              <div class="info-box">
+                <div class="info-row">
+                  <span class="label">User Name</span>
+                  <span class="value">${userName}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Email</span>
+                  <span class="value">${userEmail}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Plan</span>
+                  <span class="value">${userRole}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Refund Amount</span>
+                  <span class="value">$${refundAmount.toFixed(2)} USD</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Refund ID</span>
+                  <span class="value">${refundId}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Processed At</span>
+                  <span class="value">${new Date().toLocaleString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric', 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  })}</span>
+                </div>
+              </div>
+              
+              <h3>User's Reason</h3>
+              <div class="reason-box">
+                <p style="margin: 0; white-space: pre-wrap;">${refundReason}</p>
+              </div>
+              
+              <div style="margin-top: 20px; padding: 15px; background: #e7f3ff; border-radius: 6px;">
+                <p style="margin: 0;"><strong>Actions Taken:</strong></p>
+                <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+                  <li>Stripe refund processed</li>
+                  <li>Subscription canceled</li>
+                  <li>User account permanently deleted</li>
+                  <li>All user data permanently removed</li>
+                  <li>Confirmation email sent to user</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Failed to send admin refund notification:', error);
+      return { success: false, error };
+    }
+
+    console.log('✅ Admin refund notification sent:', data.id);
+    return { success: true, data };
+
+  } catch (error) {
+    console.error('❌ Admin refund notification error:', error);
+    return { success: false, error };
+  }
+};
+
 // Test connection when service loads
 testConnection();
 
 module.exports = {
   sendWelcomeEmail,
   sendAdminNotification,
-  sendPaymentReceiptEmail,        // ✅ NEW
-  sendPaymentFailedEmail,          // ✅ NEW
-  sendCancellationEmail,           // ✅ NEW
+  sendPaymentReceiptEmail,
+  sendPaymentFailedEmail,
+  sendCancellationEmail,
   sendTeamInvitationEmail,
   sendInvitationReminderEmail,
   sendPasswordResetEmail,
+  sendRefundAccountDeletionEmail,      // ✅ NEW
+  sendAdminRefundNotification,         // ✅ NEW
   testConnection
 };
