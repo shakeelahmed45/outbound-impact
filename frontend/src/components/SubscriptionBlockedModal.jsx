@@ -207,10 +207,10 @@ const SubscriptionBlockedModal = ({ user, onReactivateSuccess }) => {
             <p className="text-xs sm:text-sm text-gray-600">
               Need help? Contact us at{' '}
               <a 
-                href="mailto:support@outboundimpact.net" 
+                href="mailto:support@outboundimpact.org" 
                 className="text-purple-600 hover:text-purple-800 font-medium break-all"
               >
-                support@outboundimpact.net
+                support@outboundimpact.org
               </a>
             </p>
           </div>

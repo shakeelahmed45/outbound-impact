@@ -266,13 +266,13 @@ const SettingsPage = () => {
   const handleCancelSubscription = async () => {
     const confirmed = window.confirm(
       '⚠️ Cancel Subscription?\n\n' +
-      'Your subscription will be canceled immediately and you will receive a prorated refund for the unused time.\n\n' +
+      'Your subscription will be canceled immediately.\n\n' +
       'You will lose access to:\n' +
       '• All uploaded content\n' +
       '• Team collaboration features\n' +
       '• Analytics and tracking\n' +
       '• QR code generation\n\n' +
-      'This action cannot be undone. Are you sure?'
+      'Are you sure?'
     );
 
     if (!confirmed) return;
@@ -676,7 +676,7 @@ const SettingsPage = () => {
             </div>
 
             {/* ✅ AUTO-RENEWAL TOGGLE */}
-            {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
+            {!userIsTeamMember && (
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border-2 border-blue-200 shadow-lg">
                 <div className="flex items-center justify-between">
                   <div>
@@ -778,7 +778,7 @@ const SettingsPage = () => {
             </div>
 
             {/* ✅ CANCEL SUBSCRIPTION BUTTON */}
-            {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
+            {!userIsTeamMember && (
               <div className="pt-4 space-y-3">
                 <button
                   onClick={handleCancelSubscription}
@@ -793,7 +793,7 @@ const SettingsPage = () => {
                   ) : (
                     <>
                       <Trash2 size={18} />
-                      Cancel Subscription & Get Refund
+                      Cancel Subscription
                     </>
                   )}
                 </button>
@@ -1286,7 +1286,7 @@ const SettingsPage = () => {
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                       </svg>
                     </div>
-                    <p className="text-sm sm:text-base text-gray-700 min-w-0">Click <strong>"Cancel Subscription & Get Refund"</strong> button</p>
+                    <p className="text-sm sm:text-base text-gray-700 min-w-0">Click <strong>"Cancel Subscription"</strong> button</p>
                   </div>
                   <div className="flex items-start gap-2 sm:gap-3">
                     <div className="bg-purple-100 text-purple-600 w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-1">
@@ -1353,7 +1353,7 @@ const SettingsPage = () => {
                       </div>
                       <div className="bg-green-500/10 border-2 border-green-400 rounded-lg p-3 sm:p-4">
                         <p className="text-sm sm:text-base font-semibold text-green-900 mb-1.5 sm:mb-2">✅ Correct Way to Cancel:</p>
-                        <p className="text-xs sm:text-sm text-green-800">Always use the <strong>"Cancel Subscription & Get Refund"</strong> button in the Subscription section above. This ensures you get your refund (if eligible) and your data is handled properly.</p>
+                        <p className="text-xs sm:text-sm text-green-800">Always use the <strong>"Cancel Subscription"</strong> button in the Subscription section above. This ensures you get your refund (if eligible) and your data is handled properly.</p>
                       </div>
                     </div>
                   </div>
@@ -1392,7 +1392,7 @@ const SettingsPage = () => {
                       If you have any questions about our refund policy or need assistance with cancellation, our support team is here to help!
                     </p>
                     <a
-                      href="mailto:support@outboundimpact.com"
+                      href="mailto:support@outboundimpact.org"
                       className="inline-flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 bg-purple-600 text-white rounded-lg text-sm sm:text-base font-semibold hover:bg-purple-700 transition-all"
                     >
                       <Mail size={16} className="sm:w-5 sm:h-5" />
