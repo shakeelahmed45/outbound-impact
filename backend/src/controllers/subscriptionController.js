@@ -173,15 +173,16 @@ const cancelSubscription = async (req, res) => {
       });
     }
 
-    // Check for active subscription
+    // ✅ NEW: Check if webhook has completed (CRITICAL FIX!)
     if (!user.stripeCustomerId || !user.subscriptionId) {
-      console.error('❌ Missing subscription data:');
+      console.log('⚠️ Subscription data not yet synced from Stripe webhook');
       console.error('   stripeCustomerId:', user.stripeCustomerId || 'MISSING');
       console.error('   subscriptionId:', user.subscriptionId || 'MISSING');
       
       return res.status(400).json({
         status: 'error',
-        message: 'No active subscription found.'
+        message: 'Your subscription is still being set up. Please wait 30-60 seconds and try again.',
+        code: 'WEBHOOK_PENDING'
       });
     }
 

@@ -266,13 +266,13 @@ const SettingsPage = () => {
   const handleCancelSubscription = async () => {
     const confirmed = window.confirm(
       '⚠️ Cancel Subscription?\n\n' +
-      'Your subscription will be canceled immediately.\n\n' +
+      'Your subscription will be canceled immediately and you will receive a prorated refund for the unused time.\n\n' +
       'You will lose access to:\n' +
       '• All uploaded content\n' +
       '• Team collaboration features\n' +
       '• Analytics and tracking\n' +
       '• QR code generation\n\n' +
-      'Are you sure?'
+      'This action cannot be undone. Are you sure?'
     );
 
     if (!confirmed) return;
@@ -306,7 +306,17 @@ const SettingsPage = () => {
       }
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Failed to cancel subscription';
-      showToast(errorMessage, 'error');
+      const errorCode = error.response?.data?.code;
+      
+      // ✅ Handle webhook pending error
+      if (errorCode === 'WEBHOOK_PENDING') {
+        showToast(
+          'Subscription is still being set up. Please wait 30 seconds and try again.',
+          'warning'
+        );
+      } else {
+        showToast(errorMessage, 'error');
+      }
     } finally {
       setCancelingSubscription(false);
     }
@@ -780,10 +790,28 @@ const SettingsPage = () => {
             {/* ✅ CANCEL SUBSCRIPTION BUTTON */}
             {!userIsTeamMember && (
               <div className="pt-4 space-y-3">
+                {/* ⚠️ Webhook pending warning */}
+                {(!effectiveUser?.stripeCustomerId || !effectiveUser?.subscriptionId) && effectiveUser?.subscriptionStatus === 'active' && (
+                  <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="text-yellow-600 flex-shrink-0 mt-0.5" size={20} />
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-yellow-900 text-sm mb-1">
+                          Subscription Setup in Progress
+                        </h4>
+                        <p className="text-yellow-800 text-xs leading-relaxed">
+                          Your subscription is being finalized. Please wait 30-60 seconds before canceling. 
+                          Refresh the page if this message persists after 1 minute.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <button
                   onClick={handleCancelSubscription}
-                  disabled={cancelingSubscription}
-                  className="w-full px-6 py-3 border-2 border-red-500 text-red-600 rounded-xl font-semibold hover:bg-red-50 transition-all flex items-center gap-2 justify-center disabled:opacity-50"
+                  disabled={cancelingSubscription || !effectiveUser?.stripeCustomerId || !effectiveUser?.subscriptionId}
+                  className="w-full px-6 py-3 border-2 border-red-500 text-red-600 rounded-xl font-semibold hover:bg-red-50 transition-all flex items-center gap-2 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {cancelingSubscription ? (
                     <>
@@ -793,7 +821,7 @@ const SettingsPage = () => {
                   ) : (
                     <>
                       <Trash2 size={18} />
-                      Cancel Subscription
+                      Cancel Subscription & Get Refund
                     </>
                   )}
                 </button>
@@ -1286,7 +1314,7 @@ const SettingsPage = () => {
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                       </svg>
                     </div>
-                    <p className="text-sm sm:text-base text-gray-700 min-w-0">Click <strong>"Cancel Subscription"</strong> button</p>
+                    <p className="text-sm sm:text-base text-gray-700 min-w-0">Click <strong>"Cancel Subscription & Get Refund"</strong> button</p>
                   </div>
                   <div className="flex items-start gap-2 sm:gap-3">
                     <div className="bg-purple-100 text-purple-600 w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-1">
@@ -1353,7 +1381,7 @@ const SettingsPage = () => {
                       </div>
                       <div className="bg-green-500/10 border-2 border-green-400 rounded-lg p-3 sm:p-4">
                         <p className="text-sm sm:text-base font-semibold text-green-900 mb-1.5 sm:mb-2">✅ Correct Way to Cancel:</p>
-                        <p className="text-xs sm:text-sm text-green-800">Always use the <strong>"Cancel Subscription"</strong> button in the Subscription section above. This ensures you get your refund (if eligible) and your data is handled properly.</p>
+                        <p className="text-xs sm:text-sm text-green-800">Always use the <strong>"Cancel Subscription & Get Refund"</strong> button in the Subscription section above. This ensures you get your refund (if eligible) and your data is handled properly.</p>
                       </div>
                     </div>
                   </div>
@@ -1392,7 +1420,7 @@ const SettingsPage = () => {
                       If you have any questions about our refund policy or need assistance with cancellation, our support team is here to help!
                     </p>
                     <a
-                      href="mailto:support@outboundimpact.org"
+                      href="mailto:support@outboundimpact.com"
                       className="inline-flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 bg-purple-600 text-white rounded-lg text-sm sm:text-base font-semibold hover:bg-purple-700 transition-all"
                     >
                       <Mail size={16} className="sm:w-5 sm:h-5" />
