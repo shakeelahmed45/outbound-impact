@@ -2,6 +2,84 @@ const prisma = require('../lib/prisma');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 /**
+ * ✅ HELPER: Sync subscription data from Stripe if missing
+ * This fixes accounts where webhook failed to populate stripeCustomerId/subscriptionId
+ */
+const syncSubscriptionDataIfMissing = async (user) => {
+  console.log('🔄 Checking if subscription data needs syncing...');
+  
+  // If both fields exist, no sync needed
+  if (user.stripeCustomerId && user.subscriptionId) {
+    console.log('✅ Subscription data already exists');
+    return user;
+  }
+  
+  // If subscription is not active, don't try to sync
+  if (user.subscriptionStatus !== 'active' && user.subscriptionStatus !== 'trialing') {
+    console.log('⚠️ Subscription not active, cannot sync');
+    return user;
+  }
+  
+  console.log('🔍 Subscription data missing, fetching from Stripe...');
+  console.log('   Email:', user.email);
+  console.log('   stripeCustomerId:', user.stripeCustomerId || 'MISSING');
+  console.log('   subscriptionId:', user.subscriptionId || 'MISSING');
+  
+  try {
+    // Search for customer in Stripe by email
+    const customers = await stripe.customers.list({
+      email: user.email,
+      limit: 1
+    });
+    
+    if (customers.data.length === 0) {
+      console.error('❌ No Stripe customer found for email:', user.email);
+      return user; // Return original user, let it fail with original error
+    }
+    
+    const customer = customers.data[0];
+    console.log('✅ Found Stripe customer:', customer.id);
+    
+    // Get active subscriptions for this customer
+    const subscriptions = await stripe.subscriptions.list({
+      customer: customer.id,
+      status: 'active',
+      limit: 1
+    });
+    
+    if (subscriptions.data.length === 0) {
+      console.error('❌ No active subscription found for customer:', customer.id);
+      return user; // Return original user, let it fail with original error
+    }
+    
+    const subscription = subscriptions.data[0];
+    console.log('✅ Found active subscription:', subscription.id);
+    
+    // Update database with Stripe data
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        stripeCustomerId: customer.id,
+        subscriptionId: subscription.id,
+        priceId: subscription.items.data[0].price.id,
+        currentPeriodStart: new Date(subscription.current_period_start * 1000),
+        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+      }
+    });
+    
+    console.log('✅ Database synced with Stripe data!');
+    console.log('   stripeCustomerId:', updatedUser.stripeCustomerId);
+    console.log('   subscriptionId:', updatedUser.subscriptionId);
+    
+    return updatedUser;
+    
+  } catch (error) {
+    console.error('❌ Failed to sync subscription data:', error.message);
+    return user; // Return original user, let it fail with original error
+  }
+};
+
+/**
  * ✅ TOGGLE AUTO-RENEWAL
  * 
  * Turn auto-renewal ON/OFF by setting cancel_at_period_end
@@ -16,13 +94,13 @@ const toggleAutoRenewal = async (req, res) => {
     console.log('🔄 Toggling auto-renewal:', autoRenewal ? 'ON' : 'OFF');
     console.log('   User ID:', userId);
 
-    // ✅ FIXED: Get user with ALL subscription fields including stripeCustomerId
-    const user = await prisma.user.findUnique({
+    // Get user with ALL subscription fields
+    let user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
         email: true,
-        stripeCustomerId: true,      // ✅ ADDED - Critical field!
+        stripeCustomerId: true,
         subscriptionId: true,
         subscriptionStatus: true,
         priceId: true,
@@ -39,9 +117,12 @@ const toggleAutoRenewal = async (req, res) => {
       });
     }
 
-    // ✅ FIXED: Check BOTH stripeCustomerId AND subscriptionId
+    // ✅ NEW: Try to sync data if missing
+    user = await syncSubscriptionDataIfMissing(user);
+
+    // Check if still missing after sync attempt
     if (!user.stripeCustomerId || !user.subscriptionId) {
-      console.error('❌ Missing subscription data:');
+      console.error('❌ Missing subscription data after sync attempt:');
       console.error('   stripeCustomerId:', user.stripeCustomerId || 'MISSING');
       console.error('   subscriptionId:', user.subscriptionId || 'MISSING');
       
@@ -51,7 +132,7 @@ const toggleAutoRenewal = async (req, res) => {
       });
     }
 
-    // ✅ FIXED: Check subscription status
+    // Check subscription status
     if (user.subscriptionStatus === 'canceled' || user.subscriptionStatus === 'incomplete') {
       console.error('❌ Invalid subscription status:', user.subscriptionStatus);
       
@@ -71,14 +152,14 @@ const toggleAutoRenewal = async (req, res) => {
     const subscription = await stripe.subscriptions.update(
       user.subscriptionId,
       {
-        cancel_at_period_end: !autoRenewal  // If autoRenewal is true, set cancel_at_period_end to false
+        cancel_at_period_end: !autoRenewal
       }
     );
 
     console.log('✅ Stripe subscription updated:', subscription.id);
     console.log('   cancel_at_period_end:', subscription.cancel_at_period_end);
 
-    // Update user in database with fields that actually exist
+    // Update user in database
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
@@ -89,7 +170,7 @@ const toggleAutoRenewal = async (req, res) => {
         email: true,
         name: true,
         role: true,
-        profilePicture: true,  // ✅ FIXED: was 'photo', should be 'profilePicture'
+        profilePicture: true,
         subscriptionStatus: true,
         subscriptionId: true,
         stripeCustomerId: true,
@@ -101,7 +182,7 @@ const toggleAutoRenewal = async (req, res) => {
       }
     });
 
-    // ✅ Get memberOf relation to check if team member
+    // Get memberOf relation to check if team member
     const userWithRelations = await prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -111,7 +192,6 @@ const toggleAutoRenewal = async (req, res) => {
       }
     });
 
-    // ✅ Compute if user is a team member
     const isTeamMember = userWithRelations.memberOf && userWithRelations.memberOf.length > 0;
 
     console.log('✅ User updated:', user.email, '- Status:', updatedUser.subscriptionStatus);
@@ -124,7 +204,7 @@ const toggleAutoRenewal = async (req, res) => {
         : 'Auto-renewal disabled. Subscription will end on ' + new Date(subscription.current_period_end * 1000).toLocaleDateString(),
       user: {
         ...updatedUser,
-        isTeamMember: isTeamMember,  // ✅ Add team member flag
+        isTeamMember: isTeamMember,
         storageUsed: updatedUser.storageUsed.toString(),
         storageLimit: updatedUser.storageLimit.toString(),
       },
@@ -144,10 +224,11 @@ const toggleAutoRenewal = async (req, res) => {
 };
 
 /**
- * ✅ CANCEL SUBSCRIPTION WITH 7-DAY REFUND LOGIC
+ * ✅ CANCEL SUBSCRIPTION WITH 7-DAY REFUND LOGIC + AUTO-SYNC
  * 
+ * - Automatically syncs missing subscription data from Stripe before canceling
  * - Within 7 days: Full refund + immediate cancellation
- * - After 7 days: Cancel at period end (no refund)
+ * - After 7 days: Cancel immediately (no refund)
  */
 const cancelSubscription = async (req, res) => {
   try {
@@ -156,11 +237,11 @@ const cancelSubscription = async (req, res) => {
     console.log('🗑️ Canceling subscription for user:', userId);
 
     // Get user with subscription fields and memberOf relation
-    const user = await prisma.user.findUnique({
+    let user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
         memberOf: {
-          select: { id: true }  // Check if user is a team member
+          select: { id: true }
         }
       }
     });
@@ -173,9 +254,12 @@ const cancelSubscription = async (req, res) => {
       });
     }
 
-    // Check for active subscription
+    // ✅ NEW: Try to sync subscription data from Stripe if missing
+    user = await syncSubscriptionDataIfMissing(user);
+
+    // Check for active subscription after sync attempt
     if (!user.stripeCustomerId || !user.subscriptionId) {
-      console.error('❌ Missing subscription data:');
+      console.error('❌ Missing subscription data after sync attempt:');
       console.error('   stripeCustomerId:', user.stripeCustomerId || 'MISSING');
       console.error('   subscriptionId:', user.subscriptionId || 'MISSING');
       
@@ -202,9 +286,9 @@ const cancelSubscription = async (req, res) => {
     console.log('   Status:', user.subscriptionStatus);
     console.log('   Period Start:', user.currentPeriodStart);
 
-    // ✅ CALCULATE 7-DAY REFUND ELIGIBILITY
+    // Calculate 7-day refund eligibility
     let isRefundEligible = false;
-    let daysSinceStart = 999; // Default to high number if no start date
+    let daysSinceStart = 999;
 
     if (user.currentPeriodStart) {
       const subscriptionDate = new Date(user.currentPeriodStart);
@@ -222,10 +306,8 @@ const cancelSubscription = async (req, res) => {
     let refundInfo = null;
     let cancellationMessage = '';
 
-    // ✅ ALWAYS CANCEL IMMEDIATELY (both within 7 days and after)
-    console.log('🗑️ Canceling subscription immediately in Stripe...');
-
     // Cancel subscription immediately in Stripe
+    console.log('🗑️ Canceling subscription immediately in Stripe...');
     const canceledSubscription = await stripe.subscriptions.cancel(
       user.subscriptionId
     );
@@ -233,10 +315,9 @@ const cancelSubscription = async (req, res) => {
     console.log('✅ Subscription canceled in Stripe:', canceledSubscription.id);
 
     if (isRefundEligible) {
-      // ✅ WITHIN 7 DAYS: Process full refund
+      // Within 7 days: Process full refund
       console.log('💰 Within 7-day refund window - processing refund');
 
-      // Get the latest invoice to refund
       const invoices = await stripe.invoices.list({
         subscription: user.subscriptionId,
         limit: 1
@@ -245,7 +326,6 @@ const cancelSubscription = async (req, res) => {
       if (invoices.data.length > 0 && invoices.data[0].paid) {
         const invoice = invoices.data[0];
         
-        // Create full refund
         const refund = await stripe.refunds.create({
           payment_intent: invoice.payment_intent,
           reason: 'requested_by_customer',
@@ -266,12 +346,12 @@ const cancelSubscription = async (req, res) => {
       }
 
     } else {
-      // ❌ AFTER 7 DAYS: Cancel immediately but NO refund
+      // After 7 days: Cancel immediately but NO refund
       console.log('⚠️ Past 7-day refund window - no refund processed');
       cancellationMessage = `Subscription has been canceled immediately. No refund is available as the 7-day refund period has passed.`;
     }
 
-    // ✅ ALWAYS update database to 'canceled' status (immediate blocking)
+    // Update database to 'canceled' status
     await prisma.user.update({
       where: { id: user.id },
       data: {
@@ -295,12 +375,11 @@ const cancelSubscription = async (req, res) => {
       where: { id: user.id },
       include: {
         memberOf: {
-          select: { id: true }  // Check if user is a team member
+          select: { id: true }
         }
       }
     });
 
-    // ✅ Compute if user is a team member
     const isTeamMember = updatedUser.memberOf && updatedUser.memberOf.length > 0;
 
     console.log('✅ Cancellation complete:', user.email);
@@ -314,8 +393,8 @@ const cancelSubscription = async (req, res) => {
       daysSinceStart: daysSinceStart,
       user: {
         ...updatedUser,
-        isTeamMember: isTeamMember,  // ✅ Add team member flag
-        memberOf: undefined,  // Remove relation object
+        isTeamMember: isTeamMember,
+        memberOf: undefined,
         storageUsed: updatedUser.storageUsed.toString(),
         storageLimit: updatedUser.storageLimit.toString(),
       },
@@ -337,8 +416,6 @@ const cancelSubscription = async (req, res) => {
 
 /**
  * ✅ REACTIVATE CANCELED SUBSCRIPTION
- * 
- * Creates a new Stripe checkout session for a canceled subscription
  */
 const reactivateSubscription = async (req, res) => {
   try {
@@ -346,7 +423,6 @@ const reactivateSubscription = async (req, res) => {
 
     console.log('🔄 Reactivating subscription for user:', userId);
 
-    // Get user
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -367,7 +443,6 @@ const reactivateSubscription = async (req, res) => {
       });
     }
 
-    // Check if subscription is actually canceled
     if (user.subscriptionStatus !== 'canceled') {
       console.error('❌ Subscription not canceled:', user.subscriptionStatus);
       return res.status(400).json({
@@ -376,11 +451,9 @@ const reactivateSubscription = async (req, res) => {
       });
     }
 
-    // Determine which price ID to use based on user's role
-    let priceId = user.priceId; // Try to use their previous price
+    let priceId = user.priceId;
 
     if (!priceId) {
-      // If no previous price, determine from role
       const roleToPriceMap = {
         'INDIVIDUAL': process.env.STRIPE_INDIVIDUAL_PRICE,
         'ORG_SMALL': process.env.STRIPE_SMALL_ORG_PRICE,
@@ -404,7 +477,6 @@ const reactivateSubscription = async (req, res) => {
     console.log('   Role:', user.role);
     console.log('   Price ID:', priceId);
 
-    // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
       customer_email: user.email,
       line_items: [
