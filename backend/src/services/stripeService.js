@@ -10,7 +10,7 @@ const createCheckoutSession = async (email, priceId, planName) => {
           quantity: 1,
         },
       ],
-      mode: planName === 'INDIVIDUAL' ? 'payment' : 'subscription',
+      mode: 'subscription', // ✅ FIXED: All plans use subscription mode now
       success_url: `${process.env.FRONTEND_URL}/auth/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.FRONTEND_URL}/plans`,
       customer_email: email,
@@ -49,14 +49,14 @@ const upgradePlan = async (user, newPriceId, newPlanName) => {
     console.log('New price ID:', newPriceId);
     console.log('New plan:', newPlanName);
 
-    // INDIVIDUAL plan is one-time payment, not subscription
-    if (user.role === 'INDIVIDUAL') {
-      // For INDIVIDUAL upgrading to subscription plan
+    // ✅ UPDATED: Individual plan is now also subscription-based
+    // For users upgrading from INDIVIDUAL (if no subscriptionId exists yet)
+    if (!user.subscriptionId && user.stripeCustomerId) {
       // Create new subscription with customer
       const subscription = await stripe.subscriptions.create({
         customer: user.stripeCustomerId,
         items: [{ price: newPriceId }],
-        proration_behavior: 'none', // No proration since it's one-time to subscription
+        proration_behavior: 'none', // No proration for first subscription
         metadata: {
           planName: newPlanName,
           upgradedFrom: user.role,
