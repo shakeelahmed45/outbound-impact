@@ -1408,15 +1408,4 @@ const SettingsPage = () => {
               <button
                 onClick={() => setShowRefundPolicy(false)}
                 className="w-full px-4 py-2.5 sm:px-6 sm:py-3 bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-xl text-sm sm:text-base font-semibold hover:from-purple-700 hover:to-violet-700 transition-all shadow-lg"
-              >
-                I Understand
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </DashboardLayout>
-  );
-};
-
-export default SettingsPage;
+              
