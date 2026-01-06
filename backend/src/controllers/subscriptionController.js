@@ -224,11 +224,16 @@ const toggleAutoRenewal = async (req, res) => {
 };
 
 /**
- * ✅ CANCEL SUBSCRIPTION WITH 7-DAY REFUND LOGIC + AUTO-SYNC
+ * ✅ IMPROVED: CANCEL SUBSCRIPTION WITH 7-DAY REFUND LOGIC + EDGE CASE FIXES
  * 
  * - Automatically syncs missing subscription data from Stripe before canceling
  * - Within 7 days: Full refund + immediate cancellation
  * - After 7 days: Cancel immediately (no refund)
+ * 
+ * IMPROVEMENTS:
+ * 1. Handles NULL currentPeriodStart (defaults to eligible - benefit of doubt)
+ * 2. Uses UTC dates for timezone consistency
+ * 3. Separate error handling for refund failures (still cancels even if refund fails)
  */
 const cancelSubscription = async (req, res) => {
   try {
@@ -286,21 +291,44 @@ const cancelSubscription = async (req, res) => {
     console.log('   Status:', user.subscriptionStatus);
     console.log('   Period Start:', user.currentPeriodStart);
 
-    // Calculate 7-day refund eligibility
+    // ✅ IMPROVED: Calculate 7-day refund eligibility with edge case handling
     let isRefundEligible = false;
     let daysSinceStart = 999;
 
-    if (user.currentPeriodStart) {
+    if (!user.currentPeriodStart) {
+      // ✅ FIX 1: If no start date, assume new subscription (be generous to user)
+      console.warn('⚠️ No currentPeriodStart found - assuming new subscription');
+      console.warn('   This should not happen - check webhook/sync logic');
+      console.warn('   Defaulting to REFUND ELIGIBLE (benefit of doubt to user)');
+      isRefundEligible = true; // Give benefit of doubt
+      daysSinceStart = 0;
+      
+    } else {
+      // ✅ FIX 2: Use UTC dates to avoid timezone edge cases
       const subscriptionDate = new Date(user.currentPeriodStart);
       const now = new Date();
-      const diffTime = now - subscriptionDate;
+      
+      // Convert to UTC midnight to avoid timezone issues
+      const subscriptionDateUTC = Date.UTC(
+        subscriptionDate.getUTCFullYear(),
+        subscriptionDate.getUTCMonth(),
+        subscriptionDate.getUTCDate()
+      );
+      
+      const nowUTC = Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate()
+      );
+      
+      const diffTime = nowUTC - subscriptionDateUTC;
       daysSinceStart = Math.floor(diffTime / (1000 * 60 * 60 * 24));
       isRefundEligible = daysSinceStart <= 7;
       
-      console.log('📅 Subscription age:', daysSinceStart, 'days');
+      console.log('📅 Subscription age:', daysSinceStart, 'days (UTC calculation)');
+      console.log('   Start date:', subscriptionDate.toISOString());
+      console.log('   Current date:', now.toISOString());
       console.log('💰 Refund eligible:', isRefundEligible ? 'YES' : 'NO');
-    } else {
-      console.warn('⚠️ No currentPeriodStart found - cannot check refund eligibility');
     }
 
     let refundInfo = null;
@@ -326,29 +354,48 @@ const cancelSubscription = async (req, res) => {
       if (invoices.data.length > 0 && invoices.data[0].paid) {
         const invoice = invoices.data[0];
         
-        const refund = await stripe.refunds.create({
-          payment_intent: invoice.payment_intent,
-          reason: 'requested_by_customer',
-        });
+        // ✅ FIX 3: Separate error handling for refund failures
+        try {
+          const refund = await stripe.refunds.create({
+            payment_intent: invoice.payment_intent,
+            reason: 'requested_by_customer',
+          });
 
-        console.log('💰 Refund processed:', refund.id);
-        console.log('   Amount:', (refund.amount / 100).toFixed(2), refund.currency.toUpperCase());
+          console.log('💰 Refund processed:', refund.id);
+          console.log('   Amount:', (refund.amount / 100).toFixed(2), refund.currency.toUpperCase());
 
-        refundInfo = {
-          id: refund.id,
-          amount: refund.amount,
-          currency: refund.currency,
-        };
+          refundInfo = {
+            id: refund.id,
+            amount: refund.amount,
+            currency: refund.currency,
+            status: 'succeeded'
+          };
 
-        cancellationMessage = `Subscription canceled immediately and refund of $${(refund.amount / 100).toFixed(2)} ${refund.currency.toUpperCase()} has been processed. You will see the refund in 5-10 business days.`;
+          cancellationMessage = `Subscription canceled immediately and refund of $${(refund.amount / 100).toFixed(2)} ${refund.currency.toUpperCase()} has been processed. You will see the refund in 5-10 business days.`;
+          
+        } catch (refundError) {
+          // ✅ Still cancel subscription even if refund fails
+          console.error('❌ Refund failed:', refundError.message);
+          console.error('   Subscription is still canceled');
+          console.error('   User should contact support for manual refund');
+          
+          refundInfo = {
+            error: true,
+            message: refundError.message,
+            status: 'failed'
+          };
+          
+          cancellationMessage = 'Subscription has been canceled successfully. However, the automatic refund could not be processed. Please contact support at support@outboundimpact.org with your subscription details to process the refund manually.';
+        }
       } else {
-        cancellationMessage = 'Subscription canceled successfully with refund processing.';
+        console.warn('⚠️ No paid invoice found for refund');
+        cancellationMessage = 'Subscription canceled successfully. Refund will be processed shortly.';
       }
 
     } else {
       // After 7 days: Cancel immediately but NO refund
       console.log('⚠️ Past 7-day refund window - no refund processed');
-      cancellationMessage = `Subscription has been canceled immediately. No refund is available as the 7-day refund period has passed.`;
+      cancellationMessage = `Subscription has been canceled immediately. No refund is available as the 7-day refund period has passed (${daysSinceStart} days since subscription start).`;
     }
 
     // Update database to 'canceled' status
@@ -385,6 +432,7 @@ const cancelSubscription = async (req, res) => {
     console.log('✅ Cancellation complete:', user.email);
     console.log('   Updated status:', updatedUser.subscriptionStatus);
     console.log('   Is team member:', isTeamMember);
+    console.log('   Refund info:', refundInfo ? 'Included' : 'None');
 
     res.json({
       status: 'success',
