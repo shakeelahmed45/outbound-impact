@@ -778,7 +778,7 @@ const SettingsPage = () => {
             </div>
 
             {/* ✅ CANCEL SUBSCRIPTION BUTTON */}
-            {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
+            {!userIsTeamMember && (
               <div className="pt-4 space-y-3">
                 <button
                   onClick={handleCancelSubscription}
