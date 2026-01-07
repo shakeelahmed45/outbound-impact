@@ -7,15 +7,16 @@ const authMiddleware = require('../middleware/auth');
 const refundController = require('../controllers/refundController');
 
 /**
- * EXISTING USER ROUTES
+ * USER ROUTES
  */
 router.post('/upload-photo', authMiddleware, userController.uploadProfilePhoto);
 router.put('/profile', authMiddleware, userController.updateProfile);
 router.delete('/account', authMiddleware, userController.deleteAccount);
 router.put('/change-email', authMiddleware, userController.changeEmail);
+router.put('/change-password', authMiddleware, userController.changePassword); // ✅ NEW: Change password route
 
 /**
- * ðŸ”„ REFUND ROUTES (7-DAY POLICY)
+ * 🔄 REFUND ROUTES (7-DAY POLICY)
  * Added to userRoutes to avoid timing issues
  */
 router.get('/refund/check-eligibility', authMiddleware, refundController.checkRefundEligibility);

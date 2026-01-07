@@ -1104,117 +1104,165 @@ const SettingsPage = () => {
         }}
       />
 
-      {/* Password Change Modal */}
-      {showPasswordChange && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-2xl p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                  <Shield className="text-white" size={20} />
-                </div>
-                <h4 className="text-xl font-bold text-purple-900">Change Password</h4>
-              </div>
-              <div className="flex items-start gap-2 text-sm text-purple-800 mb-6 bg-white/50 p-3 rounded-lg">
-                <AlertTriangle size={18} className="flex-shrink-0 mt-0.5" />
-                <p>Your new password must be at least 8 characters long and different from your current password.</p>
-              </div>
-              
-              {passwordError && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-center gap-2">
-                  <AlertTriangle size={16} className="text-red-600 flex-shrink-0" />
-                  <p className="text-red-800 text-sm">{passwordError}</p>
-                </div>
-              )}
-
-              <form onSubmit={handlePasswordChange} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Current Password
-                  </label>
-                  <input
-                    type="password"
-                    value={passwordData.currentPassword}
-                    onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                    placeholder="Enter current password"
-                    className="w-full px-4 py-3 border-2 border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
-                    disabled={changingPassword}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    New Password
-                  </label>
-                  <input
-                    type="password"
-                    value={passwordData.newPassword}
-                    onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                    placeholder="Enter new password (min 8 characters)"
-                    className="w-full px-4 py-3 border-2 border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
-                    disabled={changingPassword}
-                    required
-                    minLength={8}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Confirm New Password
-                  </label>
-                  <input
-                    type="password"
-                    value={passwordData.confirmPassword}
-                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                    placeholder="Confirm new password"
-                    className="w-full px-4 py-3 border-2 border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
-                    disabled={changingPassword}
-                    required
-                  />
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    type="submit"
-                    disabled={changingPassword}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold hover:shadow-xl transform hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2"
-                  >
-                    {changingPassword ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Changing...
-                      </>
-                    ) : (
-                      <>
-                        <Shield size={18} />
-                        Change Password
-                      </>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowPasswordChange(false);
-                      setPasswordData({
-                        currentPassword: '',
-                        newPassword: '',
-                        confirmPassword: '',
-                      });
-                      setPasswordError('');
-                    }}
-                    className="flex-1 px-6 py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-all"
-                    disabled={changingPassword}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
+      {/* ✅ RESPONSIVE PASSWORD CHANGE MODAL */}
+{showPasswordChange && (
+  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    {/* Modal Container - Fixed height with flex layout */}
+    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col" style={{ maxHeight: 'calc(100vh - 2rem)' }}>
+      
+      {/* Header - Fixed at top */}
+      <div className="flex-shrink-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4 sm:p-6 rounded-t-2xl">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="bg-white/20 p-2 sm:p-3 rounded-full flex-shrink-0">
+              <Shield size={20} className="sm:w-6 sm:h-6" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-xl font-bold truncate">Change Password</h2>
+              <p className="text-purple-100 text-xs sm:text-sm mt-0.5 sm:mt-1">Update your security</p>
             </div>
           </div>
+          <button
+            onClick={() => {
+              setShowPasswordChange(false);
+              setPasswordData({
+                currentPassword: '',
+                newPassword: '',
+                confirmPassword: '',
+              });
+              setPasswordError('');
+            }}
+            className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-full transition-all flex-shrink-0"
+            aria-label="Close modal"
+          >
+            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-      )}
+      </div>
 
+      {/* Scrollable Content Area */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+        
+        {/* Info Alert */}
+        <div className="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6">
+          <div className="flex items-start gap-2 sm:gap-3">
+            <AlertTriangle size={18} className="text-purple-600 flex-shrink-0 mt-0.5 sm:mt-1" />
+            <p className="text-xs sm:text-sm text-purple-800 leading-relaxed">
+              Your new password must be at least <strong>8 characters long</strong> and <strong>different from your current password</strong>.
+            </p>
+          </div>
+        </div>
+        
+        {/* Error Message */}
+        {passwordError && (
+          <div className="bg-red-50 border-2 border-red-200 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 animate-shake">
+            <div className="flex items-start gap-2 sm:gap-3">
+              <AlertTriangle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+              <p className="text-xs sm:text-sm text-red-800 font-medium">{passwordError}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Password Form */}
+        <form onSubmit={handlePasswordChange} className="space-y-4 sm:space-y-5">
+          
+          {/* Current Password */}
+          <div>
+            <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
+              Current Password
+            </label>
+            <input
+              type="password"
+              value={passwordData.currentPassword}
+              onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+              placeholder="Enter current password"
+              className="w-full px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base border-2 border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+              disabled={changingPassword}
+              required
+            />
+          </div>
+
+          {/* New Password */}
+          <div>
+            <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
+              New Password
+            </label>
+            <input
+              type="password"
+              value={passwordData.newPassword}
+              onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+              placeholder="Enter new password (min 8 characters)"
+              className="w-full px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base border-2 border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+              disabled={changingPassword}
+              required
+              minLength={8}
+            />
+          </div>
+
+          {/* Confirm New Password */}
+          <div>
+            <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
+              Confirm New Password
+            </label>
+            <input
+              type="password"
+              value={passwordData.confirmPassword}
+              onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+              placeholder="Confirm new password"
+              className="w-full px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base border-2 border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+              disabled={changingPassword}
+              required
+            />
+          </div>
+
+        </form>
+      </div>
+
+      {/* Footer - Fixed at bottom with buttons */}
+      <div className="flex-shrink-0 bg-gray-50 px-4 sm:px-6 py-3 sm:py-4 rounded-b-2xl border-t-2 border-gray-200">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+          <button
+            type="submit"
+            onClick={handlePasswordChange}
+            disabled={changingPassword}
+            className="flex-1 px-4 py-2.5 sm:px-6 sm:py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl text-sm sm:text-base font-semibold hover:from-purple-700 hover:to-pink-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {changingPassword ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span className="hidden sm:inline">Changing...</span>
+                <span className="sm:hidden">Wait...</span>
+              </>
+            ) : (
+              <>
+                <Shield size={16} className="sm:w-5 sm:h-5" />
+                Change Password
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowPasswordChange(false);
+              setPasswordData({
+                currentPassword: '',
+                newPassword: '',
+                confirmPassword: '',
+              });
+              setPasswordError('');
+            }}
+            className="flex-1 sm:flex-none px-4 py-2.5 sm:px-6 sm:py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-xl text-sm sm:text-base font-semibold hover:bg-gray-50 hover:border-gray-400 transition-all"
+            disabled={changingPassword}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
       {/* ✅ REFUND POLICY MODAL - FULLY RESPONSIVE */}
       {showRefundPolicy && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">

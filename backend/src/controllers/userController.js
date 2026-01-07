@@ -1,4 +1,5 @@
 const prisma = require('../lib/prisma'); // ✅ Use shared Prisma instance
+const bcrypt = require('bcryptjs'); // ✅ NEW: Import bcrypt for password hashing
 
 const uploadProfilePhoto = async (req, res) => {
   try {
@@ -188,9 +189,107 @@ const changeEmail = async (req, res) => {
   }
 };
 
+// ✅ NEW: Change password function
+const changePassword = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { currentPassword, newPassword } = req.body;
+
+    console.log('🔐 Changing password for user:', userId);
+
+    // Validation
+    if (!currentPassword || !newPassword) {
+      console.error('❌ Missing required fields');
+      return res.status(400).json({
+        status: 'error',
+        message: 'Current password and new password are required'
+      });
+    }
+
+    if (newPassword.length < 8) {
+      console.error('❌ New password too short');
+      return res.status(400).json({
+        status: 'error',
+        message: 'New password must be at least 8 characters long'
+      });
+    }
+
+    // Get user
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        password: true,
+      }
+    });
+
+    if (!user) {
+      console.error('❌ User not found:', userId);
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    console.log('✅ User found:', user.email);
+
+    // Verify current password
+    const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+
+    if (!isValidPassword) {
+      console.error('❌ Current password incorrect');
+      return res.status(401).json({
+        status: 'error',
+        message: 'Current password is incorrect'
+      });
+    }
+
+    console.log('✅ Current password verified');
+
+    // Check if new password is same as current
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      console.error('❌ New password same as current');
+      return res.status(400).json({
+        status: 'error',
+        message: 'New password must be different from current password'
+      });
+    }
+
+    console.log('✅ New password is different');
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword }
+    });
+
+    console.log('✅ Password changed successfully for user:', user.email);
+
+    res.json({
+      status: 'success',
+      message: 'Password changed successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Change password error:', error);
+    console.error('   Error message:', error.message);
+    
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to change password'
+    });
+  }
+};
+
 module.exports = {
   uploadProfilePhoto,
   updateProfile,
   deleteAccount,
   changeEmail,
+  changePassword, // ✅ NEW: Export changePassword
 };
