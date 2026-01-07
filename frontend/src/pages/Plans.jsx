@@ -1,17 +1,18 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, Loader2, Zap } from 'lucide-react';
+import { Check, Loader2, Zap, Tag } from 'lucide-react';
 import api from '../services/api';
+import CouponModal from '../components/CouponModal';
 
 const Plans = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('');
   
-  // ✅ Coupon code state
-  const [couponCode, setCouponCode] = useState('');
+  // Coupon state
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponModalOpen, setCouponModalOpen] = useState(false);
   const [couponError, setCouponError] = useState('');
-  const [couponSuccess, setCouponSuccess] = useState('');
   
   // Enterprise customization state
   const [enterpriseStorage, setEnterpriseStorage] = useState(1500);
@@ -102,11 +103,15 @@ const Plans = () => {
     return basePrice;
   };
 
+  const handleApplyCoupon = (couponCode) => {
+    setAppliedCoupon(couponCode);
+    setCouponError('');
+  };
+
   const handleSelectPlan = async (planId) => {
     setLoading(true);
     setSelectedPlan(planId);
     setCouponError('');
-    setCouponSuccess('');
 
     try {
       const signupData = JSON.parse(localStorage.getItem('signupData') || '{}');
@@ -116,36 +121,32 @@ const Plans = () => {
         return;
       }
 
-      // ✅ Prepare checkout data
+      // Prepare request data
       const requestData = {
         ...signupData,
         plan: planId,
       };
 
-      // ✅ Add coupon code if provided
-      if (couponCode.trim()) {
-        requestData.couponCode = couponCode.trim().toUpperCase();
-        console.log('🎫 Applying coupon code:', couponCode.trim().toUpperCase());
+      // Add coupon code if applied
+      if (appliedCoupon) {
+        requestData.couponCode = appliedCoupon;
+        console.log('Applying coupon code:', appliedCoupon);
       }
 
       const response = await api.post('/auth/checkout', requestData);
 
       if (response.data.status === 'success') {
-        if (couponCode.trim()) {
-          setCouponSuccess('✅ Coupon code applied successfully!');
-        }
-        // Small delay to show success message
-        setTimeout(() => {
-          window.location.href = response.data.url;
-        }, 500);
+        window.location.href = response.data.url;
       }
     } catch (error) {
       console.error('Checkout error:', error);
       const errorMessage = error.response?.data?.message || 'Failed to create checkout';
       
-      // ✅ Show coupon-specific errors
+      // Check if error is coupon-related
       if (errorMessage.toLowerCase().includes('coupon') || errorMessage.toLowerCase().includes('invalid')) {
         setCouponError(errorMessage);
+        setAppliedCoupon(null); // Clear invalid coupon
+        alert(errorMessage);
       } else {
         alert(errorMessage);
       }
@@ -159,7 +160,6 @@ const Plans = () => {
     setLoading(true);
     setSelectedPlan('ORG_ENTERPRISE');
     setCouponError('');
-    setCouponSuccess('');
 
     try {
       const signupData = JSON.parse(localStorage.getItem('signupData') || '{}');
@@ -182,42 +182,33 @@ const Plans = () => {
         }
       };
 
-      console.log('Sending enterprise checkout request:', {
-        plan: 'ORG_ENTERPRISE',
-        enterpriseConfig
-      });
-
-      // ✅ Prepare request data
+      // Prepare request data
       const requestData = {
         ...signupData,
         plan: 'ORG_ENTERPRISE',
         enterpriseConfig,
       };
 
-      // ✅ Add coupon code if provided
-      if (couponCode.trim()) {
-        requestData.couponCode = couponCode.trim().toUpperCase();
-        console.log('🎫 Applying coupon code to Enterprise:', couponCode.trim().toUpperCase());
+      // Add coupon code if applied
+      if (appliedCoupon) {
+        requestData.couponCode = appliedCoupon;
+        console.log('Applying coupon code to Enterprise:', appliedCoupon);
       }
 
       const response = await api.post('/auth/checkout', requestData);
 
       if (response.data.status === 'success') {
-        if (couponCode.trim()) {
-          setCouponSuccess('✅ Coupon code applied successfully!');
-        }
-        setTimeout(() => {
-          window.location.href = response.data.url;
-        }, 500);
+        window.location.href = response.data.url;
       }
     } catch (error) {
       console.error('Enterprise checkout error:', error);
-      console.error('Error response:', error.response?.data);
-      const errorMessage = error.response?.data?.message || 'Failed to create enterprise checkout. Please make sure STRIPE_ENTERPRISE_PRICE is set in backend .env';
+      const errorMessage = error.response?.data?.message || 'Failed to create enterprise checkout';
       
-      // ✅ Show coupon-specific errors
+      // Check if error is coupon-related
       if (errorMessage.toLowerCase().includes('coupon') || errorMessage.toLowerCase().includes('invalid')) {
         setCouponError(errorMessage);
+        setAppliedCoupon(null); // Clear invalid coupon
+        alert(errorMessage);
       } else {
         alert(errorMessage);
       }
@@ -231,6 +222,14 @@ const Plans = () => {
 
   return (
     <div className="min-h-screen bg-white py-12 px-4">
+      {/* Coupon Modal */}
+      <CouponModal
+        isOpen={couponModalOpen}
+        onClose={() => setCouponModalOpen(false)}
+        onApplyCoupon={handleApplyCoupon}
+        appliedCoupon={appliedCoupon}
+      />
+
       <div className="text-center mb-12">
         <img 
           src="/logo.webp" 
@@ -246,55 +245,6 @@ const Plans = () => {
         </p>
       </div>
 
-      {/* ✅ Coupon Code Input - ADDED! */}
-      <div className="max-w-md mx-auto mb-8">
-        <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl shadow-lg p-6 border-2 border-purple-200">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-2xl">🎟️</span>
-            <h3 className="text-lg font-bold text-purple-800">Have a Coupon Code?</h3>
-          </div>
-          
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={couponCode}
-              onChange={(e) => {
-                setCouponCode(e.target.value.toUpperCase());
-                setCouponError('');
-                setCouponSuccess('');
-              }}
-              placeholder="Enter coupon code"
-              className="flex-1 px-4 py-3 border-2 border-purple-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent uppercase font-mono text-lg"
-              disabled={loading}
-            />
-          </div>
-
-          {/* Success Message */}
-          {couponSuccess && (
-            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-green-700 text-sm font-semibold flex items-center gap-2">
-                <span>✅</span>
-                {couponSuccess}
-              </p>
-            </div>
-          )}
-
-          {/* Error Message */}
-          {couponError && (
-            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-700 text-sm font-semibold flex items-center gap-2">
-                <span>❌</span>
-                {couponError}
-              </p>
-            </div>
-          )}
-
-          <p className="mt-3 text-sm text-purple-600">
-            💡 Enter your code and select a plan below. The discount will be applied at checkout!
-          </p>
-        </div>
-      </div>
-
       {/* Plans Grid */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
         {plans.map((plan) => (
@@ -307,7 +257,7 @@ const Plans = () => {
             {plan.popular && (
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                 <span className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-2 rounded-full text-sm font-bold shadow-lg">
-                  🔥 Most Popular
+                  Most Popular
                 </span>
               </div>
             )}
@@ -338,10 +288,23 @@ const Plans = () => {
               ))}
             </ul>
 
+            {/* Applied Coupon Badge */}
+            {appliedCoupon && (
+              <div className="mb-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 rounded-lg p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Tag className="text-green-600" size={16} />
+                    <span className="text-sm font-semibold text-green-900">Coupon Applied</span>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-green-700">{appliedCoupon}</span>
+                </div>
+              </div>
+            )}
+
             <button
               onClick={() => handleSelectPlan(plan.id)}
               disabled={loading && selectedPlan === plan.id}
-              className="w-full gradient-btn text-white py-3 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full gradient-btn text-white py-3 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 disabled:opacity-50 mb-3"
             >
               {loading && selectedPlan === plan.id ? (
                 <>
@@ -351,6 +314,14 @@ const Plans = () => {
               ) : (
                 'Select Plan'
               )}
+            </button>
+
+            {/* Coupon Link */}
+            <button
+              onClick={() => setCouponModalOpen(true)}
+              className="w-full text-center text-sm text-purple-600 hover:text-purple-700 font-medium transition-colors"
+            >
+              {appliedCoupon ? 'Change coupon code' : 'Have a coupon code?'}
             </button>
           </div>
         ))}
@@ -465,6 +436,13 @@ const Plans = () => {
                     </span>
                   </div>
 
+                  {appliedCoupon && (
+                    <div className="flex justify-between items-center pb-3 border-b border-white/30">
+                      <span className="font-medium text-sm sm:text-base">Coupon</span>
+                      <span className="font-bold text-base sm:text-lg font-mono">{appliedCoupon}</span>
+                    </div>
+                  )}
+
                   <div className="pt-2">
                     <div className="text-xs sm:text-sm opacity-90 mb-2">Included Features:</div>
                     <div className="space-y-1 text-xs sm:text-sm">
@@ -497,7 +475,7 @@ const Plans = () => {
                 <button
                   onClick={handleEnterpriseCheckout}
                   disabled={loading && selectedPlan === 'ORG_ENTERPRISE'}
-                  className="w-full bg-white text-yellow-600 py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg hover:bg-gray-100 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
+                  className="w-full bg-white text-yellow-600 py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg hover:bg-gray-100 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg mb-3"
                 >
                   {loading && selectedPlan === 'ORG_ENTERPRISE' ? (
                     <>
@@ -507,10 +485,18 @@ const Plans = () => {
                     </>
                   ) : (
                     <>
-                      <span className="hidden sm:inline">Proceed to Checkout →</span>
-                      <span className="sm:hidden">Checkout →</span>
+                      <span className="hidden sm:inline">Proceed to Checkout</span>
+                      <span className="sm:hidden">Checkout</span>
                     </>
                   )}
+                </button>
+
+                {/* Enterprise Coupon Link */}
+                <button
+                  onClick={() => setCouponModalOpen(true)}
+                  className="w-full text-center text-sm text-white/90 hover:text-white font-medium transition-colors"
+                >
+                  {appliedCoupon ? 'Change coupon code' : 'Have a coupon code?'}
                 </button>
 
                 <p className="text-xs text-center mt-4 opacity-80">
