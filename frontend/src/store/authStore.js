@@ -1,13 +1,14 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
-// ✅ FIXED: Use Zustand persist middleware for automatic localStorage sync
+// ✅ FIXED: Add rehydration tracking for multi-tab support
 const useAuthStore = create(
   persist(
     (set, get) => ({
       user: null,
       token: null,
       isAuthenticated: false,
+      _hasHydrated: false, // ✅ NEW: Track if state has been restored from localStorage
       
       setUser: (user) => {
         set({ user, isAuthenticated: true });
@@ -20,32 +21,40 @@ const useAuthStore = create(
       logout: () => {
         set({ user: null, token: null, isAuthenticated: false });
       },
+      
+      // ✅ NEW: Called after rehydration completes
+      setHasHydrated: (state) => {
+        set({ _hasHydrated: state });
+      },
     }),
     {
-      name: 'auth-storage', // ✅ localStorage key name
-      storage: createJSONStorage(() => localStorage), // ✅ Use localStorage
+      name: 'auth-storage', // localStorage key name
+      storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        // ✅ Only persist these fields
+        // Only persist these fields
         user: state.user,
         token: state.token,
         isAuthenticated: state.isAuthenticated,
+        // Don't persist _hasHydrated (reset to false on reload)
       }),
+      onRehydrateStorage: () => (state) => {
+        // ✅ NEW: Set hydration complete after state is restored
+        state?.setHasHydrated(true);
+      },
     }
   )
 );
 
 export default useAuthStore;
 
-// ✅ Helper functions remain the same
+// Helper functions remain the same
 export const getEffectiveUserId = () => {
   const user = useAuthStore.getState().user;
   
-  // If user is a team member, use organization ID for data fetching
   if (user?.isTeamMember && user?.organization?.id) {
     return user.organization.id;
   }
   
-  // Otherwise use their own ID
   return user?.id;
 };
 
@@ -62,23 +71,19 @@ export const getTeamRole = () => {
 export const canEdit = () => {
   const user = useAuthStore.getState().user;
   
-  // Organization owners can always edit
   if (!user?.isTeamMember) {
     return true;
   }
   
-  // Team members: ADMIN and EDITOR can edit, VIEWER cannot
   return user?.teamRole === 'ADMIN' || user?.teamRole === 'EDITOR';
 };
 
 export const canManageTeam = () => {
   const user = useAuthStore.getState().user;
   
-  // Organization owners can manage team
   if (!user?.isTeamMember) {
     return true;
   }
   
-  // Only ADMIN team members can manage team
   return user?.teamRole === 'ADMIN';
 };
