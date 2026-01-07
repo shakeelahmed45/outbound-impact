@@ -11,14 +11,17 @@ const useAuthStore = create(
       _hasHydrated: false, // ✅ NEW: Track if state has been restored from localStorage
       
       setUser: (user) => {
+        console.log('🔵 authStore.setUser called:', user ? 'User data exists' : 'No user data');
         set({ user, isAuthenticated: true });
       },
       
       setToken: (token) => {
+        console.log('🔵 authStore.setToken called:', token ? 'Token exists' : 'No token');
         set({ token, isAuthenticated: true });
       },
       
       logout: () => {
+        console.log('🔵 authStore.logout called');
         set({ user: null, token: null, isAuthenticated: false });
       },
       
@@ -37,9 +40,24 @@ const useAuthStore = create(
         isAuthenticated: state.isAuthenticated,
         // Don't persist _hasHydrated (reset to false on reload)
       }),
-      onRehydrateStorage: () => (state) => {
-        // ✅ NEW: Set hydration complete after state is restored
-        state?.setHasHydrated(true);
+      onRehydrateStorage: () => {
+        console.log('🔄 Zustand persist: Starting rehydration from localStorage...');
+        
+        return (state, error) => {
+          if (error) {
+            console.error('❌ Zustand persist: Rehydration FAILED:', error);
+          } else {
+            console.log('✅ Zustand persist: Rehydration complete!');
+            console.log('📊 Restored state:', {
+              hasUser: !!state?.user,
+              hasToken: !!state?.token,
+              isAuthenticated: state?.isAuthenticated
+            });
+            
+            // ✅ CRITICAL: Set hydration complete
+            state?.setHasHydrated(true);
+          }
+        };
       },
     }
   )
