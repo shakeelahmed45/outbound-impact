@@ -8,37 +8,42 @@ const Plans = () => {
   const [loading, setLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('');
   
+  // ✅ Coupon code state
+  const [couponCode, setCouponCode] = useState('');
+  const [couponError, setCouponError] = useState('');
+  const [couponSuccess, setCouponSuccess] = useState('');
+  
   // Enterprise customization state
-  const [enterpriseStorage, setEnterpriseStorage] = useState(1500);  // ✅ Default: 1500GB
+  const [enterpriseStorage, setEnterpriseStorage] = useState(1500);
   const [enterpriseTeamMembers, setEnterpriseTeamMembers] = useState(50);
 
   const plans = [
     {
       id: 'INDIVIDUAL',
       name: 'Individual',
-      price: '$85',              // ✅ UPDATED from $60
+      price: '$85',
       period: 'one-time',
-      storage: '250GB',          // ✅ UPDATED from 2GB
+      storage: '250GB',
       features: [
         'Upload images, videos, audio',
         'QR code generation',
         'View tracking & analytics',
-        '250GB storage',         // ✅ UPDATED from 2GB
+        '250GB storage',
         'Unlimited views',
-        'Lifetime access',       // ✅ ADDED to clarify
+        'Lifetime access',
       ],
     },
     {
       id: 'ORG_SMALL',
       name: 'Small Organization',
-      price: '$35',              // ✅ UPDATED from $15
+      price: '$35',
       period: 'per month',
-      storage: '250GB',          // ✅ UPDATED from 10GB
+      storage: '250GB',
       features: [
         'Everything in Individual',
         'Team management (up to 5 users)',
         'Campaign creation',
-        '250GB storage',         // ✅ UPDATED from 10GB
+        '250GB storage',
         'Advanced analytics',
         'Priority support',
       ],
@@ -47,14 +52,14 @@ const Plans = () => {
     {
       id: 'ORG_MEDIUM',
       name: 'Medium Organization',
-      price: '$60',              // ✅ UPDATED from $35
+      price: '$60',
       period: 'per month',
-      storage: '500GB',          // ✅ UPDATED from 30GB
+      storage: '500GB',
       features: [
         'Everything in Small Org',
         'Team management (up to 20 users)',
         'Custom branding',
-        '500GB storage',         // ✅ UPDATED from 30GB
+        '500GB storage',
         'Export reports (CSV/PDF)',
         'Dedicated support',
       ],
@@ -63,7 +68,7 @@ const Plans = () => {
 
   // Storage options for Enterprise
   const storageOptions = [
-    { value: 1500, label: '1.5 TB', price: 0 },      // ✅ Base: 1500GB for $99
+    { value: 1500, label: '1.5 TB', price: 0 },
     { value: 2000, label: '2 TB', price: 50 },
     { value: 3000, label: '3 TB', price: 150 },
     { value: 5000, label: '5 TB', price: 350 },
@@ -82,7 +87,7 @@ const Plans = () => {
 
   // Calculate Enterprise price
   const calculateEnterprisePrice = () => {
-    let basePrice = 99;          // ✅ UPDATED from 199
+    let basePrice = 99;
     
     const storageOption = storageOptions.find(opt => opt.value === enterpriseStorage);
     if (storageOption) {
@@ -100,6 +105,8 @@ const Plans = () => {
   const handleSelectPlan = async (planId) => {
     setLoading(true);
     setSelectedPlan(planId);
+    setCouponError('');
+    setCouponSuccess('');
 
     try {
       const signupData = JSON.parse(localStorage.getItem('signupData') || '{}');
@@ -109,17 +116,39 @@ const Plans = () => {
         return;
       }
 
-      const response = await api.post('/auth/checkout', {
+      // ✅ Prepare checkout data
+      const requestData = {
         ...signupData,
         plan: planId,
-      });
+      };
+
+      // ✅ Add coupon code if provided
+      if (couponCode.trim()) {
+        requestData.couponCode = couponCode.trim().toUpperCase();
+        console.log('🎫 Applying coupon code:', couponCode.trim().toUpperCase());
+      }
+
+      const response = await api.post('/auth/checkout', requestData);
 
       if (response.data.status === 'success') {
-        window.location.href = response.data.url;
+        if (couponCode.trim()) {
+          setCouponSuccess('✅ Coupon code applied successfully!');
+        }
+        // Small delay to show success message
+        setTimeout(() => {
+          window.location.href = response.data.url;
+        }, 500);
       }
     } catch (error) {
       console.error('Checkout error:', error);
-      alert(error.response?.data?.message || 'Failed to create checkout');
+      const errorMessage = error.response?.data?.message || 'Failed to create checkout';
+      
+      // ✅ Show coupon-specific errors
+      if (errorMessage.toLowerCase().includes('coupon') || errorMessage.toLowerCase().includes('invalid')) {
+        setCouponError(errorMessage);
+      } else {
+        alert(errorMessage);
+      }
     } finally {
       setLoading(false);
       setSelectedPlan('');
@@ -129,6 +158,8 @@ const Plans = () => {
   const handleEnterpriseCheckout = async () => {
     setLoading(true);
     setSelectedPlan('ORG_ENTERPRISE');
+    setCouponError('');
+    setCouponSuccess('');
 
     try {
       const signupData = JSON.parse(localStorage.getItem('signupData') || '{}');
@@ -156,19 +187,40 @@ const Plans = () => {
         enterpriseConfig
       });
 
-      const response = await api.post('/auth/checkout', {
+      // ✅ Prepare request data
+      const requestData = {
         ...signupData,
         plan: 'ORG_ENTERPRISE',
         enterpriseConfig,
-      });
+      };
+
+      // ✅ Add coupon code if provided
+      if (couponCode.trim()) {
+        requestData.couponCode = couponCode.trim().toUpperCase();
+        console.log('🎫 Applying coupon code to Enterprise:', couponCode.trim().toUpperCase());
+      }
+
+      const response = await api.post('/auth/checkout', requestData);
 
       if (response.data.status === 'success') {
-        window.location.href = response.data.url;
+        if (couponCode.trim()) {
+          setCouponSuccess('✅ Coupon code applied successfully!');
+        }
+        setTimeout(() => {
+          window.location.href = response.data.url;
+        }, 500);
       }
     } catch (error) {
       console.error('Enterprise checkout error:', error);
       console.error('Error response:', error.response?.data);
-      alert(error.response?.data?.message || 'Failed to create enterprise checkout. Please make sure STRIPE_ENTERPRISE_PRICE is set in backend .env');
+      const errorMessage = error.response?.data?.message || 'Failed to create enterprise checkout. Please make sure STRIPE_ENTERPRISE_PRICE is set in backend .env';
+      
+      // ✅ Show coupon-specific errors
+      if (errorMessage.toLowerCase().includes('coupon') || errorMessage.toLowerCase().includes('invalid')) {
+        setCouponError(errorMessage);
+      } else {
+        alert(errorMessage);
+      }
     } finally {
       setLoading(false);
       setSelectedPlan('');
@@ -192,6 +244,55 @@ const Plans = () => {
         <p className="text-xl text-secondary">
           Select the perfect plan for your needs
         </p>
+      </div>
+
+      {/* ✅ Coupon Code Input - ADDED! */}
+      <div className="max-w-md mx-auto mb-8">
+        <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl shadow-lg p-6 border-2 border-purple-200">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-2xl">🎟️</span>
+            <h3 className="text-lg font-bold text-purple-800">Have a Coupon Code?</h3>
+          </div>
+          
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={couponCode}
+              onChange={(e) => {
+                setCouponCode(e.target.value.toUpperCase());
+                setCouponError('');
+                setCouponSuccess('');
+              }}
+              placeholder="Enter coupon code"
+              className="flex-1 px-4 py-3 border-2 border-purple-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent uppercase font-mono text-lg"
+              disabled={loading}
+            />
+          </div>
+
+          {/* Success Message */}
+          {couponSuccess && (
+            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-green-700 text-sm font-semibold flex items-center gap-2">
+                <span>✅</span>
+                {couponSuccess}
+              </p>
+            </div>
+          )}
+
+          {/* Error Message */}
+          {couponError && (
+            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-700 text-sm font-semibold flex items-center gap-2">
+                <span>❌</span>
+                {couponError}
+              </p>
+            </div>
+          )}
+
+          <p className="mt-3 text-sm text-purple-600">
+            💡 Enter your code and select a plan below. The discount will be applied at checkout!
+          </p>
+        </div>
       </div>
 
       {/* Plans Grid */}
