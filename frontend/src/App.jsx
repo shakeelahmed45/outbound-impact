@@ -3,6 +3,7 @@ import { useState } from 'react';
 import NetworkWarning from './components/common/NetworkWarning';
 import SplashScreen from './components/common/SplashScreen';
 import ProtectedRoute from './components/common/ProtectedRoute';
+import RootRedirect from './components/common/RootRedirect';
 import SignUp from './pages/SignUp';
 import SignIn from './pages/SignIn';
 import Plans from './pages/Plans';
@@ -53,7 +54,7 @@ function App() {
     <BrowserRouter>
       <NetworkWarning />
       <Routes>
-        <Route path="/" element={<Navigate to="/signin" replace />} />
+        <Route path="/" element={<RootRedirect />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/signin" element={<SignIn />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
