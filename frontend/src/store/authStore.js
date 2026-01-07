@@ -1,29 +1,42 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
-const useAuthStore = create((set) => ({
-  user: JSON.parse(localStorage.getItem('user')) || null, // ✅ FIXED: Load user from localStorage
-  token: localStorage.getItem('token') || null,
-  isAuthenticated: !!localStorage.getItem('token'), // ✅ FIXED: Initialize based on token existence
-  
-  setUser: (user) => {
-    localStorage.setItem('user', JSON.stringify(user)); // ✅ FIXED: Save user to localStorage
-    set({ user, isAuthenticated: true });
-  },
-  setToken: (token) => {
-    localStorage.setItem('token', token);
-    set({ token, isAuthenticated: true }); // ✅ FIXED: Set isAuthenticated when token is set
-  },
-  logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user'); // ✅ FIXED: Remove user from localStorage
-    set({ user: null, token: null, isAuthenticated: false });
-  },
-}));
+// ✅ FIXED: Use Zustand persist middleware for automatic localStorage sync
+const useAuthStore = create(
+  persist(
+    (set, get) => ({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      
+      setUser: (user) => {
+        set({ user, isAuthenticated: true });
+      },
+      
+      setToken: (token) => {
+        set({ token, isAuthenticated: true });
+      },
+      
+      logout: () => {
+        set({ user: null, token: null, isAuthenticated: false });
+      },
+    }),
+    {
+      name: 'auth-storage', // ✅ localStorage key name
+      storage: createJSONStorage(() => localStorage), // ✅ Use localStorage
+      partialize: (state) => ({
+        // ✅ Only persist these fields
+        user: state.user,
+        token: state.token,
+        isAuthenticated: state.isAuthenticated,
+      }),
+    }
+  )
+);
 
 export default useAuthStore;
 
-// Add these AFTER: export default useAuthStore;
-
+// ✅ Helper functions remain the same
 export const getEffectiveUserId = () => {
   const user = useAuthStore.getState().user;
   
