@@ -1,14 +1,15 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import safariFriendlyStorage from '../utils/safariFriendlyStorage';
 
-// ✅ FIXED: Add rehydration tracking for multi-tab support
+// ✅ SAFARI FIX: Use Safari-friendly storage that falls back to cookies
 const useAuthStore = create(
   persist(
     (set, get) => ({
       user: null,
       token: null,
       isAuthenticated: false,
-      _hasHydrated: false, // ✅ NEW: Track if state has been restored from localStorage
+      _hasHydrated: false, // ✅ Track if state has been restored from localStorage
       
       setUser: (user) => {
         console.log('🔵 authStore.setUser called:', user ? 'User data exists' : 'No user data');
@@ -25,14 +26,15 @@ const useAuthStore = create(
         set({ user: null, token: null, isAuthenticated: false });
       },
       
-      // ✅ NEW: Called after rehydration completes
+      // ✅ Called after rehydration completes
       setHasHydrated: (state) => {
+        console.log('🔵 authStore.setHasHydrated called:', state);
         set({ _hasHydrated: state });
       },
     }),
     {
-      name: 'auth-storage', // localStorage key name
-      storage: createJSONStorage(() => localStorage),
+      name: 'auth-storage', // Storage key name
+      storage: createJSONStorage(() => safariFriendlyStorage), // ✅ SAFARI FIX: Use wrapper instead of localStorage
       partialize: (state) => ({
         // Only persist these fields
         user: state.user,
@@ -41,7 +43,7 @@ const useAuthStore = create(
         // Don't persist _hasHydrated (reset to false on reload)
       }),
       onRehydrateStorage: () => {
-        console.log('🔄 Zustand persist: Starting rehydration from localStorage...');
+        console.log('🔄 Zustand persist: Starting rehydration from storage...');
         
         return (state, error) => {
           if (error) {
