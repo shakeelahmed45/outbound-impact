@@ -1,8 +1,27 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-const createCheckoutSession = async (email, priceId, planName) => {
+const createCheckoutSession = async (email, priceId, planName, couponCode = null) => {
   try {
-    const session = await stripe.checkout.sessions.create({
+    console.log('🔵 Creating checkout session:', { email, priceId, planName, couponCode });
+
+    // ✅ Validate coupon code with Stripe if provided
+    if (couponCode) {
+      try {
+        // Check if coupon exists and is valid
+        const coupon = await stripe.coupons.retrieve(couponCode);
+        console.log('✅ Valid coupon found:', {
+          id: coupon.id,
+          percentOff: coupon.percent_off,
+          amountOff: coupon.amount_off,
+          valid: coupon.valid,
+        });
+      } catch (error) {
+        console.error('❌ Invalid coupon code:', couponCode);
+        throw new Error('Invalid or expired coupon code');
+      }
+    }
+
+    const sessionConfig = {
       payment_method_types: ['card'],
       line_items: [
         {
@@ -10,17 +29,29 @@ const createCheckoutSession = async (email, priceId, planName) => {
           quantity: 1,
         },
       ],
-      mode: 'subscription', // ✅ FIXED: All plans use subscription mode now
+      mode: 'subscription',
       success_url: `${process.env.FRONTEND_URL}/auth/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.FRONTEND_URL}/plans`,
       customer_email: email,
       metadata: {
         planName: planName,
       },
-    });
+    };
+
+    // ✅ Add coupon to checkout session if provided and valid
+    if (couponCode) {
+      sessionConfig.discounts = [{
+        coupon: couponCode,
+      }];
+      console.log('✅ Coupon applied to checkout session:', couponCode);
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionConfig);
+    console.log('✅ Checkout session created:', session.id);
 
     return session;
   } catch (error) {
+    console.error('❌ Checkout session creation failed:', error);
     throw error;
   }
 };
