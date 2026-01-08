@@ -76,7 +76,12 @@ const send2FALoginEmail = async (userEmail, userName, code) => {
 // Create checkout session
 const createCheckout = async (req, res) => {
   try {
-    const { email, name, password, plan, enterpriseConfig } = req.body;
+    const { email, name, password, plan, enterpriseConfig, couponCode } = req.body;
+
+    // ✅ Log coupon code if provided
+    if (couponCode) {
+      console.log('🎫 Coupon code received from frontend:', couponCode);
+    }
 
     if (!email || !name || !password || !plan) {
       return res.status(400).json({
@@ -133,7 +138,9 @@ const createCheckout = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const session = await createCheckoutSession(normalizedEmail, priceId, plan);
+    
+    // ✅ Pass coupon code to createCheckoutSession
+    const session = await createCheckoutSession(normalizedEmail, priceId, plan, couponCode);
 
     global.pendingSignups = global.pendingSignups || {};
     global.pendingSignups[session.id] = {
