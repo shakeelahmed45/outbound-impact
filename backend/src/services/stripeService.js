@@ -1,8 +1,8 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-const createCheckoutSession = async (email, priceId, planName, couponCode = null) => {
+const createCheckoutSession = async (email, priceId, planName, couponCode = null, enterpriseConfig = null) => {
   try {
-    console.log('🔵 Creating checkout session:', { email, priceId, planName, couponCode });
+    console.log('🔵 Creating checkout session:', { email, priceId, planName, couponCode, enterpriseConfig });
 
     // ✅ Validate coupon code with Stripe if provided
     if (couponCode) {
@@ -19,6 +19,49 @@ const createCheckoutSession = async (email, priceId, planName, couponCode = null
         console.error('❌ Invalid coupon code:', couponCode);
         throw new Error('Invalid or expired coupon code');
       }
+    }
+
+    // ✅ Handle Enterprise plans with custom pricing
+    if (planName === 'ORG_ENTERPRISE' && enterpriseConfig && enterpriseConfig.calculatedPrice) {
+      console.log('🏢 Creating dynamic Enterprise price:', {
+        amount: enterpriseConfig.calculatedPrice,
+        storageGB: enterpriseConfig.storageGB,
+        teamMembers: enterpriseConfig.teamMembers
+      });
+
+      // Create a unique product for this Enterprise configuration
+      const product = await stripe.products.create({
+        name: `Enterprise Plan - ${enterpriseConfig.storageGB}GB / ${enterpriseConfig.teamMembers === -1 ? 'Unlimited' : enterpriseConfig.teamMembers} members`,
+        description: `Custom Enterprise configuration: ${enterpriseConfig.storageGB}GB storage, ${enterpriseConfig.teamMembers === -1 ? 'Unlimited' : enterpriseConfig.teamMembers} team members`,
+        metadata: {
+          planType: 'ENTERPRISE',
+          storageGB: enterpriseConfig.storageGB.toString(),
+          teamMembers: enterpriseConfig.teamMembers.toString(),
+        }
+      });
+
+      // Create a price for this product with the calculated amount
+      const price = await stripe.prices.create({
+        product: product.id,
+        unit_amount: Math.round(enterpriseConfig.calculatedPrice * 100), // Convert dollars to cents
+        currency: 'usd',
+        recurring: {
+          interval: 'month',
+        },
+        metadata: {
+          storageGB: enterpriseConfig.storageGB.toString(),
+          teamMembers: enterpriseConfig.teamMembers.toString(),
+        }
+      });
+
+      console.log('✅ Dynamic Enterprise price created:', {
+        priceId: price.id,
+        amount: enterpriseConfig.calculatedPrice,
+        productId: product.id
+      });
+
+      // Use the newly created price
+      priceId = price.id;
     }
 
     const sessionConfig = {

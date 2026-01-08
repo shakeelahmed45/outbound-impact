@@ -122,11 +122,23 @@ const createCheckout = async (req, res) => {
         storageLimit = 500 * 1024 * 1024 * 1024;
         break;
       case 'ORG_ENTERPRISE':
-        priceId = process.env.STRIPE_ENTERPRISE_PRICE;
         role = 'ORG_ENTERPRISE';
-        if (enterpriseConfig && enterpriseConfig.storageGB) {
+        
+        // ✅ For Enterprise, create a custom price based on configuration
+        if (enterpriseConfig && enterpriseConfig.calculatedPrice) {
+          console.log('🏢 Enterprise plan with custom pricing:', {
+            storageGB: enterpriseConfig.storageGB,
+            teamMembers: enterpriseConfig.teamMembers,
+            calculatedPrice: enterpriseConfig.calculatedPrice
+          });
+          
+          // We'll create a dynamic price - set priceId to null for now
+          // and handle it specially in createCheckoutSession
+          priceId = null;
           storageLimit = enterpriseConfig.storageGB * 1024 * 1024 * 1024;
         } else {
+          // Fallback to base Enterprise price
+          priceId = process.env.STRIPE_ENTERPRISE_PRICE;
           storageLimit = 1500 * 1024 * 1024 * 1024;
         }
         break;
@@ -139,8 +151,14 @@ const createCheckout = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     
-    // ✅ Pass coupon code to createCheckoutSession
-    const session = await createCheckoutSession(normalizedEmail, priceId, plan, couponCode);
+    // ✅ For Enterprise plans, pass the entire config for dynamic pricing
+    const session = await createCheckoutSession(
+      normalizedEmail, 
+      priceId, 
+      plan, 
+      couponCode,
+      enterpriseConfig  // Pass enterprise config for dynamic pricing
+    );
 
     global.pendingSignups = global.pendingSignups || {};
     global.pendingSignups[session.id] = {
