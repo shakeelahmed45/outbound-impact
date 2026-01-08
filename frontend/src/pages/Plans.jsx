@@ -534,4 +534,14 @@ const Plans = () => {
 
                 <p className="text-xs text-center mt-4 opacity-80">
                   Secure checkout powered by Stripe
-      
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Plans;
