@@ -9,8 +9,9 @@ const Plans = () => {
   const [loading, setLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('');
   
-  // Coupon state
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  // ✅ FIXED: Track coupons per plan
+  const [appliedCoupons, setAppliedCoupons] = useState({});
+  const [currentPlanForCoupon, setCurrentPlanForCoupon] = useState(null);
   const [couponModalOpen, setCouponModalOpen] = useState(false);
   const [couponError, setCouponError] = useState('');
   
@@ -103,9 +104,22 @@ const Plans = () => {
     return basePrice;
   };
 
+  // ✅ FIXED: Apply coupon to specific plan only
   const handleApplyCoupon = (couponCode) => {
-    setAppliedCoupon(couponCode);
+    if (currentPlanForCoupon) {
+      setAppliedCoupons(prev => ({
+        ...prev,
+        [currentPlanForCoupon]: couponCode
+      }));
+      console.log(`✅ Applied ${couponCode} to ${currentPlanForCoupon}`);
+    }
     setCouponError('');
+  };
+
+  // ✅ FIXED: Open modal for specific plan
+  const handleOpenCouponModal = (planId) => {
+    setCurrentPlanForCoupon(planId);
+    setCouponModalOpen(true);
   };
 
   const handleSelectPlan = async (planId) => {
@@ -127,10 +141,11 @@ const Plans = () => {
         plan: planId,
       };
 
-      // Add coupon code if applied
-      if (appliedCoupon) {
-        requestData.couponCode = appliedCoupon;
-        console.log('Applying coupon code:', appliedCoupon);
+      // ✅ FIXED: Only add coupon for THIS specific plan
+      const planCoupon = appliedCoupons[planId];
+      if (planCoupon) {
+        requestData.couponCode = planCoupon;
+        console.log(`✅ Applying coupon ${planCoupon} to ${planId} plan`);
       }
 
       const response = await api.post('/auth/checkout', requestData);
@@ -145,7 +160,11 @@ const Plans = () => {
       // Check if error is coupon-related
       if (errorMessage.toLowerCase().includes('coupon') || errorMessage.toLowerCase().includes('invalid')) {
         setCouponError(errorMessage);
-        setAppliedCoupon(null); // Clear invalid coupon
+        // ✅ FIXED: Remove coupon from THIS plan only
+        setAppliedCoupons(prev => ({
+          ...prev,
+          [planId]: null
+        }));
         alert(errorMessage);
       } else {
         alert(errorMessage);
@@ -189,10 +208,11 @@ const Plans = () => {
         enterpriseConfig,
       };
 
-      // Add coupon code if applied
-      if (appliedCoupon) {
-        requestData.couponCode = appliedCoupon;
-        console.log('Applying coupon code to Enterprise:', appliedCoupon);
+      // ✅ FIXED: Only add coupon for Enterprise plan
+      const enterpriseCoupon = appliedCoupons['ORG_ENTERPRISE'];
+      if (enterpriseCoupon) {
+        requestData.couponCode = enterpriseCoupon;
+        console.log(`✅ Applying coupon ${enterpriseCoupon} to Enterprise plan`);
       }
 
       const response = await api.post('/auth/checkout', requestData);
@@ -207,7 +227,11 @@ const Plans = () => {
       // Check if error is coupon-related
       if (errorMessage.toLowerCase().includes('coupon') || errorMessage.toLowerCase().includes('invalid')) {
         setCouponError(errorMessage);
-        setAppliedCoupon(null); // Clear invalid coupon
+        // ✅ FIXED: Remove coupon from Enterprise plan only
+        setAppliedCoupons(prev => ({
+          ...prev,
+          'ORG_ENTERPRISE': null
+        }));
         alert(errorMessage);
       } else {
         alert(errorMessage);
@@ -225,9 +249,12 @@ const Plans = () => {
       {/* Coupon Modal */}
       <CouponModal
         isOpen={couponModalOpen}
-        onClose={() => setCouponModalOpen(false)}
+        onClose={() => {
+          setCouponModalOpen(false);
+          setCurrentPlanForCoupon(null);
+        }}
         onApplyCoupon={handleApplyCoupon}
-        appliedCoupon={appliedCoupon}
+        appliedCoupon={currentPlanForCoupon ? appliedCoupons[currentPlanForCoupon] : null}
       />
 
       <div className="text-center mb-12">
@@ -247,84 +274,89 @@ const Plans = () => {
 
       {/* Plans Grid */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
-        {plans.map((plan) => (
-          <div
-            key={plan.id}
-            className={`relative bg-white rounded-2xl shadow-xl p-8 border-2 transition-all hover:scale-105 ${
-              plan.popular ? 'border-primary' : 'border-gray-200'
-            }`}
-          >
-            {plan.popular && (
-              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                <span className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-2 rounded-full text-sm font-bold shadow-lg">
-                  Most Popular
-                </span>
-              </div>
-            )}
-
-            <div className="text-center mb-6">
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                {plan.name}
-              </h3>
-              <div className="mb-2">
-                <span className="text-5xl font-bold text-primary">
-                  {plan.price}
-                </span>
-                <span className="text-secondary ml-2">
-                  {plan.period}
-                </span>
-              </div>
-              <p className="text-lg text-secondary font-semibold">
-                {plan.storage} Storage
-              </p>
-            </div>
-
-            <ul className="space-y-3 mb-8">
-              {plan.features.map((feature, index) => (
-                <li key={index} className="flex items-start gap-3">
-                  <Check className="text-primary flex-shrink-0 mt-1" size={20} />
-                  <span className="text-gray-700">{feature}</span>
-                </li>
-              ))}
-            </ul>
-
-            {/* Applied Coupon Badge */}
-            {appliedCoupon && (
-              <div className="mb-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 rounded-lg p-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Tag className="text-green-600" size={16} />
-                    <span className="text-sm font-semibold text-green-900">Coupon Applied</span>
-                  </div>
-                  <span className="text-xs font-mono font-bold text-green-700">{appliedCoupon}</span>
+        {plans.map((plan) => {
+          // ✅ FIXED: Get coupon for THIS specific plan only
+          const planCoupon = appliedCoupons[plan.id];
+          
+          return (
+            <div
+              key={plan.id}
+              className={`relative bg-white rounded-2xl shadow-xl p-8 border-2 transition-all hover:scale-105 ${
+                plan.popular ? 'border-primary' : 'border-gray-200'
+              }`}
+            >
+              {plan.popular && (
+                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                  <span className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-2 rounded-full text-sm font-bold shadow-lg">
+                    Most Popular
+                  </span>
                 </div>
-              </div>
-            )}
-
-            <button
-              onClick={() => handleSelectPlan(plan.id)}
-              disabled={loading && selectedPlan === plan.id}
-              className="w-full gradient-btn text-white py-3 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 disabled:opacity-50 mb-3"
-            >
-              {loading && selectedPlan === plan.id ? (
-                <>
-                  <Loader2 className="animate-spin" size={20} />
-                  Processing...
-                </>
-              ) : (
-                'Select Plan'
               )}
-            </button>
 
-            {/* Coupon Link */}
-            <button
-              onClick={() => setCouponModalOpen(true)}
-              className="w-full text-center text-sm text-purple-600 hover:text-purple-700 font-medium transition-colors"
-            >
-              {appliedCoupon ? 'Change coupon code' : 'Have a coupon code?'}
-            </button>
-          </div>
-        ))}
+              <div className="text-center mb-6">
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                  {plan.name}
+                </h3>
+                <div className="mb-2">
+                  <span className="text-5xl font-bold text-primary">
+                    {plan.price}
+                  </span>
+                  <span className="text-secondary ml-2">
+                    {plan.period}
+                  </span>
+                </div>
+                <p className="text-lg text-secondary font-semibold">
+                  {plan.storage} Storage
+                </p>
+              </div>
+
+              <ul className="space-y-3 mb-8">
+                {plan.features.map((feature, index) => (
+                  <li key={index} className="flex items-start gap-3">
+                    <Check className="text-primary flex-shrink-0 mt-1" size={20} />
+                    <span className="text-gray-700">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+
+              {/* ✅ FIXED: Only show badge if THIS plan has a coupon */}
+              {planCoupon && (
+                <div className="mb-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Tag className="text-green-600" size={16} />
+                      <span className="text-sm font-semibold text-green-900">Coupon Applied</span>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-green-700">{planCoupon}</span>
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={() => handleSelectPlan(plan.id)}
+                disabled={loading && selectedPlan === plan.id}
+                className="w-full gradient-btn text-white py-3 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 disabled:opacity-50 mb-3"
+              >
+                {loading && selectedPlan === plan.id ? (
+                  <>
+                    <Loader2 className="animate-spin" size={20} />
+                    Processing...
+                  </>
+                ) : (
+                  'Select Plan'
+                )}
+              </button>
+
+              {/* ✅ FIXED: Open modal for THIS specific plan */}
+              <button
+                onClick={() => handleOpenCouponModal(plan.id)}
+                className="w-full text-center text-sm text-purple-600 hover:text-purple-700 font-medium transition-colors"
+              >
+                {planCoupon ? 'Change coupon code' : 'Have a coupon code?'}
+              </button>
+            </div>
+          );
+        })}
       </div>
 
       {/* Interactive Enterprise Section */}
@@ -436,10 +468,11 @@ const Plans = () => {
                     </span>
                   </div>
 
-                  {appliedCoupon && (
+                  {/* ✅ FIXED: Only show Enterprise coupon */}
+                  {appliedCoupons['ORG_ENTERPRISE'] && (
                     <div className="flex justify-between items-center pb-3 border-b border-white/30">
                       <span className="font-medium text-sm sm:text-base">Coupon</span>
-                      <span className="font-bold text-base sm:text-lg font-mono">{appliedCoupon}</span>
+                      <span className="font-bold text-base sm:text-lg font-mono">{appliedCoupons['ORG_ENTERPRISE']}</span>
                     </div>
                   )}
 
@@ -491,12 +524,12 @@ const Plans = () => {
                   )}
                 </button>
 
-                {/* Enterprise Coupon Link */}
+                {/* ✅ FIXED: Enterprise coupon link */}
                 <button
-                  onClick={() => setCouponModalOpen(true)}
+                  onClick={() => handleOpenCouponModal('ORG_ENTERPRISE')}
                   className="w-full text-center text-sm text-white/90 hover:text-white font-medium transition-colors"
                 >
-                  {appliedCoupon ? 'Change coupon code' : 'Have a coupon code?'}
+                  {appliedCoupons['ORG_ENTERPRISE'] ? 'Change coupon code' : 'Have a coupon code?'}
                 </button>
 
                 <p className="text-xs text-center mt-4 opacity-80">
