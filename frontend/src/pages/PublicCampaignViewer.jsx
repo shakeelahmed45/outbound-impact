@@ -437,6 +437,24 @@ const PublicCampaignViewer = () => {
 
     fetchCampaign();
   }, [slug]);
+
+  // ✅ NEW: Restore scroll position after campaign loads
+  useEffect(() => {
+    if (campaign && !loading) {
+      // Small delay to ensure content is rendered
+      const timer = setTimeout(() => {
+        const savedScrollPosition = sessionStorage.getItem(`campaign_scroll_${slug}`);
+        if (savedScrollPosition) {
+          console.log('📜 Restoring scroll position:', savedScrollPosition);
+          window.scrollTo(0, parseInt(savedScrollPosition, 10));
+          // Clear the saved position after restoring
+          sessionStorage.removeItem(`campaign_scroll_${slug}`);
+        }
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [campaign, loading, slug]);
   
   // ✅ NEW: Handle back navigation for preview mode
   const handleBackToCampaigns = () => {
@@ -886,6 +904,10 @@ const PublicCampaignViewer = () => {
 };
 
   const openItem = (item) => {
+    // ✅ Save scroll position before navigating away
+    const scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
+    sessionStorage.setItem(`campaign_scroll_${slug}`, scrollPosition.toString());
+    
     // Preserve preview parameter when navigating to item
     const previewParam = isPreviewMode ? '&preview=true' : '';
     navigate(`/l/${item.slug}?from=${slug}${previewParam}`);
