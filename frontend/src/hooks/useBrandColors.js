@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import api from '../services/api';
 
 const useBrandColors = (userId = null) => {
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [colors, setColors] = useState({
     primaryColor: '#800080',
@@ -13,6 +15,17 @@ const useBrandColors = (userId = null) => {
     const loadBrandColors = async () => {
       try {
         setLoading(true);
+        
+        // ✅ CRITICAL FIX: Check if we're on a public route
+        const isPublicRoute = location.pathname.startsWith('/l/') || 
+                             location.pathname.startsWith('/c/');
+        
+        if (isPublicRoute) {
+          console.log('ℹ️ Public route detected - using default brand colors (skipping API call)');
+          applyDefaultColors();
+          setLoading(false);
+          return; // ← Exit early, no API call!
+        }
         
         // If userId provided, fetch public branding (for QR viewers)
         // Otherwise, fetch current user's branding
@@ -64,7 +77,7 @@ const useBrandColors = (userId = null) => {
     };
 
     loadBrandColors();
-  }, [userId]);
+  }, [userId, location.pathname]);
 
   return { colors, loading };
 };
