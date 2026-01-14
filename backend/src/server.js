@@ -97,13 +97,16 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 // 📡 EXPRESS CONFIGURATION
 // ═══════════════════════════════════════════════
 
-// CORS configuration - Allow web app AND mobile app
+// ✅ FIXED: CORS configuration - Allow web app AND mobile app
 const allowedOrigins = [
-  process.env.FRONTEND_URL,      // Web app (https://outboundimpact.net)
-  'https://localhost',            // Capacitor Android
-  'capacitor://localhost',        // Capacitor alternative format
-  'http://localhost:5173',        // Local development
-  'http://localhost:5000'         // Local backend testing
+  'https://outboundimpact.net',           // Main domain
+  'https://www.outboundimpact.net',       // WWW subdomain
+  process.env.FRONTEND_URL,               // Environment variable (backup)
+  'https://localhost',                    // Capacitor Android
+  'capacitor://localhost',                // Capacitor alternative format
+  'http://localhost:5173',                // Local development
+  'http://localhost:5000',                // Local backend testing
+  'http://localhost:3000'                 // Additional local dev
 ].filter(Boolean);
 
 app.use(cors({
@@ -255,4 +258,4 @@ if (process.env.VERCEL) {
     console.log('🔍 Debug routes active at /api/debug');
     console.log('═══════════════════════════════════════════════\n');
   });
-}// Force rebuild Sun Jan  4 08:46:55 PKT 2026
+}
