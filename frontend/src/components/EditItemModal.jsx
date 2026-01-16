@@ -30,16 +30,14 @@ const EditItemModal = ({ item, isOpen, onClose, onSuccess }) => {
     e.preventDefault();
     setError('');
 
-    // Validate button fields for TEXT items
-    if (item.type === 'TEXT') {
-      if (formData.buttonText && !formData.buttonUrl) {
-        setError('Please enter button URL');
-        return;
-      }
-      if (formData.buttonUrl && !formData.buttonText) {
-        setError('Please enter button text');
-        return;
-      }
+    // ✅ FIXED: Validate button fields for ALL item types (not just TEXT)
+    if (formData.buttonText && !formData.buttonUrl) {
+      setError('Please enter button URL');
+      return;
+    }
+    if (formData.buttonUrl && !formData.buttonText) {
+      setError('Please enter button text');
+      return;
     }
 
     setSaving(true);
@@ -48,13 +46,14 @@ const EditItemModal = ({ item, isOpen, onClose, onSuccess }) => {
       const updateData = {
         title: formData.title,
         description: formData.description,
+        // ✅ FIXED: Send button fields for ALL types (not just TEXT)
+        buttonText: formData.buttonText || null,
+        buttonUrl: formData.buttonUrl || null,
       };
 
       // Add content for TEXT items
       if (item.type === 'TEXT') {
         updateData.content = formData.content;
-        updateData.buttonText = formData.buttonText || null;
-        updateData.buttonUrl = formData.buttonUrl || null;
       }
 
       const response = await api.put(`/items/${item.id}`, updateData);
@@ -120,91 +119,89 @@ const EditItemModal = ({ item, isOpen, onClose, onSuccess }) => {
 
           {/* TEXT Content */}
           {item.type === 'TEXT' && (
-            <>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Content *
-                </label>
-                <textarea
-                  value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  rows={10}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
-                  placeholder="Write your content here..."
-                  required
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Content *
+              </label>
+              <textarea
+                value={formData.content}
+                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                rows={10}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+                placeholder="Write your content here..."
+                required
+              />
+            </div>
+          )}
 
-              {/* Button Fields */}
-              <div className="border-t border-gray-200 pt-6">
-                <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-xl p-6">
-                  <div className="flex items-start gap-3 mb-4">
-                    <div className="flex-shrink-0">
-                      <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-lg">
-                        <ExternalLink size={24} className="text-white" />
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-lg font-bold text-primary mb-2">
-                        🔗 Custom Button (Optional)
-                      </h4>
-                      <p className="text-sm text-gray-600 mb-4">
-                        Add a call-to-action button that appears at the end of your text content.
-                      </p>
-                    </div>
+          {/* ✅ FIXED: Button Fields - NOW AVAILABLE FOR ALL ITEM TYPES */}
+          <div className="border-t border-gray-200 pt-6">
+            <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-xl p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-lg">
+                    <ExternalLink size={24} className="text-white" />
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Button Text
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.buttonText}
-                        onChange={(e) => setFormData({ ...formData, buttonText: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                        placeholder="e.g., Visit Website"
-                        maxLength={50}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Button URL
-                      </label>
-                      <input
-                        type="url"
-                        value={formData.buttonUrl}
-                        onChange={(e) => setFormData({ ...formData, buttonUrl: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                        placeholder="https://example.com"
-                      />
-                    </div>
-                  </div>
-
-                  {formData.buttonText && formData.buttonUrl && (
-                    <div className="mt-4 p-4 bg-white border border-purple-200 rounded-lg">
-                      <p className="text-xs font-semibold text-gray-600 mb-2">Preview:</p>
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all"
-                      >
-                        <ExternalLink size={18} />
-                        {formData.buttonText}
-                      </button>
-                    </div>
-                  )}
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-lg font-bold text-primary mb-2">
+                    🔗 Custom Button (Optional)
+                  </h4>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Add a call-to-action button that appears with your content.
+                  </p>
                 </div>
               </div>
-            </>
-          )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Button Text
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.buttonText}
+                    onChange={(e) => setFormData({ ...formData, buttonText: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="e.g., Visit Website"
+                    maxLength={50}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Button URL
+                  </label>
+                  <input
+                    type="url"
+                    value={formData.buttonUrl}
+                    onChange={(e) => setFormData({ ...formData, buttonUrl: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="https://example.com"
+                  />
+                </div>
+              </div>
+
+              {formData.buttonText && formData.buttonUrl && (
+                <div className="mt-4 p-4 bg-white border border-purple-200 rounded-lg">
+                  <p className="text-xs font-semibold text-gray-600 mb-2">Preview:</p>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all"
+                  >
+                    <ExternalLink size={18} />
+                    {formData.buttonText}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* File type info for non-TEXT items */}
           {item.type !== 'TEXT' && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-sm text-blue-800">
-                <strong>Note:</strong> You can only edit the title and description. 
+                <strong>Note:</strong> You can edit the title, description, and button link. 
                 To change the {item.type.toLowerCase()} file itself, please create a new item.
               </p>
             </div>

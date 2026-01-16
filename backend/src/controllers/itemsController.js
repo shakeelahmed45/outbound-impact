@@ -171,35 +171,34 @@ const updateItem = async (req, res) => {
       });
     }
 
-    if (item.type === 'TEXT') {
-      if (buttonText && !buttonUrl) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Button URL is required when button text is provided',
-        });
-      }
-      if (buttonUrl && !buttonText) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Button text is required when button URL is provided',
-        });
-      }
-      
-      if (buttonUrl) {
-        try {
-          new URL(buttonUrl);
-          if (!buttonUrl.startsWith('http://') && !buttonUrl.startsWith('https://')) {
-            return res.status(400).json({
-              status: 'error',
-              message: 'Button URL must start with http:// or https://',
-            });
-          }
-        } catch (error) {
+    // ✅ FIXED: Validate button fields for ALL item types
+    if (buttonText && !buttonUrl) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Button URL is required when button text is provided',
+      });
+    }
+    if (buttonUrl && !buttonText) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Button text is required when button URL is provided',
+      });
+    }
+    
+    if (buttonUrl) {
+      try {
+        new URL(buttonUrl);
+        if (!buttonUrl.startsWith('http://') && !buttonUrl.startsWith('https://')) {
           return res.status(400).json({
             status: 'error',
-            message: 'Invalid button URL format',
+            message: 'Button URL must start with http:// or https://',
           });
         }
+      } catch (error) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Invalid button URL format',
+        });
       }
     }
 
@@ -213,10 +212,9 @@ const updateItem = async (req, res) => {
       updateData.fileSize = BigInt(content.length);
     }
     
-    if (item.type === 'TEXT') {
-      if (buttonText !== undefined) updateData.buttonText = buttonText || null;
-      if (buttonUrl !== undefined) updateData.buttonUrl = buttonUrl || null;
-    }
+    // ✅ FIXED: Allow button fields for ALL item types
+    if (buttonText !== undefined) updateData.buttonText = buttonText || null;
+    if (buttonUrl !== undefined) updateData.buttonUrl = buttonUrl || null;
 
     // âœ… NEW: Allow updating sharingEnabled
     if (sharingEnabled !== undefined) {
