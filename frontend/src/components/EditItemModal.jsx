@@ -73,25 +73,25 @@ const EditItemModal = ({ item, isOpen, onClose, onSuccess }) => {
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4">
-      {/* ✅ RESPONSIVE MODAL CONTAINER - Guaranteed to work on all devices */}
+      {/* ✅ SUPER RESPONSIVE MODAL - Guaranteed button visibility */}
       <div 
-        className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col" 
+        className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-md flex flex-col" 
         style={{ 
-          maxHeight: 'calc(100vh - 3rem)',
+          maxHeight: 'calc(100vh - 24px)',
           height: 'auto'
         }}
       >
         
-        {/* ✅ FIXED HEADER - Always visible at top */}
-        <div className="flex-shrink-0 bg-gradient-to-r from-purple-600 to-violet-600 text-white px-4 py-3 sm:px-6 sm:py-4 rounded-t-xl sm:rounded-t-2xl">
+        {/* ✅ COMPACT HEADER - Fixed at top */}
+        <div className="flex-shrink-0 bg-gradient-to-r from-purple-600 to-violet-600 text-white px-4 py-3 sm:px-5 sm:py-4 rounded-t-xl sm:rounded-t-2xl">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
               <div className="bg-white/20 p-2 rounded-lg flex-shrink-0">
                 <Save size={18} className="sm:w-5 sm:h-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <h2 className="text-base sm:text-xl font-bold truncate">Edit Item</h2>
-                <p className="text-purple-100 text-xs sm:text-sm">Update your {item.type.toLowerCase()} content</p>
+                <h2 className="text-base sm:text-lg font-bold truncate">Edit Item</h2>
+                <p className="text-purple-100 text-xs hidden sm:block">Update your {item.type.toLowerCase()} content</p>
               </div>
             </div>
             <button
@@ -99,66 +99,68 @@ const EditItemModal = ({ item, isOpen, onClose, onSuccess }) => {
               className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-full transition-all flex-shrink-0"
               aria-label="Close modal"
             >
-              <X size={20} className="sm:w-6 sm:h-6" />
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
         </div>
 
-        {/* ✅ SCROLLABLE CONTENT AREA - Takes available space */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 sm:px-6 sm:py-4">
+        {/* ✅ SCROLLABLE CONTENT - COMPACT spacing */}
+        <div className="flex-1 overflow-y-auto px-4 py-3 sm:px-5 sm:py-4">
           <form onSubmit={handleSubmit} id="edit-item-form">
             
-            {/* Error Message */}
+            {/* Error Message - Compact */}
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-2.5 mb-3 sm:mb-4 animate-shake">
-                <p className="text-xs sm:text-sm text-red-800 font-medium">{error}</p>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-2.5 mb-3 animate-shake">
+                <p className="text-xs text-red-800 font-medium">{error}</p>
               </div>
             )}
 
-            <div className="space-y-3 sm:space-y-4">
+            <div className="space-y-3">
               
-              {/* Title Field */}
+              {/* Title Field - Compact */}
               <div>
-                <label className="block text-xs sm:text-sm font-bold text-gray-700 mb-1.5 sm:mb-2">
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">
                   Title <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
                   placeholder="Enter title"
                   required
                   disabled={saving}
                 />
               </div>
 
-              {/* Description Field */}
+              {/* Description Field - Compact */}
               <div>
-                <label className="block text-xs sm:text-sm font-bold text-gray-700 mb-1.5 sm:mb-2">
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">
                   Description (Optional)
                 </label>
                 <input
                   type="text"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
                   placeholder="Add a description"
                   disabled={saving}
                 />
               </div>
 
-              {/* TEXT Content Field */}
+              {/* TEXT Content Field - Compact */}
               {item.type === 'TEXT' && (
                 <div>
-                  <label className="block text-xs sm:text-sm font-bold text-gray-700 mb-1.5 sm:mb-2">
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">
                     Content <span className="text-red-500">*</span>
                   </label>
                   <textarea
                     value={formData.content}
                     onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                    rows={6}
-                    className="w-full px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none transition-all"
+                    rows={4}
+                    className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none transition-all"
                     placeholder="Write your content here..."
                     required
                     disabled={saving}
@@ -166,66 +168,66 @@ const EditItemModal = ({ item, isOpen, onClose, onSuccess }) => {
                 </div>
               )}
 
-              {/* ✅ BUTTON FIELDS - Available for ALL types */}
-              <div className="border-t-2 border-gray-200 pt-3 sm:pt-4">
-                <div className="bg-gradient-to-br from-purple-50 to-violet-50 border-2 border-purple-200 rounded-xl p-3 sm:p-4">
-                  <div className="flex items-start gap-2 sm:gap-3 mb-3">
+              {/* ✅ BUTTON FIELDS - Compact version */}
+              <div className="border-t-2 border-gray-200 pt-3">
+                <div className="bg-gradient-to-br from-purple-50 to-violet-50 border-2 border-purple-200 rounded-lg p-3">
+                  <div className="flex items-start gap-2 mb-2">
                     <div className="flex-shrink-0">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-purple-600 to-violet-600 rounded-lg flex items-center justify-center shadow-md">
-                        <ExternalLink size={16} className="text-white sm:w-5 sm:h-5" />
+                      <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-violet-600 rounded-lg flex items-center justify-center">
+                        <ExternalLink size={14} className="text-white" />
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className="text-sm sm:text-base font-bold text-purple-900 mb-1">
+                      <h4 className="text-xs font-bold text-purple-900 mb-0.5">
                         🔗 Custom Button (Optional)
                       </h4>
-                      <p className="text-xs sm:text-sm text-gray-600">
-                        Add a call-to-action button that appears with your content.
+                      <p className="text-xs text-gray-600">
+                        Add a call-to-action button
                       </p>
                     </div>
                   </div>
 
-                  <div className="space-y-2 sm:space-y-3">
-                    {/* Button Text */}
+                  <div className="space-y-2">
+                    {/* Button Text - Compact */}
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
                         Button Text
                       </label>
                       <input
                         type="text"
                         value={formData.buttonText}
                         onChange={(e) => setFormData({ ...formData, buttonText: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                        className="w-full px-2.5 py-1.5 text-xs border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
                         placeholder="e.g., Visit Website"
                         maxLength={50}
                         disabled={saving}
                       />
                     </div>
 
-                    {/* Button URL */}
+                    {/* Button URL - Compact */}
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
                         Button URL
                       </label>
                       <input
                         type="url"
                         value={formData.buttonUrl}
                         onChange={(e) => setFormData({ ...formData, buttonUrl: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                        className="w-full px-2.5 py-1.5 text-xs border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
                         placeholder="https://example.com"
                         disabled={saving}
                       />
                     </div>
 
-                    {/* Button Preview */}
+                    {/* Button Preview - Compact */}
                     {formData.buttonText && formData.buttonUrl && (
-                      <div className="mt-2 p-2 sm:p-3 bg-white border-2 border-purple-200 rounded-lg">
-                        <p className="text-xs font-semibold text-gray-600 mb-1.5">Preview:</p>
+                      <div className="mt-2 p-2 bg-white border-2 border-purple-200 rounded-lg">
+                        <p className="text-xs font-semibold text-gray-600 mb-1">Preview:</p>
                         <button
                           type="button"
-                          className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-2 sm:px-4 sm:py-2.5 bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-lg text-xs sm:text-sm font-semibold shadow-md"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-lg text-xs font-semibold"
                         >
-                          <ExternalLink size={14} className="sm:w-4 sm:h-4" />
+                          <ExternalLink size={12} />
                           {formData.buttonText}
                         </button>
                       </div>
@@ -234,10 +236,10 @@ const EditItemModal = ({ item, isOpen, onClose, onSuccess }) => {
                 </div>
               </div>
 
-              {/* Info Note for non-TEXT items */}
+              {/* Info Note - Compact */}
               {item.type !== 'TEXT' && (
-                <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-2.5 sm:p-3">
-                  <p className="text-xs sm:text-sm text-blue-800">
+                <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-2">
+                  <p className="text-xs text-blue-800">
                     <strong>Note:</strong> You can edit the title, description, and button link. 
                     To change the {item.type.toLowerCase()} file itself, please create a new item.
                   </p>
@@ -248,9 +250,9 @@ const EditItemModal = ({ item, isOpen, onClose, onSuccess }) => {
           </form>
         </div>
 
-        {/* ✅ FIXED FOOTER - Always visible at bottom */}
-        <div className="flex-shrink-0 bg-gray-50 px-4 py-2.5 sm:px-6 sm:py-3 rounded-b-xl sm:rounded-b-2xl border-t-2 border-gray-200">
-          <div className="flex gap-2 sm:gap-3">
+        {/* ✅ FIXED FOOTER - ALWAYS VISIBLE - Compact */}
+        <div className="flex-shrink-0 bg-gray-50 px-4 py-2.5 sm:py-3 rounded-b-xl sm:rounded-b-2xl border-t-2 border-gray-200">
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={onClose}
@@ -273,7 +275,7 @@ const EditItemModal = ({ item, isOpen, onClose, onSuccess }) => {
               ) : (
                 <>
                   <Save size={14} />
-                  <span className="text-xs sm:text-sm">Save Changes</span>
+                  <span className="text-xs sm:text-sm">Save</span>
                 </>
               )}
             </button>
