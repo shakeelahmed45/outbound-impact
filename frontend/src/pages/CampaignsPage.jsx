@@ -844,26 +844,25 @@ const CampaignsPage = () => {
           </div>
         )}
 
-        {/* ✅ ULTRA-COMPACT RESPONSIVE EDIT CAMPAIGN MODAL */}
+        {/* ✅ EXTREME COMPACT RESPONSIVE EDIT CAMPAIGN MODAL - Works on ALL devices */}
         {showEditModal && selectedCampaign && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2">
-            {/* ULTRA-COMPACT MODAL CONTAINER */}
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-1">
+            {/* EXTREME COMPACT MODAL - iPhone 4 compatible */}
             <div 
-              className="bg-white rounded-lg sm:rounded-xl shadow-2xl w-full max-w-sm flex flex-col" 
+              className="bg-white rounded-lg shadow-2xl w-full flex flex-col" 
               style={{ 
-                maxHeight: 'calc(100vh - 16px)',
+                maxWidth: '340px',
+                maxHeight: 'calc(100vh - 8px)',
                 height: 'auto'
               }}
             >
               
-              {/* MINIMAL HEADER */}
-              <div className="flex-shrink-0 bg-gradient-to-r from-purple-600 to-violet-600 text-white px-3 py-2 rounded-t-lg sm:rounded-t-xl">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <Folder size={16} className="flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <h2 className="text-sm font-bold truncate">Edit Campaign</h2>
-                    </div>
+              {/* ULTRA-MINIMAL HEADER */}
+              <div className="flex-shrink-0 bg-gradient-to-r from-purple-600 to-violet-600 text-white px-2 py-1.5 rounded-t-lg">
+                <div className="flex items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <Folder size={14} />
+                    <h2 className="text-xs font-bold truncate">Edit Campaign</h2>
                   </div>
                   <button
                     onClick={() => {
@@ -872,156 +871,113 @@ const CampaignsPage = () => {
                       setFormData({ name: '', description: '', category: '', logoUrl: '', passwordProtected: false, password: '' });
                       clearLogo();
                     }}
-                    className="text-white/80 hover:text-white hover:bg-white/20 p-1 rounded-full transition-all flex-shrink-0"
+                    className="text-white/80 hover:text-white p-0.5 rounded"
                   >
-                    <X size={18} />
+                    <X size={16} />
                   </button>
                 </div>
               </div>
 
-              {/* SCROLLABLE CONTENT - ULTRA COMPACT */}
-              <div className="flex-1 overflow-y-auto px-3 py-2">
+              {/* SCROLLABLE CONTENT - EXTREME COMPACT */}
+              <div className="flex-1 overflow-y-auto px-2 py-1.5">
                 <form onSubmit={handleEdit} id="edit-campaign-form">
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     
-                    {/* Logo Upload - Compact */}
+                    {/* Logo - Inline compact */}
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Campaign Logo (Optional)
-                      </label>
-                      
-                      {logoPreview ? (
-                        <div className="relative border border-dashed border-gray-300 rounded p-2">
-                          <img 
-                            src={logoPreview} 
-                            alt="Logo preview" 
-                            className="h-16 w-auto mx-auto object-contain"
-                          />
-                          <button
-                            type="button"
-                            onClick={clearLogo}
-                            className="absolute top-1 right-1 p-0.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition"
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      ) : (
-                        <label className="flex flex-col items-center justify-center border border-dashed border-gray-300 rounded p-3 cursor-pointer hover:border-purple-500 transition">
-                          <ImageIcon className="text-gray-400 mb-1" size={20} />
-                          <span className="text-xs text-gray-600">Click to upload</span>
-                          <span className="text-xs text-gray-400">PNG, JPG up to 5MB</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleLogoSelect}
-                            className="hidden"
-                          />
-                        </label>
-                      )}
+                      <label className="block text-xs font-bold text-gray-700 mb-0.5">Logo</label>
+                      <div className="flex gap-1.5">
+                        {logoPreview ? (
+                          <div className="relative w-12 h-12 border border-gray-300 rounded flex-shrink-0">
+                            <img src={logoPreview} alt="Logo" className="w-full h-full object-contain" />
+                            <button
+                              type="button"
+                              onClick={clearLogo}
+                              className="absolute -top-1 -right-1 p-0.5 bg-red-500 text-white rounded-full"
+                            >
+                              <X size={10} />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="w-12 h-12 border border-dashed border-gray-300 rounded flex items-center justify-center cursor-pointer flex-shrink-0">
+                            <ImageIcon size={16} className="text-gray-400" />
+                            <input type="file" accept="image/*" onChange={handleLogoSelect} className="hidden" />
+                          </label>
+                        )}
+                        <span className="text-xs text-gray-500 flex items-center">Optional</span>
+                      </div>
                     </div>
 
-                    {/* Campaign Name - Compact */}
+                    {/* Name - Compact */}
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Campaign Name <span className="text-red-500">*</span>
+                      <label className="block text-xs font-bold text-gray-700 mb-0.5">
+                        Name <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-purple-500"
                         required
                       />
                     </div>
 
                     {/* Category - Compact */}
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Category
-                      </label>
+                      <label className="block text-xs font-bold text-gray-700 mb-0.5">Category</label>
                       <select
                         value={formData.category}
                         onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-purple-500"
                       >
-                        <option value="">Select a category</option>
+                        <option value="">Select</option>
                         {CAMPAIGN_CATEGORIES.map((category) => (
-                          <option key={category} value={category}>
-                            {category}
-                          </option>
+                          <option key={category} value={category}>{category}</option>
                         ))}
                       </select>
                     </div>
 
-                    {/* Description - Compact */}
+                    {/* Description - Single row */}
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Description
-                      </label>
+                      <label className="block text-xs font-bold text-gray-700 mb-0.5">Description</label>
                       <textarea
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500 resize-none"
-                        rows={2}
+                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 resize-none"
+                        rows={1}
                       />
                     </div>
 
-                    {/* PASSWORD PROTECTION - MINIMAL */}
-                    <div className="border-t border-gray-200 pt-2">
-                      <div className="bg-yellow-50 border border-yellow-200 rounded p-2">
-                        <div className="flex items-start gap-2 mb-2">
-                          <div className="w-6 h-6 bg-yellow-500 rounded flex items-center justify-center flex-shrink-0">
-                            {formData.passwordProtected ? <Lock size={12} className="text-white" /> : <Unlock size={12} className="text-white" />}
+                    {/* PASSWORD - ULTRA MINIMAL */}
+                    <div className="border-t border-gray-200 pt-1.5">
+                      <div className="bg-yellow-50 border border-yellow-200 rounded p-1.5">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <div className="w-5 h-5 bg-yellow-500 rounded flex items-center justify-center flex-shrink-0">
+                            {formData.passwordProtected ? <Lock size={10} className="text-white" /> : <Unlock size={10} className="text-white" />}
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-xs font-bold text-yellow-900 mb-0.5">
-                              🔒 Password Protection
-                            </h4>
-                            <p className="text-xs text-gray-600">
-                              {selectedCampaign.passwordProtected 
-                                ? 'Currently protected' 
-                                : 'Add password to restrict access'}
-                            </p>
-                          </div>
+                          <span className="text-xs font-bold text-yellow-900">🔒 Password</span>
                         </div>
 
-                        <label className="flex items-center gap-2 cursor-pointer mb-2">
+                        <label className="flex items-center gap-1.5 cursor-pointer mb-1">
                           <input
                             type="checkbox"
                             checked={formData.passwordProtected}
                             onChange={(e) => setFormData({ ...formData, passwordProtected: e.target.checked, password: e.target.checked ? formData.password : '' })}
-                            className="w-4 h-4 text-yellow-600 focus:ring-yellow-500 border-gray-300 rounded"
+                            className="w-3 h-3"
                           />
-                          <span className="text-xs font-semibold text-gray-800">
-                            Enable password protection
-                          </span>
+                          <span className="text-xs font-semibold">Enable protection</span>
                         </label>
 
                         {formData.passwordProtected && (
-                          <div className="space-y-1.5">
-                            <input
-                              type="text"
-                              value={formData.password}
-                              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-yellow-500 focus:border-yellow-500"
-                              placeholder={selectedCampaign.passwordProtected ? "Leave blank to keep current" : "Enter password (min 4 chars)"}
-                              required={formData.passwordProtected && !selectedCampaign.passwordProtected}
-                              minLength={formData.password ? 4 : 0}
-                            />
-                            <p className="text-xs text-gray-500">
-                              {selectedCampaign.passwordProtected 
-                                ? 'Only enter to change password' 
-                                : 'Share this with authorized users'}
-                            </p>
-                          </div>
-                        )}
-
-                        {!formData.passwordProtected && selectedCampaign.passwordProtected && (
-                          <div className="p-1.5 bg-red-50 border border-red-200 rounded mt-1.5">
-                            <p className="text-xs text-red-800">
-                              <strong>⚠️</strong> Disabling makes campaign public
-                            </p>
-                          </div>
+                          <input
+                            type="text"
+                            value={formData.password}
+                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                            className="w-full px-1.5 py-0.5 text-xs border border-gray-300 rounded"
+                            placeholder={selectedCampaign.passwordProtected ? "Leave blank to keep" : "Min 4 chars"}
+                            required={formData.passwordProtected && !selectedCampaign.passwordProtected}
+                            minLength={formData.password ? 4 : 0}
+                          />
                         )}
                       </div>
                     </div>
@@ -1030,9 +986,9 @@ const CampaignsPage = () => {
                 </form>
               </div>
 
-              {/* FIXED FOOTER - ALWAYS VISIBLE */}
-              <div className="flex-shrink-0 bg-gray-50 px-3 py-2 rounded-b-lg sm:rounded-b-xl border-t border-gray-200">
-                <div className="flex gap-2">
+              {/* FIXED FOOTER - MINIMAL */}
+              <div className="flex-shrink-0 bg-gray-50 px-2 py-1.5 rounded-b-lg border-t border-gray-200">
+                <div className="flex gap-1.5">
                   <button
                     type="button"
                     onClick={() => {
@@ -1041,7 +997,7 @@ const CampaignsPage = () => {
                       setFormData({ name: '', description: '', category: '', logoUrl: '', passwordProtected: false, password: '' });
                       clearLogo();
                     }}
-                    className="flex-1 px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded text-sm font-semibold hover:bg-gray-50 transition-all disabled:opacity-50"
+                    className="flex-1 px-2 py-1.5 bg-white border border-gray-300 text-gray-700 rounded text-xs font-semibold"
                     disabled={uploadingLogo}
                   >
                     Cancel
@@ -1050,7 +1006,7 @@ const CampaignsPage = () => {
                     type="submit"
                     form="edit-campaign-form"
                     disabled={uploadingLogo}
-                    className="flex-1 px-3 py-2 bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded text-sm font-semibold hover:from-purple-700 hover:to-violet-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 px-2 py-1.5 bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded text-xs font-semibold disabled:opacity-50"
                   >
                     {uploadingLogo ? 'Uploading...' : 'Save'}
                   </button>
@@ -1059,7 +1015,6 @@ const CampaignsPage = () => {
             </div>
           </div>
         )}
-
 
 
 
