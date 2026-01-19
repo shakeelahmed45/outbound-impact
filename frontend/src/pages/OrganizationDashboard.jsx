@@ -15,7 +15,7 @@ const OrganizationDashboard = () => {
     storageLimit: 10737418240, // 250GB default for small org
     qrCodesGenerated: 0,
     teamMembers: 0,
-    campaigns: 0,
+    streams: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -68,7 +68,7 @@ const OrganizationDashboard = () => {
       color: 'from-blue-500 to-blue-600',
     },
     {
-      title: 'Campaigns',
+      title: 'Streams',
       value: stats.campaigns,
       icon: Folder,
       color: 'from-pink-500 to-pink-600',
@@ -177,7 +177,7 @@ const OrganizationDashboard = () => {
             className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center"
           >
             <Folder className="mx-auto mb-2 text-primary" size={24} />
-            <span className="text-sm font-semibold text-gray-700">Campaigns</span>
+            <span className="text-sm font-semibold text-gray-700">Streams</span>
           </button>
           <button 
             onClick={() => navigate('/dashboard/upload')}

@@ -154,7 +154,7 @@ const Dashboard = () => {
             <p className="text-3xl font-bold text-primary mb-1">{stats?.totalQRCodes || 0}</p>
             <p className="text-sm text-gray-600 flex items-center gap-1">
               QR Codes Generated
-              <Tooltip content="Number of QR codes generated for campaigns" iconSize={14} />
+              <Tooltip content="Number of QR codes generated for Streams" iconSize={14} />
             </p>
           </div>
           
@@ -164,10 +164,10 @@ const Dashboard = () => {
                 <Folder size={24} className="text-white" />
               </div>
             </div>
-            <p className="text-3xl font-bold text-primary mb-1">{stats?.totalCampaigns || 0}</p>
+            <p className="text-3xl font-bold text-primary mb-1">{stats?.totalstreamss || 0}</p>
             <p className="text-sm text-gray-600 flex items-center gap-1">
-              Active Campaigns
-              <Tooltip content="Number of campaigns you've created" iconSize={14} />
+              Active Streamss
+              <Tooltip content="Number of streams you've created" iconSize={14} />
             </p>
           </div>
         </div>
@@ -271,7 +271,7 @@ const Dashboard = () => {
               className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center"
             >
               <Folder className="mx-auto mb-2 text-primary" size={24} />
-              <span className="text-sm font-semibold text-gray-700">Campaigns</span>
+              <span className="text-sm font-semibold text-gray-700">Streams</span>
             </button>
 
             {/* ✅ FIXED: Enterprise-Only Quick Actions - HIDDEN for VIEWERS */}
