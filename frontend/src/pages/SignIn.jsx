@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 import api from '../services/api';
 import useAuthStore from '../store/authStore';
 
@@ -13,6 +13,9 @@ const SignIn = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Show password state
+  const [showPassword, setShowPassword] = useState(false);
   
   // 2FA state
   const [requires2FA, setRequires2FA] = useState(false);
@@ -131,7 +134,7 @@ const SignIn = () => {
               </div>
             )}
 
-            {/* Password field - hide if 2FA is active */}
+            {/* Password field with show/hide toggle - hide if 2FA is active */}
             {!requires2FA && (
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -145,15 +148,29 @@ const SignIn = () => {
                     Forgot Password?
                   </Link>
                 </div>
-                <input
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                  placeholder="••••••••"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                    placeholder="••••••••"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <EyeOff size={20} />
+                    ) : (
+                      <Eye size={20} />
+                    )}
+                  </button>
+                </div>
               </div>
             )}
 
