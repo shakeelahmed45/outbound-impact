@@ -62,15 +62,15 @@ const ItemsPage = () => {
         setCampaigns(response.data.campaigns);
       }
     } catch (error) {
-      console.error('Failed to fetch campaigns:', error);
+      console.error('Failed to fetch streams:', error);
     }
   };
 
   // ✅ RESTORED: Get campaign name by ID
   const getCampaignName = (campaignId) => {
-    if (!campaignId) return 'No Campaign';
+    if (!campaignId) return 'No Stream';
     const campaign = campaigns.find(c => c.id === campaignId);
-    return campaign ? campaign.name : 'Unknown Campaign';
+    return campaign ? campaign.name : 'Unknown Stream';
   };
 
   const handleEditClick = (item) => {

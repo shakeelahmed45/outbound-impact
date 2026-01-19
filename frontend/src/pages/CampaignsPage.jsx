@@ -132,7 +132,7 @@ const CampaignsPage = () => {
 
       const uploadData = {
         title: `Stream Logo - ${Date.now()}`,
-        description: 'Campaign logo image',
+        description: 'Stream logo image',
         type: 'IMAGE',
         fileData: base64Data,
         fileName: logoFile.name,
