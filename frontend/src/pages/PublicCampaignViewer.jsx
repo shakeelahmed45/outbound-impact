@@ -419,7 +419,7 @@ const PublicCampaignViewer = () => {
           
           // ✅ NEW: Check if campaign requires password
           if (campaignData.requiresPassword || campaignData.passwordProtected) {
-            console.log('Campaign requires password');
+            console.log('🔒 Campaign requires password');
             setRequiresPassword(true);
             setCampaign(campaignData);
             setLoading(false);
@@ -429,7 +429,7 @@ const PublicCampaignViewer = () => {
           setCampaign(campaignData);
         }
       } catch (err) {
-        setError('Stream not found');
+        setError('Campaign not found');
       } finally {
         setLoading(false);
       }
@@ -930,7 +930,7 @@ const PublicCampaignViewer = () => {
                 <Lock size={40} className="text-white" />
               </div>
             )}
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">{campaign?.name || 'Protected Stream'}</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">{campaign?.name || 'Protected Campaign'}</h1>
             {campaign?.description && (
               <p className="text-gray-600">{campaign.description}</p>
             )}
@@ -943,7 +943,7 @@ const PublicCampaignViewer = () => {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Password Required</h2>
-                <p className="text-sm text-gray-600">This stream is protected</p>
+                <p className="text-sm text-gray-600">This campaign is protected</p>
               </div>
             </div>
 
@@ -1006,7 +1006,7 @@ const PublicCampaignViewer = () => {
                 ) : (
                   <>
                     <Lock size={20} />
-                    <span>Unlock Stream</span>
+                    <span>Unlock Campaign</span>
                   </>
                 )}
               </button>
@@ -1014,7 +1014,7 @@ const PublicCampaignViewer = () => {
 
             <div className="mt-6 pt-6 border-t border-gray-200">
               <p className="text-xs text-gray-500 text-center">
-                Don't have the password? Contact the stream owner to get access.
+                Don't have the password? Contact the campaign owner to get access.
               </p>
             </div>
           </div>
@@ -1044,8 +1044,8 @@ const PublicCampaignViewer = () => {
           <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <span className="text-4xl">❌</span>
           </div>
-          <h1 className="text-3xl font-bold text-primary mb-4">Stream Not Found</h1>
-          <p className="text-secondary mb-6">The stream you are looking for does not exist.</p>
+          <h1 className="text-3xl font-bold text-primary mb-4">Campaign Not Found</h1>
+          <p className="text-secondary mb-6">The campaign you are looking for does not exist.</p>
         </div>
       </div>
     );
@@ -1061,7 +1061,7 @@ const PublicCampaignViewer = () => {
             className="mb-6 flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow-md hover:shadow-lg transition-all text-primary font-semibold"
           >
             <ArrowLeft size={20} />
-            <span>Back to Streams</span>
+            <span>Back to Campaigns</span>
           </button>
         )}
         
@@ -1075,13 +1075,13 @@ const PublicCampaignViewer = () => {
           
           {/* Content Container */}
           <div className="relative z-10 p-6 sm:p-8">
-            {/* Logo Section with white background card */}
+            {/* Logo Section with white background card - DOUBLED SIZE */}
             {campaign.logoUrl && (
               <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 mb-6 shadow-lg inline-block">
                 <img 
                   src={campaign.logoUrl} 
                   alt={`${campaign.name} logo`}
-                  className="h-20 sm:h-24 md:h-32 lg:h-40 w-auto object-contain max-w-full"
+                  className="h-40 sm:h-48 md:h-64 lg:h-80 w-auto object-contain max-w-full"
                 />
               </div>
             )}
@@ -1183,7 +1183,7 @@ const PublicCampaignViewer = () => {
               <Folder className="text-primary" size={40} />
             </div>
             <h2 className="text-2xl font-bold text-primary mb-4">No Items Yet</h2>
-            <p className="text-secondary">This stream doesn't have any content yet.</p>
+            <p className="text-secondary">This campaign doesn't have any content yet.</p>
           </div>
         )}
       </div>

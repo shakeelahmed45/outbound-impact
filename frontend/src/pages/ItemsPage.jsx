@@ -62,15 +62,15 @@ const ItemsPage = () => {
         setCampaigns(response.data.campaigns);
       }
     } catch (error) {
-      console.error('Failed to fetch streams:', error);
+      console.error('Failed to fetch campaigns:', error);
     }
   };
 
   // ✅ RESTORED: Get campaign name by ID
   const getCampaignName = (campaignId) => {
-    if (!campaignId) return 'No Stream';
+    if (!campaignId) return 'No Campaign';
     const campaign = campaigns.find(c => c.id === campaignId);
-    return campaign ? campaign.name : 'Unknown Stream';
+    return campaign ? campaign.name : 'Unknown Campaign';
   };
 
   const handleEditClick = (item) => {
@@ -187,7 +187,7 @@ const ItemsPage = () => {
   const getTypeIcon = (type) => {
     switch (type) {
       case 'IMAGE': return <Image size={20} className="text-blue-500" />;
-      case 'VIDEO': return <Video size={20} className="text-purple-500" />;
+      case 'VIDEO': return <Video size={20} className="text-red-500" />;
       case 'AUDIO': return <Music size={20} className="text-green-500" />;
       case 'TEXT': return <FileText size={20} className="text-orange-500" />;
       case 'EMBED': return <Link size={20} className="text-pink-500" />;
