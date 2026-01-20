@@ -66,14 +66,14 @@ const ItemsPage = () => {
         setCampaigns(response.data.campaigns);
       }
     } catch (error) {
-      console.error('Failed to fetch campaigns:', error);
+      console.error('Failed to fetch streams:', error);
     }
   };
 
   const getCampaignName = (campaignId) => {
-    if (!campaignId) return 'No Campaign';
+    if (!campaignId) return 'No Stream';
     const campaign = campaigns.find(c => c.id === campaignId);
-    return campaign ? campaign.name : 'Unknown Campaign';
+    return campaign ? campaign.name : 'Unknown Stream';
   };
 
   const handleEditClick = (item) => {
@@ -181,7 +181,7 @@ const ItemsPage = () => {
         updateData.buttonUrl = editFormData.buttonUrl || null;
       }
 
-      // ✅ RESTORED: Handle thumbnail upload
+      // ✅ FIXED: Handle thumbnail upload with correct endpoint
       if (thumbnailFile) {
         setUploadingThumbnail(true);
         const reader = new FileReader();
@@ -189,8 +189,7 @@ const ItemsPage = () => {
         await new Promise((resolve, reject) => {
           reader.onload = async (e) => {
             try {
-              const thumbnailResponse = await api.post('/upload/thumbnail', {
-                itemId: editingItem.id,
+              const thumbnailResponse = await api.post(`/items/${editingItem.id}/thumbnail`, {
                 thumbnailData: e.target.result,
               });
 
@@ -254,7 +253,7 @@ const ItemsPage = () => {
   const getTypeIcon = (type) => {
     switch (type) {
       case 'IMAGE': return <Image size={20} className="text-blue-500" />;
-      case 'VIDEO': return <Video size={20} className="text-purple-500" />;
+      case 'VIDEO': return <Video size={20} className="text-red-500" />;
       case 'AUDIO': return <Music size={20} className="text-green-500" />;
       case 'TEXT': return <FileText size={20} className="text-orange-500" />;
       case 'EMBED': return <Link size={20} className="text-pink-500" />;
@@ -385,7 +384,7 @@ const ItemsPage = () => {
                     </p>
                   )}
 
-                  {/* Campaign Info */}
+                  {/* Stream Info */}
                   <div className="mb-3 flex items-center gap-2 text-sm text-gray-600">
                     <Folder size={16} className="text-primary" />
                     <span className="font-medium truncate">
@@ -459,62 +458,62 @@ const ItemsPage = () => {
           </div>
         )}
 
-        {/* Edit Modal */}
+        {/* ✅ FIXED: Edit Modal - Ultra Compact Design */}
         {showEditModal && editingItem && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
               {/* Header */}
-              <div className="bg-gradient-to-r from-primary to-secondary p-6 text-white">
+              <div className="bg-gradient-to-r from-primary to-secondary p-4 text-white">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold">Edit Item</h2>
+                  <h2 className="text-xl font-bold">Edit Item</h2>
                   <button
                     onClick={() => setShowEditModal(false)}
                     className="p-2 hover:bg-white/20 rounded-lg transition"
                   >
-                    <X size={24} />
+                    <X size={20} />
                   </button>
                 </div>
               </div>
 
               {/* Form */}
-              <div className="p-6 space-y-6">
-                {/* ✅ RESTORED: Thumbnail Upload Section */}
-                <div className="border-t border-gray-200 pt-6">
-                  <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-xl p-6">
-                    <div className="flex items-start gap-3 mb-4">
+              <div className="p-4 space-y-4">
+                {/* ✅ COMPACT: Thumbnail Upload Section */}
+                <div className="border-t border-gray-200 pt-4">
+                  <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-xl p-4">
+                    <div className="flex items-start gap-2 mb-3">
                       <div className="flex-shrink-0">
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
-                          <Image size={24} className="text-white" />
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
+                          <Image size={20} className="text-white" />
                         </div>
                       </div>
                       <div className="flex-1">
-                        <h4 className="text-lg font-bold text-blue-600 mb-2">
+                        <h4 className="text-base font-bold text-blue-600 mb-1">
                           🖼️ Custom Thumbnail
                         </h4>
-                        <p className="text-sm text-gray-600 mb-4">
-                          Upload a custom thumbnail image to represent this content. Max 5MB.
+                        <p className="text-xs text-gray-600 mb-3">
+                          Upload a custom thumbnail image. Max 5MB.
                         </p>
                       </div>
                     </div>
 
                     {/* Current/Preview Thumbnail */}
                     {thumbnailPreview && (
-                      <div className="mb-4">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      <div className="mb-3">
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
                           Current Thumbnail:
                         </label>
                         <div className="relative inline-block">
                           <img 
                             src={thumbnailPreview} 
                             alt="Thumbnail preview"
-                            className="w-48 h-48 object-cover rounded-lg border-2 border-blue-300"
+                            className="w-32 h-32 object-cover rounded-lg border-2 border-blue-300"
                           />
                           <button
                             type="button"
                             onClick={handleRemoveThumbnail}
                             className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition"
                           >
-                            <X size={16} />
+                            <X size={14} />
                           </button>
                         </div>
                       </div>
@@ -522,9 +521,9 @@ const ItemsPage = () => {
 
                     {/* Upload Button */}
                     <div>
-                      <label className="cursor-pointer inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg font-semibold hover:shadow-lg transition-all">
-                        <Upload size={18} />
-                        <span>{thumbnailPreview ? 'Change Thumbnail' : 'Upload Thumbnail'}</span>
+                      <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg font-semibold hover:shadow-lg transition-all text-sm">
+                        <Upload size={16} />
+                        <span>{thumbnailPreview ? 'Change' : 'Upload'}</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -532,8 +531,8 @@ const ItemsPage = () => {
                           className="hidden"
                         />
                       </label>
-                      <p className="text-xs text-gray-500 mt-2">
-                        Accepted: JPG, PNG, GIF, WebP (Max 5MB)
+                      <p className="text-xs text-gray-500 mt-1">
+                        JPG, PNG, GIF, WebP (Max 5MB)
                       </p>
                     </div>
                   </div>
@@ -541,28 +540,28 @@ const ItemsPage = () => {
 
                 {/* Title */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
                     Title *
                   </label>
                   <input
                     type="text"
                     value={editFormData.title}
                     onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
                     placeholder="Enter title"
                   />
                 </div>
 
                 {/* Description */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
                     Description (Optional)
                   </label>
                   <textarea
                     value={editFormData.description}
                     onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
-                    rows={3}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none text-sm"
                     placeholder="Add a description"
                   />
                 </div>
@@ -571,43 +570,43 @@ const ItemsPage = () => {
                 {editingItem.type === 'TEXT' && (
                   <>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Content
                       </label>
                       <textarea
                         value={editFormData.content}
                         onChange={(e) => setEditFormData({ ...editFormData, content: e.target.value })}
-                        rows={10}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+                        rows={6}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none text-sm"
                         placeholder="Write your content here..."
                       />
                     </div>
 
                     {/* Button fields for TEXT */}
-                    <div className="border-t border-gray-200 pt-6">
-                      <h4 className="text-lg font-bold text-gray-900 mb-4">Custom Button</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="border-t border-gray-200 pt-4">
+                      <h4 className="text-base font-bold text-gray-900 mb-3">Custom Button</h4>
+                      <div className="grid grid-cols-1 gap-3">
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          <label className="block text-sm font-semibold text-gray-700 mb-1">
                             Button Text
                           </label>
                           <input
                             type="text"
                             value={editFormData.buttonText}
                             onChange={(e) => setEditFormData({ ...editFormData, buttonText: e.target.value })}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
                             placeholder="e.g., Visit Website"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          <label className="block text-sm font-semibold text-gray-700 mb-1">
                             Button URL
                           </label>
                           <input
                             type="url"
                             value={editFormData.buttonUrl}
                             onChange={(e) => setEditFormData({ ...editFormData, buttonUrl: e.target.value })}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
                             placeholder="https://example.com"
                           />
                         </div>
@@ -617,32 +616,32 @@ const ItemsPage = () => {
                 )}
 
                 {/* Sharing Control */}
-                <div className="border-t border-gray-200 pt-6">
-                  <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-6">
-                    <div className="flex items-start gap-3 mb-4">
+                <div className="border-t border-gray-200 pt-4">
+                  <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-4">
+                    <div className="flex items-start gap-2 mb-3">
                       <div className="flex-shrink-0">
-                        <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+                        <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
                           {editFormData.sharingEnabled ? (
-                            <Share2 size={24} className="text-white" />
+                            <Share2 size={20} className="text-white" />
                           ) : (
-                            <Lock size={24} className="text-white" />
+                            <Lock size={20} className="text-white" />
                           )}
                         </div>
                       </div>
                       <div className="flex-1">
-                        <h4 className="text-lg font-bold text-indigo-600 mb-2">
+                        <h4 className="text-base font-bold text-indigo-600 mb-1">
                           Sharing Control
                         </h4>
-                        <p className="text-sm text-gray-600 mb-4">
-                          Choose who can share this content. This gives you control over how your content spreads.
+                        <p className="text-xs text-gray-600 mb-3">
+                          Choose who can share this content.
                         </p>
                       </div>
                     </div>
 
                     {/* Toggle Options */}
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <label 
-                        className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                        className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
                           !editFormData.sharingEnabled 
                             ? 'border-indigo-500 bg-white shadow-md' 
                             : 'border-gray-200 bg-white hover:border-indigo-300'
@@ -653,21 +652,21 @@ const ItemsPage = () => {
                           name="sharing-edit"
                           checked={!editFormData.sharingEnabled}
                           onChange={() => setEditFormData({ ...editFormData, sharingEnabled: false })}
-                          className="mt-1 w-5 h-5 text-indigo-600 focus:ring-indigo-500"
+                          className="mt-0.5 w-4 h-4 text-indigo-600 focus:ring-indigo-500"
                         />
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <Lock size={18} className="text-indigo-600" />
-                            <span className="font-bold text-gray-900">🔒 Keep within our community</span>
+                            <Lock size={16} className="text-indigo-600" />
+                            <span className="font-bold text-gray-900 text-sm">🔒 Keep within our community</span>
                           </div>
-                          <p className="text-sm text-gray-600">
-                            Only people with the link can view this content. Share button will be hidden.
+                          <p className="text-xs text-gray-600">
+                            Only people with the link can view. Share button hidden.
                           </p>
                         </div>
                       </label>
 
                       <label 
-                        className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                        className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
                           editFormData.sharingEnabled 
                             ? 'border-indigo-500 bg-white shadow-md' 
                             : 'border-gray-200 bg-white hover:border-indigo-300'
@@ -678,15 +677,15 @@ const ItemsPage = () => {
                           name="sharing-edit"
                           checked={editFormData.sharingEnabled}
                           onChange={() => setEditFormData({ ...editFormData, sharingEnabled: true })}
-                          className="mt-1 w-5 h-5 text-indigo-600 focus:ring-indigo-500"
+                          className="mt-0.5 w-4 h-4 text-indigo-600 focus:ring-indigo-500"
                         />
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <Share2 size={18} className="text-indigo-600" />
-                            <span className="font-bold text-gray-900">🔁 Allow others to share this</span>
+                            <Share2 size={16} className="text-indigo-600" />
+                            <span className="font-bold text-gray-900 text-sm">🔁 Allow others to share</span>
                           </div>
-                          <p className="text-sm text-gray-600">
-                            Viewers can share this content via social media, WhatsApp, email, etc.
+                          <p className="text-xs text-gray-600">
+                            Viewers can share via social media, email, etc.
                           </p>
                         </div>
                       </label>
@@ -695,36 +694,39 @@ const ItemsPage = () => {
                 </div>
               </div>
 
-              {/* Footer */}
-              <div className="border-t border-gray-200 p-6 bg-gray-50 flex gap-4">
-                <button
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setThumbnailFile(null);
-                    setThumbnailPreview(null);
-                  }}
-                  className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-100 transition"
-                  disabled={saving || uploadingThumbnail}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveEdit}
-                  disabled={saving || uploadingThumbnail}
-                  className="flex-1 gradient-btn text-white px-6 py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {saving || uploadingThumbnail ? (
-                    <>
-                      <Loader2 className="animate-spin" size={20} />
-                      {uploadingThumbnail ? 'Uploading thumbnail...' : 'Saving...'}
-                    </>
-                  ) : (
-                    <>
-                      <Save size={20} />
-                      Save Changes
-                    </>
-                  )}
-                </button>
+              {/* ✅ COMPACT: Footer */}
+              <div className="border-t border-gray-200 p-3 bg-gray-50">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setShowEditModal(false);
+                      setThumbnailFile(null);
+                      setThumbnailPreview(null);
+                    }}
+                    className="flex-1 px-3 py-2 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-100 transition text-sm"
+                    disabled={saving || uploadingThumbnail}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveEdit}
+                    disabled={saving || uploadingThumbnail}
+                    className="flex-1 gradient-btn text-white px-3 py-2 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                  >
+                    {saving || uploadingThumbnail ? (
+                      <>
+                        <Loader2 className="animate-spin" size={16} />
+                        <span className="hidden sm:inline">{uploadingThumbnail ? 'Uploading...' : 'Saving...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save size={16} />
+                        <span className="hidden sm:inline">Save Changes</span>
+                        <span className="sm:hidden">Save</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
