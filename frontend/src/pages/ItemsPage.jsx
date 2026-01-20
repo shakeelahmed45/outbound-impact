@@ -476,7 +476,7 @@ const ItemsPage = () => {
               </div>
 
               {/* Form */}
-              <div className="p-4 space-y-4">
+              <div className="p-4 space-y-4 pb-24">
                 {/* ✅ COMPACT: Thumbnail Upload Section */}
                 <div className="border-t border-gray-200 pt-4">
                   <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-xl p-4">
