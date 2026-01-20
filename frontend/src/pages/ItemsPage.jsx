@@ -461,9 +461,9 @@ const ItemsPage = () => {
         {/* ✅ FIXED: Edit Modal - Ultra Compact Design */}
         {showEditModal && editingItem && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-              {/* Header */}
-              <div className="bg-gradient-to-r from-primary to-secondary p-4 text-white">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden">
+              {/* Header - Fixed at Top */}
+              <div className="flex-shrink-0 bg-gradient-to-r from-primary to-secondary p-4 text-white">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-bold">Edit Item</h2>
                   <button
@@ -475,8 +475,8 @@ const ItemsPage = () => {
                 </div>
               </div>
 
-              {/* Form */}
-              <div className="p-4 space-y-4 pb-24">
+              {/* Form - Scrollable Content */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {/* ✅ COMPACT: Thumbnail Upload Section */}
                 <div className="border-t border-gray-200 pt-4">
                   <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-xl p-4">
@@ -694,8 +694,8 @@ const ItemsPage = () => {
                 </div>
               </div>
 
-              {/* ✅ COMPACT: Footer */}
-              <div className="border-t border-gray-200 p-3 bg-gray-50">
+              {/* ✅ STICKY: Footer - Always Visible */}
+              <div className="flex-shrink-0 border-t border-gray-200 p-3 bg-gray-50">
                 <div className="flex gap-2">
                   <button
                     onClick={() => {
