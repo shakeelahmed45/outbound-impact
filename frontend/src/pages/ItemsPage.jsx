@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Image, Video, Music, FileText, Link, Trash2, Edit, Eye, BarChart3, 
-  Download, Search, Filter, X, Loader2, Share2, Lock, ExternalLink, Paperclip, Save, Folder
+  Download, Search, Filter, X, Loader2, Share2, Lock, ExternalLink, Paperclip, Save, Folder, Upload
 } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import api from '../services/api';
@@ -15,7 +15,7 @@ const ItemsPage = () => {
   const { toasts, showToast, removeToast } = useToast();
   
   const [items, setItems] = useState([]);
-  const [campaigns, setCampaigns] = useState([]); // ✅ RESTORED: Campaign list
+  const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('ALL');
@@ -33,10 +33,15 @@ const ItemsPage = () => {
   });
   const [saving, setSaving] = useState(false);
 
+  // ✅ RESTORED: Thumbnail upload state
+  const [thumbnailFile, setThumbnailFile] = useState(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState(null);
+  const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
+
   useEffect(() => {
     document.title = 'My Items | Outbound Impact';
     fetchItems();
-    fetchCampaigns(); // ✅ RESTORED: Fetch campaigns
+    fetchCampaigns();
   }, []);
 
   const fetchItems = async () => {
@@ -54,7 +59,6 @@ const ItemsPage = () => {
     }
   };
 
-  // ✅ RESTORED: Fetch campaigns function
   const fetchCampaigns = async () => {
     try {
       const response = await api.get('/campaigns');
@@ -62,15 +66,14 @@ const ItemsPage = () => {
         setCampaigns(response.data.campaigns);
       }
     } catch (error) {
-      console.error('Failed to fetch streams:', error);
+      console.error('Failed to fetch campaigns:', error);
     }
   };
 
-  // ✅ RESTORED: Get campaign name by ID
   const getCampaignName = (campaignId) => {
-    if (!campaignId) return 'No Stream';
+    if (!campaignId) return 'No Campaign';
     const campaign = campaigns.find(c => c.id === campaignId);
-    return campaign ? campaign.name : 'Unknown Stream';
+    return campaign ? campaign.name : 'Unknown Campaign';
   };
 
   const handleEditClick = (item) => {
@@ -83,7 +86,43 @@ const ItemsPage = () => {
       buttonText: item.buttonText || '',
       buttonUrl: item.buttonUrl || '',
     });
+    // ✅ RESTORED: Set existing thumbnail preview
+    setThumbnailPreview(item.thumbnailUrl || null);
+    setThumbnailFile(null);
     setShowEditModal(true);
+  };
+
+  // ✅ RESTORED: Handle thumbnail file selection
+  const handleThumbnailChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      showToast('Please select an image file', 'error');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Image must be less than 5MB', 'error');
+      return;
+    }
+
+    setThumbnailFile(file);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setThumbnailPreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // ✅ RESTORED: Remove thumbnail
+  const handleRemoveThumbnail = () => {
+    setThumbnailFile(null);
+    setThumbnailPreview(null);
   };
 
   // Quick toggle sharing without opening edit modal
@@ -96,7 +135,6 @@ const ItemsPage = () => {
       });
 
       if (response.data.status === 'success') {
-        // Update local state
         setItems(items.map(i => 
           i.id === item.id 
             ? { ...i, sharingEnabled: newSharingValue }
@@ -118,7 +156,6 @@ const ItemsPage = () => {
       return;
     }
 
-    // Validate button fields
     if (editFormData.buttonText && !editFormData.buttonUrl) {
       showToast('Please enter button URL', 'error');
       return;
@@ -144,10 +181,37 @@ const ItemsPage = () => {
         updateData.buttonUrl = editFormData.buttonUrl || null;
       }
 
+      // ✅ RESTORED: Handle thumbnail upload
+      if (thumbnailFile) {
+        setUploadingThumbnail(true);
+        const reader = new FileReader();
+        
+        await new Promise((resolve, reject) => {
+          reader.onload = async (e) => {
+            try {
+              const thumbnailResponse = await api.post('/upload/thumbnail', {
+                itemId: editingItem.id,
+                thumbnailData: e.target.result,
+              });
+
+              if (thumbnailResponse.data.status === 'success') {
+                updateData.thumbnailUrl = thumbnailResponse.data.thumbnailUrl;
+              }
+              resolve();
+            } catch (error) {
+              reject(error);
+            }
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(thumbnailFile);
+        });
+        
+        setUploadingThumbnail(false);
+      }
+
       const response = await api.put(`/items/${editingItem.id}`, updateData);
 
       if (response.data.status === 'success') {
-        // Update local state
         setItems(items.map(item => 
           item.id === editingItem.id 
             ? { ...item, ...response.data.item }
@@ -157,12 +221,15 @@ const ItemsPage = () => {
         showToast('Item updated successfully!', 'success');
         setShowEditModal(false);
         setEditingItem(null);
+        setThumbnailFile(null);
+        setThumbnailPreview(null);
       }
     } catch (error) {
       console.error('Failed to update item:', error);
       showToast(error.response?.data?.message || 'Failed to update item', 'error');
     } finally {
       setSaving(false);
+      setUploadingThumbnail(false);
     }
   };
 
@@ -219,7 +286,6 @@ const ItemsPage = () => {
         {/* Search and Filter */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
               <input
@@ -231,7 +297,6 @@ const ItemsPage = () => {
               />
             </div>
 
-            {/* Filter */}
             <div className="relative">
               <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
               <select
@@ -320,7 +385,7 @@ const ItemsPage = () => {
                     </p>
                   )}
 
-                  {/* ✅ RESTORED: Campaign Info */}
+                  {/* Campaign Info */}
                   <div className="mb-3 flex items-center gap-2 text-sm text-gray-600">
                     <Folder size={16} className="text-primary" />
                     <span className="font-medium truncate">
@@ -413,6 +478,67 @@ const ItemsPage = () => {
 
               {/* Form */}
               <div className="p-6 space-y-6">
+                {/* ✅ RESTORED: Thumbnail Upload Section */}
+                <div className="border-t border-gray-200 pt-6">
+                  <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-xl p-6">
+                    <div className="flex items-start gap-3 mb-4">
+                      <div className="flex-shrink-0">
+                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
+                          <Image size={24} className="text-white" />
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-lg font-bold text-blue-600 mb-2">
+                          🖼️ Custom Thumbnail
+                        </h4>
+                        <p className="text-sm text-gray-600 mb-4">
+                          Upload a custom thumbnail image to represent this content. Max 5MB.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Current/Preview Thumbnail */}
+                    {thumbnailPreview && (
+                      <div className="mb-4">
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Current Thumbnail:
+                        </label>
+                        <div className="relative inline-block">
+                          <img 
+                            src={thumbnailPreview} 
+                            alt="Thumbnail preview"
+                            className="w-48 h-48 object-cover rounded-lg border-2 border-blue-300"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleRemoveThumbnail}
+                            className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Upload Button */}
+                    <div>
+                      <label className="cursor-pointer inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg font-semibold hover:shadow-lg transition-all">
+                        <Upload size={18} />
+                        <span>{thumbnailPreview ? 'Change Thumbnail' : 'Upload Thumbnail'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleThumbnailChange}
+                          className="hidden"
+                        />
+                      </label>
+                      <p className="text-xs text-gray-500 mt-2">
+                        Accepted: JPG, PNG, GIF, WebP (Max 5MB)
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Title */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -515,7 +641,6 @@ const ItemsPage = () => {
 
                     {/* Toggle Options */}
                     <div className="space-y-3">
-                      {/* Option 1: Keep within community */}
                       <label 
                         className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
                           !editFormData.sharingEnabled 
@@ -541,7 +666,6 @@ const ItemsPage = () => {
                         </div>
                       </label>
 
-                      {/* Option 2: Allow sharing */}
                       <label 
                         className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
                           editFormData.sharingEnabled 
@@ -574,21 +698,25 @@ const ItemsPage = () => {
               {/* Footer */}
               <div className="border-t border-gray-200 p-6 bg-gray-50 flex gap-4">
                 <button
-                  onClick={() => setShowEditModal(false)}
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setThumbnailFile(null);
+                    setThumbnailPreview(null);
+                  }}
                   className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-100 transition"
-                  disabled={saving}
+                  disabled={saving || uploadingThumbnail}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSaveEdit}
-                  disabled={saving}
+                  disabled={saving || uploadingThumbnail}
                   className="flex-1 gradient-btn text-white px-6 py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {saving ? (
+                  {saving || uploadingThumbnail ? (
                     <>
                       <Loader2 className="animate-spin" size={20} />
-                      Saving...
+                      {uploadingThumbnail ? 'Uploading thumbnail...' : 'Saving...'}
                     </>
                   ) : (
                     <>
