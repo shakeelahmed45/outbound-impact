@@ -461,7 +461,7 @@ const ItemsPage = () => {
         {/* ✅ FIXED: Edit Modal - Ultra Compact Design */}
         {showEditModal && editingItem && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[75vh] flex flex-col overflow-hidden">
               {/* Header - Fixed at Top */}
               <div className="flex-shrink-0 bg-gradient-to-r from-primary to-secondary p-4 text-white">
                 <div className="flex items-center justify-between">
@@ -488,7 +488,7 @@ const ItemsPage = () => {
                       </div>
                       <div className="flex-1">
                         <h4 className="text-base font-bold text-blue-600 mb-1">
-                          🖼️ Custom Thumbnail
+                           Custom Thumbnail
                         </h4>
                         <p className="text-xs text-gray-600 mb-3">
                           Upload a custom thumbnail image. Max 5MB.
@@ -617,7 +617,7 @@ const ItemsPage = () => {
 
                 {/* Sharing Control */}
                 <div className="border-t border-gray-200 pt-4">
-                  <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-4">
+                  <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-3">
                     <div className="flex items-start gap-2 mb-3">
                       <div className="flex-shrink-0">
                         <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
@@ -632,7 +632,7 @@ const ItemsPage = () => {
                         <h4 className="text-base font-bold text-indigo-600 mb-1">
                           Sharing Control
                         </h4>
-                        <p className="text-xs text-gray-600 mb-3">
+                        <p className="text-xs text-gray-600 mb-2">
                           Choose who can share this content.
                         </p>
                       </div>
@@ -641,7 +641,7 @@ const ItemsPage = () => {
                     {/* Toggle Options */}
                     <div className="space-y-2">
                       <label 
-                        className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                        className={`flex items-start gap-2 p-2 rounded-xl border-2 cursor-pointer transition-all ${
                           !editFormData.sharingEnabled 
                             ? 'border-indigo-500 bg-white shadow-md' 
                             : 'border-gray-200 bg-white hover:border-indigo-300'
@@ -666,7 +666,7 @@ const ItemsPage = () => {
                       </label>
 
                       <label 
-                        className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                        className={`flex items-start gap-2 p-2 rounded-xl border-2 cursor-pointer transition-all ${
                           editFormData.sharingEnabled 
                             ? 'border-indigo-500 bg-white shadow-md' 
                             : 'border-gray-200 bg-white hover:border-indigo-300'
