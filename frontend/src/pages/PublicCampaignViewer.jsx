@@ -419,7 +419,7 @@ const PublicCampaignViewer = () => {
           
           // ✅ NEW: Check if campaign requires password
           if (campaignData.requiresPassword || campaignData.passwordProtected) {
-            console.log('Stream requires password');
+            console.log('🔒 Campaign requires password');
             setRequiresPassword(true);
             setCampaign(campaignData);
             setLoading(false);
@@ -429,7 +429,7 @@ const PublicCampaignViewer = () => {
           setCampaign(campaignData);
         }
       } catch (err) {
-        setError('Stream not found');
+        setError('Campaign not found');
       } finally {
         setLoading(false);
       }
@@ -554,9 +554,9 @@ const PublicCampaignViewer = () => {
     const hasLongContent = textContent.length > 200;
     
     return (
-      <div className="w-full h-full bg-gradient-to-br from-pink-500 via-purple-500 to-violet-600 p-4 flex flex-col overflow-hidden relative">
+      <div className="w-full h-full bg-gradient-to-br from-orange-500 via-amber-500 to-yellow-600 p-4 flex flex-col overflow-hidden relative">
         {/* Animated gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-purple-600/20 via-pink-500/20 to-violet-600/20 animate-pulse pointer-events-none"></div>
+        <div className="absolute inset-0 bg-gradient-to-tr from-amber-600/20 via-orange-500/20 to-yellow-600/20 animate-pulse pointer-events-none"></div>
         
         {/* Content */}
         <div className="relative z-10 flex flex-col h-full">
@@ -599,7 +599,7 @@ const PublicCampaignViewer = () => {
         </div>
         
         {/* Bottom gradient fade */}
-        <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-purple-900/50 to-transparent pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-amber-900/50 to-transparent pointer-events-none"></div>
       </div>
     );
   }
@@ -607,9 +607,9 @@ const PublicCampaignViewer = () => {
   // ✅ AUDIO card with mic icon and waves
   if (item.type === 'AUDIO') {
     return (
-      <div className="w-full h-full bg-gradient-to-br from-pink-500 via-purple-500 to-violet-600 p-4 flex flex-col items-center justify-center overflow-hidden relative">
+      <div className="w-full h-full bg-gradient-to-br from-green-500 via-emerald-500 to-teal-600 p-4 flex flex-col items-center justify-center overflow-hidden relative">
         {/* Animated background effect */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-purple-600/30 via-pink-500/30 to-violet-600/30 animate-pulse pointer-events-none"></div>
+        <div className="absolute inset-0 bg-gradient-to-tr from-emerald-600/30 via-green-500/30 to-teal-600/30 animate-pulse pointer-events-none"></div>
         
         {/* Content */}
         <div className="relative z-10 flex flex-col items-center text-center h-full justify-center space-y-4">
@@ -636,7 +636,7 @@ const PublicCampaignViewer = () => {
             
             {/* Mic icon */}
             <div className="relative z-10 w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
-              <Mic className="text-purple-600" size={32} />
+              <Mic className="text-emerald-600" size={32} />
             </div>
           </div>
           
@@ -673,12 +673,12 @@ const PublicCampaignViewer = () => {
                             platformType.includes('Google Drive') || 
                             platformType.includes('Google Slides');
     
-    // ✅ VIDEO EMBEDS (YouTube, Vimeo) - OFFICIAL GRADIENT COLORS
+    // ✅ VIDEO EMBEDS (YouTube, Vimeo) - RED GRADIENT COLORS
     if (isVideoEmbed) {
       return (
         <div className="relative w-full h-full">
-          {/* ✅ CHANGED: Official purple/violet gradient background */}
-          <div className="w-full h-full bg-gradient-to-br from-purple-600 via-violet-600 to-indigo-700"></div>
+          {/* ✅ CHANGED: Red/crimson gradient background */}
+          <div className="w-full h-full bg-gradient-to-br from-red-600 via-rose-600 to-pink-700"></div>
           
           {/* Overlay with play icon */}
           <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
@@ -693,7 +693,7 @@ const PublicCampaignViewer = () => {
               
               {/* Play icon */}
               <div className="relative z-10 w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
-                <Play className="text-purple-600 ml-1" size={32} />
+                <Play className="text-red-600 ml-1" size={32} />
               </div>
             </div>
           </div>
@@ -708,7 +708,7 @@ const PublicCampaignViewer = () => {
           </div>
           
           {/* Bottom info */}
-          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-purple-900/80 to-transparent">
+          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-red-900/80 to-transparent">
             <div className="flex items-center gap-2">
               <Eye className="w-4 h-4 text-white" />
               <span className="text-white text-xs sm:text-sm font-bold">Click to watch video</span>
@@ -718,12 +718,12 @@ const PublicCampaignViewer = () => {
       );
     }
     
-    // ✅ AUDIO EMBEDS (SoundCloud, Spotify) - Same as AUDIO card
+    // ✅ AUDIO EMBEDS (SoundCloud, Spotify) - GREEN/TEAL GRADIENT
     if (isAudioEmbed) {
       return (
-        <div className="w-full h-full bg-gradient-to-br from-pink-500 via-purple-500 to-violet-600 p-4 flex flex-col items-center justify-center overflow-hidden relative">
+        <div className="w-full h-full bg-gradient-to-br from-green-500 via-emerald-500 to-teal-600 p-4 flex flex-col items-center justify-center overflow-hidden relative">
           {/* Animated background effect */}
-          <div className="absolute inset-0 bg-gradient-to-tr from-purple-600/30 via-pink-500/30 to-violet-600/30 animate-pulse pointer-events-none"></div>
+          <div className="absolute inset-0 bg-gradient-to-tr from-emerald-600/30 via-green-500/30 to-teal-600/30 animate-pulse pointer-events-none"></div>
           
           {/* Content */}
           <div className="relative z-10 flex flex-col items-center text-center h-full justify-center space-y-4">
@@ -750,7 +750,7 @@ const PublicCampaignViewer = () => {
               
               {/* Music icon */}
               <div className="relative z-10 w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
-                <Music className="text-purple-600" size={32} />
+                <Music className="text-emerald-600" size={32} />
               </div>
             </div>
             
@@ -782,12 +782,12 @@ const PublicCampaignViewer = () => {
       );
     }
     
-    // ✅ DOCUMENT EMBEDS (Google Docs, Sheets, Drive, Slides) - Same as TEXT card
+    // ✅ DOCUMENT EMBEDS (Google Docs, Sheets, Drive, Slides) - BLUE/INDIGO GRADIENT
     if (isDocumentEmbed) {
       return (
-        <div className="w-full h-full bg-gradient-to-br from-pink-500 via-purple-500 to-violet-600 p-4 flex flex-col overflow-hidden relative">
+        <div className="w-full h-full bg-gradient-to-br from-blue-500 via-indigo-500 to-blue-700 p-4 flex flex-col overflow-hidden relative">
           {/* Animated gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-tr from-purple-600/20 via-pink-500/20 to-violet-600/20 animate-pulse pointer-events-none"></div>
+          <div className="absolute inset-0 bg-gradient-to-tr from-indigo-600/20 via-blue-500/20 to-blue-700/20 animate-pulse pointer-events-none"></div>
           
           {/* Content */}
           <div className="relative z-10 flex flex-col h-full">
@@ -833,7 +833,7 @@ const PublicCampaignViewer = () => {
           </div>
           
           {/* Bottom gradient fade */}
-          <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-purple-900/50 to-transparent pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-blue-900/50 to-transparent pointer-events-none"></div>
         </div>
       );
     }
@@ -930,7 +930,7 @@ const PublicCampaignViewer = () => {
                 <Lock size={40} className="text-white" />
               </div>
             )}
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">{campaign?.name || 'Protected Stream'}</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">{campaign?.name || 'Protected Campaign'}</h1>
             {campaign?.description && (
               <p className="text-gray-600">{campaign.description}</p>
             )}
@@ -943,7 +943,7 @@ const PublicCampaignViewer = () => {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Password Required</h2>
-                <p className="text-sm text-gray-600">This stream is protected</p>
+                <p className="text-sm text-gray-600">This campaign is protected</p>
               </div>
             </div>
 
@@ -1006,7 +1006,7 @@ const PublicCampaignViewer = () => {
                 ) : (
                   <>
                     <Lock size={20} />
-                    <span>Unlock Stream</span>
+                    <span>Unlock Campaign</span>
                   </>
                 )}
               </button>
@@ -1014,7 +1014,7 @@ const PublicCampaignViewer = () => {
 
             <div className="mt-6 pt-6 border-t border-gray-200">
               <p className="text-xs text-gray-500 text-center">
-                Don't have the password? Contact the stream owner to get access.
+                Don't have the password? Contact the campaign owner to get access.
               </p>
             </div>
           </div>
@@ -1044,8 +1044,8 @@ const PublicCampaignViewer = () => {
           <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <span className="text-4xl">❌</span>
           </div>
-          <h1 className="text-3xl font-bold text-primary mb-4">Stream Not Found</h1>
-          <p className="text-secondary mb-6">The stream you are looking for does not exist.</p>
+          <h1 className="text-3xl font-bold text-primary mb-4">Campaign Not Found</h1>
+          <p className="text-secondary mb-6">The campaign you are looking for does not exist.</p>
         </div>
       </div>
     );
@@ -1061,7 +1061,7 @@ const PublicCampaignViewer = () => {
             className="mb-6 flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow-md hover:shadow-lg transition-all text-primary font-semibold"
           >
             <ArrowLeft size={20} />
-            <span>Back to Streams</span>
+            <span>Back to Campaigns</span>
           </button>
         )}
         
@@ -1183,7 +1183,7 @@ const PublicCampaignViewer = () => {
               <Folder className="text-primary" size={40} />
             </div>
             <h2 className="text-2xl font-bold text-primary mb-4">No Items Yet</h2>
-            <p className="text-secondary">This stream doesn't have any content yet.</p>
+            <p className="text-secondary">This campaign doesn't have any content yet.</p>
           </div>
         )}
       </div>
