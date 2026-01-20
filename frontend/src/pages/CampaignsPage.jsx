@@ -670,9 +670,14 @@ const CampaignsPage = () => {
         {/* ✅ CREATE CAMPAIGN MODAL WITH PASSWORD PROTECTION */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
-              <h2 className="text-2xl font-bold text-primary mb-6">Create Stream</h2>
-              <form onSubmit={handleCreate} className="space-y-6">
+            <div className="bg-white rounded-2xl max-w-md w-full max-h-[75vh] flex flex-col overflow-hidden">
+              {/* Header - Fixed at Top */}
+              <div className="flex-shrink-0 p-4 border-b border-gray-200">
+                <h2 className="text-2xl font-bold text-primary">Create Stream</h2>
+              </div>
+              
+              {/* Form Content - Scrollable */}
+              <form onSubmit={handleCreate} className="flex-1 overflow-y-auto p-4 space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Stream Logo (Optional)
@@ -817,8 +822,12 @@ const CampaignsPage = () => {
                     )}
                   </div>
                 </div>
-
-                <div className="flex gap-3 pt-4">
+              {/* End of scrollable form content */}
+              </form>
+              
+              {/* Sticky Footer - Buttons Always Visible */}
+              <div className="flex-shrink-0 border-t border-gray-200 p-3 bg-gray-50">
+                <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => {
@@ -826,20 +835,20 @@ const CampaignsPage = () => {
                       setFormData({ name: '', description: '', category: '', logoUrl: '', passwordProtected: false, password: '' });
                       clearLogo();
                     }}
-                    className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-all"
+                    className="flex-1 px-4 py-2.5 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-all text-sm"
                     disabled={uploadingLogo}
                   >
                     Cancel
                   </button>
                   <button
-                    type="submit"
+                    onClick={handleCreate}
                     disabled={uploadingLogo}
-                    className="flex-1 bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50"
+                    className="flex-1 bg-gradient-to-r from-primary to-secondary text-white px-4 py-2.5 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 text-sm"
                   >
                     {uploadingLogo ? 'Uploading...' : 'Create'}
                   </button>
                 </div>
-              </form>
+              </div>
             </div>
           </div>
         )}
