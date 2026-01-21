@@ -1061,7 +1061,7 @@ const PublicCampaignViewer = () => {
             className="mb-6 flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow-md hover:shadow-lg transition-all text-primary font-semibold"
           >
             <ArrowLeft size={20} />
-            <span>Back to Campaigns</span>
+            <span>Back to Streams</span>
           </button>
         )}
         
