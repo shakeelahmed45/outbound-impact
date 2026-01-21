@@ -1,0 +1,77 @@
+const express = require('express');
+const router = express.Router();
+const chatController = require('../controllers/chatController');
+const authMiddleware = require('../middleware/authMiddleware');
+const resolveEffectiveUserId = require('../middleware/resolveEffectiveUserId');
+const adminMiddleware = require('../middleware/adminMiddleware');
+
+// ═══════════════════════════════════════════════════════════
+// USER ROUTES - Protected by authMiddleware
+// ═══════════════════════════════════════════════════════════
+
+// Get or create user's conversation
+router.get(
+  '/conversation',
+  authMiddleware,
+  resolveEffectiveUserId,
+  chatController.getOrCreateConversation
+);
+
+// Send message (works for both user and admin)
+router.post(
+  '/message',
+  authMiddleware,
+  resolveEffectiveUserId,
+  chatController.sendMessage
+);
+
+// ═══════════════════════════════════════════════════════════
+// ADMIN ROUTES - Protected by authMiddleware + adminMiddleware
+// ═══════════════════════════════════════════════════════════
+
+// Get all conversations with optional status filter
+router.get(
+  '/all-conversations',
+  authMiddleware,
+  resolveEffectiveUserId,
+  adminMiddleware,
+  chatController.getAllConversations
+);
+
+// Get single conversation by ID
+router.get(
+  '/conversation/:id',
+  authMiddleware,
+  resolveEffectiveUserId,
+  adminMiddleware,
+  chatController.getConversationById
+);
+
+// Close conversation
+router.patch(
+  '/conversation/:id/close',
+  authMiddleware,
+  resolveEffectiveUserId,
+  adminMiddleware,
+  chatController.closeConversation
+);
+
+// Reopen conversation
+router.patch(
+  '/conversation/:id/reopen',
+  authMiddleware,
+  resolveEffectiveUserId,
+  adminMiddleware,
+  chatController.reopenConversation
+);
+
+// Get unread message count
+router.get(
+  '/unread-count',
+  authMiddleware,
+  resolveEffectiveUserId,
+  adminMiddleware,
+  chatController.getUnreadCount
+);
+
+module.exports = router;

@@ -4,6 +4,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const prisma = require('./lib/prisma');
 
+const chatRoutes = require('./routes/chatRoutes');
 const authRoutes = require('./routes/authRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -191,6 +192,7 @@ app.use('/api/team', teamRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/advanced-analytics', advancedAnalyticsRoutes);
+app.use('/api/chat', chatRoutes);
 
 // ✨ Enterprise feature routes
 app.use('/api/api-keys', apiKeyRoutes);
