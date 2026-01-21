@@ -68,6 +68,10 @@ const UploadPage = () => {
   const abortControllerRef = useRef(null);
   const progressIntervalRef = useRef(null);
 
+  // ✅ NEW: Real upload progress tracking
+  const [uploadedBytes, setUploadedBytes] = useState(0);
+  const [totalBytes, setTotalBytes] = useState(0);
+
   useEffect(() => {
     document.title = 'Upload | Outbound Impact';
     fetchCampaigns();
@@ -188,23 +192,46 @@ const UploadPage = () => {
   };
 
   const handleFileSelect = (file) => {
-    setSelectedFile(file);
-    
     if (file.type.startsWith('image/')) {
       setUploadType('IMAGE');
+      setSelectedFile(file);
       const reader = new FileReader();
       reader.onload = (e) => setPreview(e.target.result);
       reader.readAsDataURL(file);
     } else if (file.type.startsWith('video/')) {
-      setUploadType('VIDEO');
-      const reader = new FileReader();
-      reader.onload = (e) => setPreview(e.target.result);
-      reader.readAsDataURL(file);
+      // ✅ NEW: Validate video duration (2 minute limit)
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      
+      video.onloadedmetadata = () => {
+        window.URL.revokeObjectURL(video.src);
+        const duration = video.duration; // in seconds
+        
+        if (duration > 120) { // 120 seconds = 2 minutes
+          showToast('Video must be 2 minutes or less. Your video is ' + Math.round(duration / 60) + ' minutes long.', 'error');
+          return;
+        }
+        
+        // Video is valid, proceed with selection
+        setUploadType('VIDEO');
+        setSelectedFile(file);
+        const reader = new FileReader();
+        reader.onload = (e) => setPreview(e.target.result);
+        reader.readAsDataURL(file);
+      };
+      
+      video.onerror = () => {
+        showToast('Failed to validate video. Please try again.', 'error');
+      };
+      
+      video.src = URL.createObjectURL(file);
     } else if (file.type.startsWith('audio/')) {
       setUploadType('AUDIO');
+      setSelectedFile(file);
       setPreview(null);
     } else {
       setUploadType('OTHER');
+      setSelectedFile(file);
       setPreview(null);
     }
   };
@@ -247,19 +274,18 @@ const UploadPage = () => {
 
     setUploading(true);
     setUploadProgress(0);
+    setUploadedBytes(0);
+    setTotalBytes(selectedFile.size);
 
     abortControllerRef.current = new AbortController();
 
     try {
-      await simulateProgress(0, 20, 500);
-
       const reader = new FileReader();
       reader.onload = async (e) => {
         const fileData = e.target.result;
 
-        await simulateProgress(20, 40, 300);
-
-        const uploadPromise = api.post('/upload/file', {
+        // ✅ NEW: Real upload progress with axios onUploadProgress
+        const response = await api.post('/upload/file', {
           title,
           description,
           type: uploadType,
@@ -271,14 +297,17 @@ const UploadPage = () => {
           attachments: attachments.length > 0 ? attachments : null,
           sharingEnabled,
         }, {
-          signal: abortControllerRef.current?.signal
+          signal: abortControllerRef.current?.signal,
+          onUploadProgress: (progressEvent) => {
+            const { loaded, total } = progressEvent;
+            setUploadedBytes(loaded);
+            setTotalBytes(total || selectedFile.size);
+            
+            // Calculate percentage
+            const percentCompleted = Math.round((loaded * 100) / (total || selectedFile.size));
+            setUploadProgress(percentCompleted);
+          }
         });
-
-        const progressPromise = simulateProgress(40, 95, 2000);
-
-        const [response] = await Promise.all([uploadPromise, progressPromise]);
-
-        setUploadProgress(100);
 
         if (response.data.status === 'success') {
           const itemId = response.data.item.id;
@@ -299,6 +328,8 @@ const UploadPage = () => {
             setPreview(null);
             setUploadType(null);
             setUploadProgress(0);
+            setUploadedBytes(0);
+            setTotalBytes(0);
             setButtonText('');
             setButtonUrl('');
             setAttachments([]);
@@ -318,6 +349,8 @@ const UploadPage = () => {
       console.error('Upload error:', error);
       showToast(error.response?.data?.message || 'Failed to upload file', 'error');
       setUploadProgress(0);
+      setUploadedBytes(0);
+      setTotalBytes(0);
       setUploading(false);
     } finally {
       abortControllerRef.current = null;
@@ -1091,7 +1124,9 @@ const UploadPage = () => {
                       style={{ width: uploadProgress + '%' }}
                     />
                   </div>
-                  <p className="text-xs text-gray-600 mt-2">Please wait while we create your post...</p>
+                  <p className="text-xs text-gray-600 mt-2">
+                    Uploaded: {(uploadedBytes / 1024 / 1024).toFixed(2)} MB / {(totalBytes / 1024 / 1024).toFixed(2)} MB
+                  </p>
                 </div>
               )}
 
@@ -1423,7 +1458,9 @@ const UploadPage = () => {
                       style={{ width: uploadProgress + '%' }}
                     />
                   </div>
-                  <p className="text-xs text-gray-600 mt-2">Please wait while we upload your file...</p>
+                  <p className="text-xs text-gray-600 mt-2">
+                    Uploaded: {(uploadedBytes / 1024 / 1024).toFixed(2)} MB / {(totalBytes / 1024 / 1024).toFixed(2)} MB
+                  </p>
                 </div>
               )}
 
