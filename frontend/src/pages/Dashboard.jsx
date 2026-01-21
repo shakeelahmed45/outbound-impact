@@ -164,7 +164,7 @@ const Dashboard = () => {
                 <Folder size={24} className="text-white" />
               </div>
             </div>
-            <p className="text-3xl font-bold text-primary mb-1">{stats?.totalcampaigns || 0}</p>
+            <p className="text-3xl font-bold text-primary mb-1">{stats?.totalCampaigns || 0}</p>
             <p className="text-sm text-gray-600 flex items-center gap-1">
               Active Streams
               <Tooltip content="Number of streams you've created" iconSize={14} />
