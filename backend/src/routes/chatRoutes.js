@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const chatController = require('../controllers/chatController');
-const authMiddleware = require('../middleware/authMiddleware');
-const resolveEffectiveUserId = require('../middleware/resolveEffectiveUserId');
-const adminMiddleware = require('../middleware/adminMiddleware');
+const authMiddleware = require('../middleware/auth');
+const { requireAdmin } = require('../middleware/auth');
+const { resolveEffectiveUserId } = require('../middleware/resolveEffectiveUserId');
 
 // ═══════════════════════════════════════════════════════════
 // USER ROUTES - Protected by authMiddleware
@@ -34,7 +34,7 @@ router.get(
   '/all-conversations',
   authMiddleware,
   resolveEffectiveUserId,
-  adminMiddleware,
+  requireAdmin,
   chatController.getAllConversations
 );
 
@@ -43,7 +43,7 @@ router.get(
   '/conversation/:id',
   authMiddleware,
   resolveEffectiveUserId,
-  adminMiddleware,
+  requireAdmin,
   chatController.getConversationById
 );
 
@@ -52,7 +52,7 @@ router.patch(
   '/conversation/:id/close',
   authMiddleware,
   resolveEffectiveUserId,
-  adminMiddleware,
+  requireAdmin,
   chatController.closeConversation
 );
 
@@ -61,7 +61,7 @@ router.patch(
   '/conversation/:id/reopen',
   authMiddleware,
   resolveEffectiveUserId,
-  adminMiddleware,
+  requireAdmin,
   chatController.reopenConversation
 );
 
@@ -70,7 +70,7 @@ router.get(
   '/unread-count',
   authMiddleware,
   resolveEffectiveUserId,
-  adminMiddleware,
+  requireAdmin,
   chatController.getUnreadCount
 );
 
