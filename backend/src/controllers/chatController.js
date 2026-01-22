@@ -1,4 +1,5 @@
 const prisma = require('../lib/prisma');
+const { sendChatNotificationToAdmin, sendChatReplyToUser } = require('../services/emailService');
 
 // ═══════════════════════════════════════════════════════════
 // USER: Get or Create Conversation
@@ -135,6 +136,59 @@ const sendMessage = async (req, res) => {
       where: { id: targetConversationId },
       data: { lastMessageAt: new Date() },
     });
+
+    // ═══════════════════════════════════════════════════════════
+    // 📧 SEND EMAIL NOTIFICATIONS
+    // ═══════════════════════════════════════════════════════════
+    
+    // Get sender's full info for email
+    const senderInfo = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { 
+        email: true, 
+        firstName: true, 
+        lastName: true 
+      },
+    });
+
+    const senderName = `${senderInfo.firstName || ''} ${senderInfo.lastName || ''}`.trim() || 'User';
+
+    if (!isAdmin) {
+      // USER sent message → Notify ADMIN
+      console.log('📧 Sending chat notification to admin...');
+      sendChatNotificationToAdmin(
+        {
+          userName: senderName,
+          userEmail: senderInfo.email,
+        },
+        message.trim()
+      ).catch(err => console.error('Failed to send admin notification:', err));
+    } else {
+      // ADMIN sent message → Notify USER
+      const conversation = await prisma.chatConversation.findUnique({
+        where: { id: targetConversationId },
+        include: {
+          user: {
+            select: {
+              email: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      });
+
+      if (conversation && conversation.user) {
+        const userName = `${conversation.user.firstName || ''} ${conversation.user.lastName || ''}`.trim() || 'User';
+        
+        console.log('📧 Sending reply notification to user...');
+        sendChatReplyToUser(
+          conversation.user.email,
+          userName,
+          message.trim()
+        ).catch(err => console.error('Failed to send user notification:', err));
+      }
+    }
 
     res.json({
       status: 'success',

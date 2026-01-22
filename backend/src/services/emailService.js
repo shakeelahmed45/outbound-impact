@@ -1173,6 +1173,167 @@ const sendAdminRefundNotification = async ({ userName, userEmail, refundAmount, 
 // Test connection when service loads
 testConnection();
 
+// ═══════════════════════════════════════════════════════════
+// 💬 LIVE CHAT NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════
+
+// Send notification to admin when user sends a chat message
+const sendChatNotificationToAdmin = async (userData, message) => {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.log('⚠️ Resend not configured - skipping chat notification');
+      return { success: false, error: 'Resend not configured' };
+    }
+
+    const adminEmail = process.env.ADMIN_EMAIL || 'business.shakeelahmed@gmail.com';
+
+    const { data, error } = await resend.emails.send({
+      from: 'Outbound Impact Live Chat <noreply@outboundimpact.org>',
+      to: [adminEmail],
+      replyTo: userData.userEmail,
+      subject: `💬 New Live Chat Message from ${userData.userName}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+            .header { background: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: white; padding: 30px; margin-top: 0; border-radius: 0 0 10px 10px; }
+            .message-box { padding: 20px; margin: 20px 0; background: #fff7f0; border-left: 4px solid #FF6B35; border-radius: 4px; }
+            .info-row { padding: 12px; margin: 8px 0; background: #f8f9fa; border-left: 3px solid #FF6B35; }
+            .label { font-weight: bold; color: #FF6B35; }
+            .button { display: inline-block; padding: 14px 30px; background: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%); color: white; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h2 style="margin: 0; color: white;">💬 New Live Chat Message!</h2>
+            </div>
+            
+            <div class="content">
+              <h3>User Information:</h3>
+              
+              <div class="info-row">
+                <span class="label">Name:</span> ${userData.userName}
+              </div>
+              
+              <div class="info-row">
+                <span class="label">Email:</span> ${userData.userEmail}
+              </div>
+              
+              <div class="info-row">
+                <span class="label">Timestamp:</span> ${new Date().toLocaleString()}
+              </div>
+              
+              <h3 style="margin-top: 30px;">Message:</h3>
+              <div class="message-box">
+                <p style="margin: 0; font-size: 16px; white-space: pre-wrap;">${message}</p>
+              </div>
+              
+              <div style="text-align: center; margin-top: 30px;">
+                <a href="${process.env.FRONTEND_URL || 'https://www.outboundimpact.org'}/admin-panel/live-chat" class="button">
+                  Reply in Admin Panel
+                </a>
+              </div>
+              
+              <p style="margin-top: 30px; padding: 15px; background: #e7f3ff; border-left: 4px solid #0066cc; font-size: 14px;">
+                <strong>💡 Quick Tip:</strong> Click the button above to reply instantly, or reply to this email to contact the user directly at ${userData.userEmail}
+              </p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Failed to send chat notification:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('✅ Chat notification sent to admin:', adminEmail, '(ID:', data.id, ')');
+    return { success: true, messageId: data.id };
+  } catch (error) {
+    console.error('❌ Failed to send chat notification:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+// Send notification to user when admin replies
+const sendChatReplyToUser = async (userEmail, userName, adminReply) => {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.log('⚠️ Resend not configured - skipping user notification');
+      return { success: false, error: 'Resend not configured' };
+    }
+
+    const { data, error } = await resend.emails.send({
+      from: 'Outbound Impact Support <support@outboundimpact.org>',
+      to: [userEmail],
+      replyTo: process.env.ADMIN_EMAIL || 'business.shakeelahmed@gmail.com',
+      subject: `💬 New Reply from Outbound Impact Support`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+            .header { background: linear-gradient(135deg, #800080 0%, #9333EA 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: white; padding: 30px; margin-top: 0; border-radius: 0 0 10px 10px; }
+            .message-box { padding: 20px; margin: 20px 0; background: #f8f0ff; border-left: 4px solid #800080; border-radius: 4px; }
+            .button { display: inline-block; padding: 14px 30px; background: linear-gradient(135deg, #800080 0%, #9333EA 100%); color: white; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h2 style="margin: 0; color: white;">💬 Support Team Replied!</h2>
+            </div>
+            
+            <div class="content">
+              <p>Hi ${userName},</p>
+              
+              <p>Our support team has replied to your message:</p>
+              
+              <div class="message-box">
+                <p style="margin: 0; font-size: 16px; white-space: pre-wrap;">${adminReply}</p>
+              </div>
+              
+              <div style="text-align: center; margin-top: 30px;">
+                <a href="${process.env.FRONTEND_URL || 'https://www.outboundimpact.org'}/live-chat" class="button">
+                  Continue Conversation
+                </a>
+              </div>
+              
+              <p style="margin-top: 30px; color: #666; font-size: 14px;">
+                You can also reply to this email directly to continue the conversation.
+              </p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Failed to send user notification:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('✅ Reply notification sent to user:', userEmail, '(ID:', data.id, ')');
+    return { success: true, messageId: data.id };
+  } catch (error) {
+    console.error('❌ Failed to send user notification:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendWelcomeEmail,
   sendAdminNotification,
@@ -1184,5 +1345,7 @@ module.exports = {
   sendPasswordResetEmail,
   sendRefundAccountDeletionEmail,
   sendAdminRefundNotification,
+  sendChatNotificationToAdmin,
+  sendChatReplyToUser,
   testConnection
 };
