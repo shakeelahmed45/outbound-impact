@@ -870,11 +870,14 @@ const SettingsPage = () => {
               Live Chat Support
             </h3>
             <p className="text-gray-600 mb-6 max-w-md mx-auto text-lg">
-              Real-time chat support is on its way! Soon you will be able to connect with our support team instantly.
+              Chat with our support team in real-time. Get instant help with any questions or issues.
             </p>
-            <div className="inline-block px-8 py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-2xl font-bold text-lg shadow-xl">
-              Coming Soon
-            </div>
+            <button
+              onClick={() => navigate('/live-chat')}
+              className="inline-block px-8 py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300"
+            >
+              Open Live Chat
+            </button>
           </div>
         </div>
       );
