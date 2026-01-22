@@ -22,8 +22,7 @@ const getOrCreateConversation = async (req, res) => {
           select: {
             id: true,
             email: true,
-            firstName: true,
-            lastName: true,
+            name: true,
           },
         },
       },
@@ -44,8 +43,7 @@ const getOrCreateConversation = async (req, res) => {
             select: {
               id: true,
               email: true,
-              firstName: true,
-              lastName: true,
+              name: true,
             },
           },
         },
@@ -146,12 +144,11 @@ const sendMessage = async (req, res) => {
       where: { id: userId },
       select: { 
         email: true, 
-        firstName: true, 
-        lastName: true 
+        name: true,
       },
     });
 
-    const senderName = `${senderInfo.firstName || ''} ${senderInfo.lastName || ''}`.trim() || 'User';
+    const senderName = senderInfo.name || 'User';
 
     if (!isAdmin) {
       // USER sent message → Notify ADMIN
@@ -171,15 +168,14 @@ const sendMessage = async (req, res) => {
           user: {
             select: {
               email: true,
-              firstName: true,
-              lastName: true,
+              name: true,
             },
           },
         },
       });
 
       if (conversation && conversation.user) {
-        const userName = `${conversation.user.firstName || ''} ${conversation.user.lastName || ''}`.trim() || 'User';
+        const userName = conversation.user.name || 'User';
         
         console.log('📧 Sending reply notification to user...');
         sendChatReplyToUser(
@@ -222,8 +218,7 @@ const getAllConversations = async (req, res) => {
           select: {
             id: true,
             email: true,
-            firstName: true,
-            lastName: true,
+            name: true,
           },
         },
         messages: {
@@ -269,8 +264,7 @@ const getConversationById = async (req, res) => {
           select: {
             id: true,
             email: true,
-            firstName: true,
-            lastName: true,
+            name: true,
           },
         },
         messages: {
