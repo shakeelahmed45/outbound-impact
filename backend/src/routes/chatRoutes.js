@@ -25,6 +25,14 @@ router.post(
   chatController.sendMessage
 );
 
+// Start new conversation (closes current, creates new)
+router.post(
+  '/start-new',
+  authMiddleware,
+  resolveEffectiveUserId,
+  chatController.startNewConversation
+);
+
 // ═══════════════════════════════════════════════════════════
 // ADMIN ROUTES - Protected by authMiddleware + adminMiddleware
 // ═══════════════════════════════════════════════════════════

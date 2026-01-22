@@ -6,7 +6,8 @@ const { sendChatNotificationToAdmin, sendChatReplyToUser } = require('../service
 // ═══════════════════════════════════════════════════════════
 const getOrCreateConversation = async (req, res) => {
   try {
-    const userId = req.effectiveUserId;
+    // CRITICAL FIX: Use actual logged-in user ID, not effectiveUserId
+    const userId = req.user.userId;
 
     // Try to find existing active conversation
     let conversation = await prisma.chatConversation.findFirst({
@@ -68,7 +69,8 @@ const getOrCreateConversation = async (req, res) => {
 // ═══════════════════════════════════════════════════════════
 const sendMessage = async (req, res) => {
   try {
-    const userId = req.effectiveUserId;
+    // CRITICAL FIX: Use actual logged-in user ID, not effectiveUserId
+    const actualUserId = req.user.userId;
     const { message, conversationId } = req.body;
 
     if (!message || !message.trim()) {
@@ -78,30 +80,80 @@ const sendMessage = async (req, res) => {
       });
     }
 
-    // Determine if sender is admin or user
+    // Get actual user info (not effective user)
     const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
+      where: { id: actualUserId },
+      select: { 
+        role: true,
+        email: true,
+        name: true,
+      },
     });
 
     const isAdmin = user.role === 'ADMIN';
     const senderType = isAdmin ? 'ADMIN' : 'USER';
 
-    // If admin is sending, conversationId must be provided
-    if (isAdmin && !conversationId) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Conversation ID required for admin',
-      });
-    }
+    console.log('💬 Send Message Debug:', {
+      actualUserId,
+      isAdmin,
+      conversationId,
+      senderType,
+    });
 
-    // For users, get or create their conversation
-    let targetConversationId = conversationId;
+    // ═══════════════════════════════════════════════════════════
+    // DETERMINE TARGET CONVERSATION
+    // ═══════════════════════════════════════════════════════════
     
-    if (!isAdmin) {
+    let targetConversationId = conversationId;
+    let targetUserEmail = null;
+    let targetUserName = null;
+    
+    if (isAdmin) {
+      // ADMIN SENDING MESSAGE
+      if (!conversationId) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Conversation ID required for admin',
+        });
+      }
+
+      // CRITICAL: Verify conversation exists and get the ACTUAL user
+      const conversation = await prisma.chatConversation.findUnique({
+        where: { id: conversationId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      if (!conversation) {
+        return res.status(404).json({
+          status: 'error',
+          message: 'Conversation not found',
+        });
+      }
+
+      targetConversationId = conversation.id;
+      targetUserEmail = conversation.user.email;
+      targetUserName = conversation.user.name;
+
+      console.log('✅ Admin sending to:', {
+        conversationId: targetConversationId,
+        targetUser: targetUserName,
+        targetEmail: targetUserEmail,
+      });
+
+    } else {
+      // USER SENDING MESSAGE
+      // Get or create their conversation
       let conversation = await prisma.chatConversation.findFirst({
         where: {
-          userId,
+          userId: actualUserId,
           status: 'ACTIVE',
         },
       });
@@ -109,20 +161,24 @@ const sendMessage = async (req, res) => {
       if (!conversation) {
         conversation = await prisma.chatConversation.create({
           data: {
-            userId,
+            userId: actualUserId,
             status: 'ACTIVE',
           },
         });
       }
 
       targetConversationId = conversation.id;
+      console.log('✅ User sending from conversation:', targetConversationId);
     }
 
-    // Create the message
+    // ═══════════════════════════════════════════════════════════
+    // CREATE MESSAGE
+    // ═══════════════════════════════════════════════════════════
+    
     const newMessage = await prisma.chatMessage.create({
       data: {
         conversationId: targetConversationId,
-        senderId: userId,
+        senderId: actualUserId, // CRITICAL: Use actual user ID
         senderType,
         message: message.trim(),
         isRead: false,
@@ -135,52 +191,33 @@ const sendMessage = async (req, res) => {
       data: { lastMessageAt: new Date() },
     });
 
-    // ═══════════════════════════════════════════════════════════
-    // 📧 SEND EMAIL NOTIFICATIONS
-    // ═══════════════════════════════════════════════════════════
-    
-    // Get sender's full info for email
-    const senderInfo = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { 
-        email: true, 
-        name: true,
-      },
+    console.log('✅ Message created:', {
+      messageId: newMessage.id,
+      conversationId: targetConversationId,
+      senderType,
     });
 
-    const senderName = senderInfo.name || 'User';
-
+    // ═══════════════════════════════════════════════════════════
+    // SEND EMAIL NOTIFICATIONS
+    // ═══════════════════════════════════════════════════════════
+    
     if (!isAdmin) {
       // USER sent message → Notify ADMIN
       console.log('📧 Sending chat notification to admin...');
       sendChatNotificationToAdmin(
         {
-          userName: senderName,
-          userEmail: senderInfo.email,
+          userName: user.name,
+          userEmail: user.email,
         },
         message.trim()
       ).catch(err => console.error('Failed to send admin notification:', err));
     } else {
       // ADMIN sent message → Notify USER
-      const conversation = await prisma.chatConversation.findUnique({
-        where: { id: targetConversationId },
-        include: {
-          user: {
-            select: {
-              email: true,
-              name: true,
-            },
-          },
-        },
-      });
-
-      if (conversation && conversation.user) {
-        const userName = conversation.user.name || 'User';
-        
-        console.log('📧 Sending reply notification to user...');
+      if (targetUserEmail && targetUserName) {
+        console.log('📧 Sending reply notification to:', targetUserEmail);
         sendChatReplyToUser(
-          conversation.user.email,
-          userName,
+          targetUserEmail,
+          targetUserName,
           message.trim()
         ).catch(err => console.error('Failed to send user notification:', err));
       }
@@ -195,6 +232,7 @@ const sendMessage = async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to send message',
+      error: error.message,
     });
   }
 };
@@ -225,6 +263,16 @@ const getAllConversations = async (req, res) => {
           orderBy: { createdAt: 'desc' },
           take: 1, // Only get the last message for preview
         },
+        _count: {
+          select: {
+            messages: {
+              where: {
+                senderType: 'USER',
+                isRead: false,
+              },
+            },
+          },
+        },
       },
       orderBy: { lastMessageAt: 'desc' },
     });
@@ -234,6 +282,12 @@ const getAllConversations = async (req, res) => {
       total: await prisma.chatConversation.count(),
       active: await prisma.chatConversation.count({ where: { status: 'ACTIVE' } }),
       closed: await prisma.chatConversation.count({ where: { status: 'CLOSED' } }),
+      unread: await prisma.chatMessage.count({
+        where: {
+          senderType: 'USER',
+          isRead: false,
+        },
+      }),
     };
 
     res.json({
@@ -280,7 +334,7 @@ const getConversationById = async (req, res) => {
       });
     }
 
-    // Mark admin messages as read
+    // Mark user messages as read
     await prisma.chatMessage.updateMany({
       where: {
         conversationId: id,
@@ -378,6 +432,54 @@ const getUnreadCount = async (req, res) => {
   }
 };
 
+// ═══════════════════════════════════════════════════════════
+// USER: Start New Conversation (Close current and create new)
+// ═══════════════════════════════════════════════════════════
+const startNewConversation = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Close all existing active conversations
+    await prisma.chatConversation.updateMany({
+      where: {
+        userId,
+        status: 'ACTIVE',
+      },
+      data: { status: 'CLOSED' },
+    });
+
+    // Create new conversation
+    const conversation = await prisma.chatConversation.create({
+      data: {
+        userId,
+        status: 'ACTIVE',
+      },
+      include: {
+        messages: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    res.json({
+      status: 'success',
+      conversation,
+      message: 'New conversation started',
+    });
+  } catch (error) {
+    console.error('Start new conversation error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to start new conversation',
+    });
+  }
+};
+
 module.exports = {
   getOrCreateConversation,
   sendMessage,
@@ -386,4 +488,5 @@ module.exports = {
   closeConversation,
   reopenConversation,
   getUnreadCount,
+  startNewConversation,
 };
