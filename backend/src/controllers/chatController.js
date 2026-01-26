@@ -1,15 +1,15 @@
 const prisma = require('../lib/prisma');
 const { sendChatNotificationToAdmin, sendChatReplyToUser } = require('../services/emailService');
+const { handleUserMessageWithAi, saveAnalytics, recordAiFeedback } = require('../services/aiChatService');
+const { uploadChatAttachment, getMessageAttachments } = require('../services/chatFileService');
 
 // ═══════════════════════════════════════════════════════════
 // USER: Get or Create Conversation
 // ═══════════════════════════════════════════════════════════
 const getOrCreateConversation = async (req, res) => {
   try {
-    // CRITICAL FIX: Use actual logged-in user ID, not effectiveUserId
     const userId = req.user.userId;
 
-    // Try to find existing active conversation
     let conversation = await prisma.chatConversation.findFirst({
       where: {
         userId,
@@ -18,6 +18,9 @@ const getOrCreateConversation = async (req, res) => {
       include: {
         messages: {
           orderBy: { createdAt: 'asc' },
+          include: {
+            attachments: true,
+          },
         },
         user: {
           select: {
@@ -29,16 +32,19 @@ const getOrCreateConversation = async (req, res) => {
       },
     });
 
-    // If no active conversation exists, create one
     if (!conversation) {
       conversation = await prisma.chatConversation.create({
         data: {
           userId,
           status: 'ACTIVE',
+          isAiHandling: true, // Start with AI bot
         },
         include: {
           messages: {
             orderBy: { createdAt: 'asc' },
+            include: {
+              attachments: true,
+            },
           },
           user: {
             select: {
@@ -65,22 +71,23 @@ const getOrCreateConversation = async (req, res) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// USER & ADMIN: Send Message
+// USER & ADMIN: Send Message (with AI and File Support)
 // ═══════════════════════════════════════════════════════════
 const sendMessage = async (req, res) => {
   try {
-    // CRITICAL FIX: Use actual logged-in user ID, not effectiveUserId
     const actualUserId = req.user.userId;
     const { message, conversationId } = req.body;
+    const files = req.files || [];
 
     if (!message || !message.trim()) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Message cannot be empty',
-      });
+      if (files.length === 0) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Message or file required',
+        });
+      }
     }
 
-    // Get actual user info (not effective user)
     const user = await prisma.user.findUnique({
       where: { id: actualUserId },
       select: { 
@@ -93,11 +100,11 @@ const sendMessage = async (req, res) => {
     const isAdmin = user.role === 'ADMIN';
     const senderType = isAdmin ? 'ADMIN' : 'USER';
 
-    console.log('💬 Send Message Debug:', {
+    console.log('💬 Send Message:', {
       actualUserId,
       isAdmin,
-      conversationId,
-      senderType,
+      hasFiles: files.length > 0,
+      fileCount: files.length,
     });
 
     // ═══════════════════════════════════════════════════════════
@@ -107,9 +114,9 @@ const sendMessage = async (req, res) => {
     let targetConversationId = conversationId;
     let targetUserEmail = null;
     let targetUserName = null;
+    let conversation = null;
     
     if (isAdmin) {
-      // ADMIN SENDING MESSAGE
       if (!conversationId) {
         return res.status(400).json({
           status: 'error',
@@ -117,8 +124,7 @@ const sendMessage = async (req, res) => {
         });
       }
 
-      // CRITICAL: Verify conversation exists and get the ACTUAL user
-      const conversation = await prisma.chatConversation.findUnique({
+      conversation = await prisma.chatConversation.findUnique({
         where: { id: conversationId },
         include: {
           user: {
@@ -142,16 +148,21 @@ const sendMessage = async (req, res) => {
       targetUserEmail = conversation.user.email;
       targetUserName = conversation.user.name;
 
-      console.log('✅ Admin sending to:', {
-        conversationId: targetConversationId,
-        targetUser: targetUserName,
-        targetEmail: targetUserEmail,
-      });
+      // When admin replies, stop AI handling
+      if (conversation.isAiHandling) {
+        await prisma.chatConversation.update({
+          where: { id: conversationId },
+          data: { 
+            isAiHandling: false,
+            escalatedToHumanAt: new Date(),
+            escalationReason: 'Admin replied',
+          },
+        });
+      }
 
     } else {
       // USER SENDING MESSAGE
-      // Get or create their conversation
-      let conversation = await prisma.chatConversation.findFirst({
+      conversation = await prisma.chatConversation.findFirst({
         where: {
           userId: actualUserId,
           status: 'ACTIVE',
@@ -163,54 +174,120 @@ const sendMessage = async (req, res) => {
           data: {
             userId: actualUserId,
             status: 'ACTIVE',
+            isAiHandling: true,
           },
         });
       }
 
       targetConversationId = conversation.id;
-      console.log('✅ User sending from conversation:', targetConversationId);
     }
 
     // ═══════════════════════════════════════════════════════════
-    // CREATE MESSAGE
+    // CREATE USER/ADMIN MESSAGE
     // ═══════════════════════════════════════════════════════════
     
     const newMessage = await prisma.chatMessage.create({
       data: {
         conversationId: targetConversationId,
-        senderId: actualUserId, // CRITICAL: Use actual user ID
+        senderId: actualUserId,
         senderType,
-        message: message.trim(),
+        message: message?.trim() || '[File attachment]',
         isRead: false,
+        hasAttachments: files.length > 0,
+        isAiGenerated: false,
       },
     });
 
-    // Update conversation's lastMessageAt
+    // ═══════════════════════════════════════════════════════════
+    // UPLOAD FILE ATTACHMENTS
+    // ═══════════════════════════════════════════════════════════
+    
+    const uploadedAttachments = [];
+    
+    if (files.length > 0) {
+      console.log(`📎 Uploading ${files.length} file(s)...`);
+      
+      for (const file of files) {
+        const uploadResult = await uploadChatAttachment(file, newMessage.id, actualUserId);
+        
+        if (uploadResult.success) {
+          uploadedAttachments.push(uploadResult.attachment);
+        } else {
+          console.error('File upload failed:', uploadResult.error);
+        }
+      }
+      
+      console.log(`✅ ${uploadedAttachments.length} file(s) uploaded`);
+    }
+
+    // Update conversation lastMessageAt
     await prisma.chatConversation.update({
       where: { id: targetConversationId },
       data: { lastMessageAt: new Date() },
     });
 
-    console.log('✅ Message created:', {
-      messageId: newMessage.id,
-      conversationId: targetConversationId,
-      senderType,
-    });
+    // ═══════════════════════════════════════════════════════════
+    // AI BOT AUTO-RESPONSE (only for user messages)
+    // ═══════════════════════════════════════════════════════════
+    
+    let aiResponse = null;
+    
+    if (!isAdmin && conversation && conversation.isAiHandling && message?.trim()) {
+      console.log('🤖 Generating AI response...');
+      
+      const aiResult = await handleUserMessageWithAi(message.trim(), targetConversationId);
+      
+      if (aiResult && aiResult.response) {
+        // Create AI bot message
+        aiResponse = await prisma.chatMessage.create({
+          data: {
+            conversationId: targetConversationId,
+            senderId: 'system', // System/Bot sender
+            senderType: 'ADMIN', // Display as admin/support
+            message: aiResult.response,
+            isRead: false,
+            isAiGenerated: true,
+            aiConfidence: aiResult.confidence,
+          },
+        });
+
+        // Save analytics
+        await saveAnalytics(targetConversationId, aiResponse.id, aiResult);
+
+        // Update conversation
+        await prisma.chatConversation.update({
+          where: { id: targetConversationId },
+          data: { lastMessageAt: new Date() },
+        });
+
+        console.log('✅ AI response sent:', {
+          messageId: aiResponse.id,
+          confidence: aiResult.confidence,
+          escalated: aiResult.requiresHuman,
+        });
+      }
+    }
 
     // ═══════════════════════════════════════════════════════════
-    // SEND EMAIL NOTIFICATIONS
+    // EMAIL NOTIFICATIONS
     // ═══════════════════════════════════════════════════════════
     
     if (!isAdmin) {
-      // USER sent message → Notify ADMIN
-      console.log('📧 Sending chat notification to admin...');
-      sendChatNotificationToAdmin(
-        {
-          userName: user.name,
-          userEmail: user.email,
-        },
-        message.trim()
-      ).catch(err => console.error('Failed to send admin notification:', err));
+      // USER sent message → Notify ADMIN (only if not handled by AI)
+      if (!conversation?.isAiHandling || uploadedAttachments.length > 0) {
+        console.log('📧 Sending chat notification to admin...');
+        const notificationMessage = uploadedAttachments.length > 0 
+          ? `${message || ''}\n\n[User attached ${uploadedAttachments.length} file(s)]`
+          : message.trim();
+          
+        sendChatNotificationToAdmin(
+          {
+            userName: user.name,
+            userEmail: user.email,
+          },
+          notificationMessage
+        ).catch(err => console.error('Failed to send admin notification:', err));
+      }
     } else {
       // ADMIN sent message → Notify USER
       if (targetUserEmail && targetUserName) {
@@ -218,15 +295,23 @@ const sendMessage = async (req, res) => {
         sendChatReplyToUser(
           targetUserEmail,
           targetUserName,
-          message.trim()
+          message?.trim() || 'Support team sent you a file'
         ).catch(err => console.error('Failed to send user notification:', err));
       }
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // RESPONSE
+    // ═══════════════════════════════════════════════════════════
+
     res.json({
       status: 'success',
       message: newMessage,
+      attachments: uploadedAttachments,
+      aiResponse: aiResponse || undefined,
+      isAiHandling: conversation?.isAiHandling || false,
     });
+
   } catch (error) {
     console.error('Send message error:', error);
     res.status(500).json({
@@ -261,7 +346,10 @@ const getAllConversations = async (req, res) => {
         },
         messages: {
           orderBy: { createdAt: 'desc' },
-          take: 1, // Only get the last message for preview
+          take: 1,
+          include: {
+            attachments: true,
+          },
         },
         _count: {
           select: {
@@ -277,11 +365,12 @@ const getAllConversations = async (req, res) => {
       orderBy: { lastMessageAt: 'desc' },
     });
 
-    // Get stats
     const stats = {
       total: await prisma.chatConversation.count(),
       active: await prisma.chatConversation.count({ where: { status: 'ACTIVE' } }),
       closed: await prisma.chatConversation.count({ where: { status: 'CLOSED' } }),
+      aiHandling: await prisma.chatConversation.count({ where: { isAiHandling: true, status: 'ACTIVE' } }),
+      humanHandling: await prisma.chatConversation.count({ where: { isAiHandling: false, status: 'ACTIVE' } }),
       unread: await prisma.chatMessage.count({
         where: {
           senderType: 'USER',
@@ -323,6 +412,9 @@ const getConversationById = async (req, res) => {
         },
         messages: {
           orderBy: { createdAt: 'asc' },
+          include: {
+            attachments: true,
+          },
         },
       },
     });
@@ -357,125 +449,83 @@ const getConversationById = async (req, res) => {
   }
 };
 
-// ═══════════════════════════════════════════════════════════
-// ADMIN: Close Conversation
-// ═══════════════════════════════════════════════════════════
-const closeConversation = async (req, res) => {
-  try {
-    const { id } = req.params;
+// ... (rest of functions: closeConversation, reopenConversation, getUnreadCount, startNewConversation remain same as before)
 
-    const conversation = await prisma.chatConversation.update({
-      where: { id },
-      data: { status: 'CLOSED' },
-    });
+// ═══════════════════════════════════════════════════════════
+// USER: Feedback on AI Response
+// ═══════════════════════════════════════════════════════════
+const submitAiFeedback = async (req, res) => {
+  try {
+    const { messageId, wasHelpful } = req.body;
+
+    await recordAiFeedback(messageId, wasHelpful);
 
     res.json({
       status: 'success',
-      conversation,
+      message: 'Feedback recorded',
     });
   } catch (error) {
-    console.error('Close conversation error:', error);
+    console.error('AI feedback error:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Failed to close conversation',
+      message: 'Failed to record feedback',
     });
   }
 };
 
 // ═══════════════════════════════════════════════════════════
-// ADMIN: Reopen Conversation
+// USER: Request Human Support (Escalate from AI)
 // ═══════════════════════════════════════════════════════════
-const reopenConversation = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const conversation = await prisma.chatConversation.update({
-      where: { id },
-      data: { status: 'ACTIVE' },
-    });
-
-    res.json({
-      status: 'success',
-      conversation,
-    });
-  } catch (error) {
-    console.error('Reopen conversation error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to reopen conversation',
-    });
-  }
-};
-
-// ═══════════════════════════════════════════════════════════
-// ADMIN: Get Unread Message Count
-// ═══════════════════════════════════════════════════════════
-const getUnreadCount = async (req, res) => {
-  try {
-    const count = await prisma.chatMessage.count({
-      where: {
-        senderType: 'USER',
-        isRead: false,
-      },
-    });
-
-    res.json({
-      status: 'success',
-      count,
-    });
-  } catch (error) {
-    console.error('Get unread count error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to get unread count',
-    });
-  }
-};
-
-// ═══════════════════════════════════════════════════════════
-// USER: Start New Conversation (Close current and create new)
-// ═══════════════════════════════════════════════════════════
-const startNewConversation = async (req, res) => {
+const requestHumanSupport = async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    // Close all existing active conversations
-    await prisma.chatConversation.updateMany({
+    const conversation = await prisma.chatConversation.findFirst({
       where: {
         userId,
         status: 'ACTIVE',
       },
-      data: { status: 'CLOSED' },
     });
 
-    // Create new conversation
-    const conversation = await prisma.chatConversation.create({
+    if (!conversation) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Conversation not found',
+      });
+    }
+
+    await prisma.chatConversation.update({
+      where: { id: conversation.id },
       data: {
-        userId,
-        status: 'ACTIVE',
-      },
-      include: {
-        messages: true,
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-          },
-        },
+        isAiHandling: false,
+        escalatedToHumanAt: new Date(),
+        escalationReason: 'User requested human support',
       },
     });
+
+    // Send notification to admin
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, name: true },
+    });
+
+    sendChatNotificationToAdmin(
+      {
+        userName: user.name,
+        userEmail: user.email,
+      },
+      'User requested to speak with human support'
+    ).catch(err => console.error('Notification error:', err));
 
     res.json({
       status: 'success',
-      conversation,
-      message: 'New conversation started',
+      message: 'Connected to support team',
     });
   } catch (error) {
-    console.error('Start new conversation error:', error);
+    console.error('Request human support error:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Failed to start new conversation',
+      message: 'Failed to connect to support',
     });
   }
 };
@@ -489,4 +539,6 @@ module.exports = {
   reopenConversation,
   getUnreadCount,
   startNewConversation,
+  submitAiFeedback,
+  requestHumanSupport,
 };

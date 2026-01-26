@@ -198,20 +198,32 @@ enum FeedbackStatus {
   RESOLVED
 }
 
+// ========================================
+// 💬 LIVE CHAT MODELS (UPDATED WITH AI)
+// ========================================
+
 model ChatConversation {
   id            String     @id @default(uuid())
   userId        String
   status        ChatStatus @default(ACTIVE)
   lastMessageAt DateTime   @default(now())
+  
+  // 🤖 AI CHATBOT FIELDS
+  isAiHandling        Boolean   @default(true)   // Is AI bot handling this conversation?
+  escalatedToHumanAt  DateTime?                  // When escalated to human support
+  escalationReason    String?                    // Why it was escalated
+  
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
-  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages ChatMessage[]
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages     ChatMessage[]
+  botAnalytics ChatBotAnalytics[]
 
   @@index([userId])
   @@index([status])
   @@index([lastMessageAt])
+  @@index([isAiHandling])
 }
 
 enum ChatStatus {
@@ -224,19 +236,113 @@ model ChatMessage {
   conversationId String
   senderId       String
   senderType     SenderType
-  message        String
+  message        String     @db.Text
   isRead         Boolean    @default(false)
-  createdAt      DateTime   @default(now())
+  
+  // 🤖 AI AND FILE FIELDS
+  isAiGenerated  Boolean   @default(false)           // Was this message from AI bot?
+  hasAttachments Boolean   @default(false)           // Does message have file attachments?
+  aiConfidence   Decimal?  @db.Decimal(3, 2)        // AI confidence score (0.00-1.00)
+  
+  createdAt      DateTime  @default(now())
 
-  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversation ChatConversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  attachments  ChatAttachment[]
+  botAnalytics ChatBotAnalytics?
 
   @@index([conversationId])
   @@index([createdAt])
+  @@index([isAiGenerated])
+  @@index([hasAttachments])
 }
 
 enum SenderType {
   USER
   ADMIN
+}
+
+// ========================================
+// 🤖 AI CHATBOT KNOWLEDGE BASE
+// ========================================
+
+model ChatKnowledgeBase {
+  id          String   @id @default(uuid())
+  category    String   // Upload, QR Codes, NFC, Billing, etc.
+  question    String   @db.Text // The FAQ question
+  answer      String   @db.Text // The answer
+  keywords    String[] // Keywords for matching
+  priority    Int      @default(0) // Higher = better match
+  isActive    Boolean  @default(true)
+  usageCount  Int      @default(0) // Track how often used
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([isActive])
+}
+
+// ========================================
+// 🎯 AI INTENT DETECTION
+// ========================================
+
+model ChatIntent {
+  id            String   @id @default(uuid())
+  name          String   @unique // e.g., "help_upload", "billing_issue"
+  description   String   @db.Text
+  patterns      String[] // Text patterns to detect intent
+  response      String   @db.Text // Auto-response for this intent
+  requiresHuman Boolean  @default(false) // Auto-escalate to human?
+  priority      Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([name])
+  @@index([isActive])
+}
+
+// ========================================
+// 📎 CHAT FILE ATTACHMENTS
+// ========================================
+
+model ChatAttachment {
+  id           String      @id @default(uuid())
+  messageId    String
+  fileName     String
+  fileType     String      // MIME type: image/png, application/pdf, etc.
+  fileSize     BigInt      // File size in bytes
+  fileUrl      String      @db.Text // CDN URL (Bunny.net)
+  thumbnailUrl String?     // Thumbnail for images
+  uploadedBy   String      // User ID who uploaded
+  createdAt    DateTime    @default(now())
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@index([uploadedBy])
+}
+
+// ========================================
+// 📊 AI BOT ANALYTICS
+// ========================================
+
+model ChatBotAnalytics {
+  id              String   @id @default(uuid())
+  conversationId  String
+  messageId       String   @unique
+  intent          String?  // Detected intent
+  knowledgeBaseId String?  // Which FAQ was used
+  confidence      Decimal? @db.Decimal(3, 2) // Bot confidence (0.00-1.00)
+  wasHelpful      Boolean? // User feedback
+  escalated       Boolean  @default(false)
+  responseTime    Int?     // Response time in milliseconds
+  createdAt       DateTime @default(now())
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message      ChatMessage      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([createdAt])
 }
 
 // ========================================
