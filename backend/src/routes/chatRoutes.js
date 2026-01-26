@@ -10,10 +10,8 @@ const { resolveEffectiveUserId } = require('../middleware/resolveEffectiveUserId
 // MULTER CONFIGURATION FOR FILE UPLOADS
 // ═══════════════════════════════════════════════════════════
 
-// Use memory storage (files stored in memory as Buffer)
 const storage = multer.memoryStorage();
 
-// File filter
 const fileFilter = (req, file, cb) => {
   const allowedTypes = [
     'image/png',
@@ -37,18 +35,17 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// Multer upload configuration
 const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB max
-    files: 5, // Max 5 files per request
+    fileSize: 10 * 1024 * 1024,
+    files: 5,
   },
 });
 
 // ═══════════════════════════════════════════════════════════
-// USER ROUTES - Protected by authMiddleware
+// USER ROUTES
 // ═══════════════════════════════════════════════════════════
 
 // Get or create user's conversation
@@ -59,13 +56,20 @@ router.get(
   chatController.getOrCreateConversation
 );
 
+// 🆕 NEW: Get messages for a conversation (for polling)
+router.get(
+  '/conversation/:conversationId/messages',
+  authMiddleware,
+  resolveEffectiveUserId,
+  chatController.getMessages
+);
+
 // Send message (with optional file attachments)
-// IMPORTANT: Changed to use multer for file uploads
 router.post(
   '/message',
   authMiddleware,
   resolveEffectiveUserId,
-  upload.array('files', 5), // Allow up to 5 files
+  upload.array('files', 5),
   chatController.sendMessage
 );
 
@@ -93,8 +97,24 @@ router.post(
   chatController.requestHumanSupport
 );
 
+// 🆕 NEW: Get chat history
+router.get(
+  '/history',
+  authMiddleware,
+  resolveEffectiveUserId,
+  chatController.getChatHistory
+);
+
+// 🆕 NEW: Submit conversation feedback (rating + comment)
+router.post(
+  '/conversation/:conversationId/feedback',
+  authMiddleware,
+  resolveEffectiveUserId,
+  chatController.submitConversationFeedback
+);
+
 // ═══════════════════════════════════════════════════════════
-// ADMIN ROUTES - Protected by authMiddleware + requireAdmin
+// ADMIN ROUTES
 // ═══════════════════════════════════════════════════════════
 
 // Get all conversations with optional status filter

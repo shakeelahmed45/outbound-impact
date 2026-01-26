@@ -213,6 +213,10 @@ model ChatConversation {
   escalatedToHumanAt  DateTime?                  // When escalated to human support
   escalationReason    String?                    // Why it was escalated
   
+  // 🆕 NEW: FEEDBACK FIELDS (Feature 4: Feedback Modal)
+  feedbackRating      Int?                       // 1-5 star rating
+  feedbackComment     String?   @db.Text         // Optional feedback comment
+  
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 

@@ -15,6 +15,7 @@ const teamRoutes = require('./routes/teamRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const advancedAnalyticsRoutes = require('./routes/advancedAnalyticsRoutes');
+const chatAutoCloseService = require('./services/chatAutoCloseService');
 
 // ✨ Enterprise feature routes
 const apiKeyRoutes = require('./routes/apiKeyRoutes');
@@ -237,6 +238,7 @@ if (process.env.VERCEL) {
   module.exports = app;
 } else {
   // Start server for local development
+  chatAutoCloseService.startAutoCloseJob();
   app.listen(PORT, () => {
     console.log('\n═══════════════════════════════════════════════');
     console.log('🚀 Outbound Impact Server');
