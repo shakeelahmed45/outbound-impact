@@ -31,8 +31,10 @@ const LiveChatPage = () => {
   const [timeUntilClose, setTimeUntilClose] = useState(15 * 60);
   
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const pollInterval = useRef(null);
   const inactivityTimerRef = useRef(null);
+  const previousMessagesLength = useRef(0);
 
   // FEATURE 1: Real-time Polling
   useEffect(() => {
@@ -51,8 +53,20 @@ const LiveChatPage = () => {
     };
   }, [conversation]);
 
+  // FIXED: Smart auto-scroll - only scroll if user is at bottom
   useEffect(() => {
-    scrollToBottom();
+    if (messages.length > previousMessagesLength.current) {
+      const container = messagesContainerRef.current;
+      if (container) {
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+        if (isNearBottom) {
+          scrollToBottom();
+        }
+      } else {
+        scrollToBottom();
+      }
+    }
+    previousMessagesLength.current = messages.length;
   }, [messages]);
 
   // FEATURE 5: Auto-close timer
@@ -448,7 +462,7 @@ const LiveChatPage = () => {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-6 bg-gray-50">
               {messages.length === 0 ? (
                 <div className="text-center py-12">
                   <MessageSquare size={64} className="mx-auto text-gray-300 mb-4" />
