@@ -1,4 +1,4 @@
-const prisma = require('../config/database');
+const prisma = require('../lib/prisma');
 const cron = require('node-cron');
 
 const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
@@ -10,9 +10,9 @@ async function closeInactiveChats() {
     const inactiveConversations = await prisma.chatConversation.findMany({
       where: {
         status: {
-          in: ['active', 'pending_admin'],
+          in: ['ACTIVE'],
         },
-        lastActivityAt: {
+        lastMessageAt: {
           lt: fifteenMinutesAgo,
         },
       },
@@ -30,8 +30,7 @@ async function closeInactiveChats() {
         },
       },
       data: {
-        status: 'closed',
-        closedAt: new Date(),
+        status: 'CLOSED',
       },
     });
 
@@ -41,9 +40,11 @@ async function closeInactiveChats() {
       await prisma.chatMessage.create({
         data: {
           conversationId: conversation.id,
-          senderId: null,
-          senderType: 'SYSTEM',
-          content: 'This chat has been automatically closed due to inactivity. You can start a new chat anytime!',
+          senderId: 'system',
+          senderType: 'ADMIN',
+          message: 'This chat has been automatically closed due to inactivity. You can start a new chat anytime!',
+          isRead: false,
+          isAiGenerated: true,
         },
       });
     }
