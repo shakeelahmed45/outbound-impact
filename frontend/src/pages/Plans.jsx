@@ -32,7 +32,7 @@ const Plans = () => {
         'View tracking & analytics',
         '250GB storage',
         'Unlimited views',
-        'Lifetime access',
+        '12 Months access',
       ],
     },
     {
