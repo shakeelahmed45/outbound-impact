@@ -1,27 +1,61 @@
 const prisma = require('../lib/prisma');
 
 // ═══════════════════════════════════════════════════════════
-// AI CHATBOT SERVICE - In-House Custom AI
-// No external APIs - Uses knowledge base and pattern matching
+// SMART AI CHATBOT SERVICE - PROFESSIONAL & INTELLIGENT
 // ═══════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════
+// NORMALIZE TEXT FOR BETTER MATCHING
+// ═══════════════════════════════════════════════════════════
+
+const normalizeText = (text) => {
+  return text
+    .toLowerCase()
+    .replace(/[?!.,;]/g, '') // Remove punctuation
+    .replace(/\s+/g, ' ') // Multiple spaces to single
+    .trim();
+};
+
+// ═══════════════════════════════════════════════════════════
+// EXTRACT KEY PHRASES
+// ═══════════════════════════════════════════════════════════
+
+const extractKeyPhrases = (text) => {
+  const normalized = normalizeText(text);
+  const words = normalized.split(' ');
+  const phrases = [];
+  
+  // Single words
+  phrases.push(...words);
+  
+  // Two-word phrases
+  for (let i = 0; i < words.length - 1; i++) {
+    phrases.push(`${words[i]} ${words[i + 1]}`);
+  }
+  
+  // Three-word phrases
+  for (let i = 0; i < words.length - 2; i++) {
+    phrases.push(`${words[i]} ${words[i + 1]} ${words[i + 2]}`);
+  }
+  
+  return phrases;
+};
 
 // ═══════════════════════════════════════════════════════════
 // DETECT USER INTENT
 // ═══════════════════════════════════════════════════════════
 
 const detectIntent = async (message) => {
-  const lowerMessage = message.toLowerCase().trim();
+  const normalized = normalizeText(message);
   
-  // Get all active intents
   const intents = await prisma.chatIntent.findMany({
     where: { isActive: true },
     orderBy: { priority: 'desc' },
   });
 
-  // Check each intent's patterns
   for (const intent of intents) {
     for (const pattern of intent.patterns) {
-      if (lowerMessage.includes(pattern.toLowerCase())) {
+      if (normalized.includes(normalizeText(pattern))) {
         console.log(`✅ Intent detected: ${intent.name}`);
         return intent;
       }
@@ -32,45 +66,61 @@ const detectIntent = async (message) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// SEARCH KNOWLEDGE BASE
+// SMART KNOWLEDGE BASE SEARCH
 // ═══════════════════════════════════════════════════════════
 
 const searchKnowledgeBase = async (message) => {
-  const lowerMessage = message.toLowerCase().trim();
-  const words = lowerMessage.split(/\s+/);
+  const normalized = normalizeText(message);
+  const userPhrases = extractKeyPhrases(message);
 
-  // Get all active knowledge base entries
   const allEntries = await prisma.chatKnowledgeBase.findMany({
     where: { isActive: true },
     orderBy: { priority: 'desc' },
   });
 
-  // Score each entry based on keyword matches
+  if (allEntries.length === 0) {
+    console.log('⚠️ No knowledge base entries found! Database might be empty.');
+    return null;
+  }
+
+  console.log(`🔍 Searching ${allEntries.length} KB entries for: "${message}"`);
+
   const scored = allEntries.map(entry => {
     let score = 0;
     let matchedKeywords = [];
 
-    // Check each keyword
     entry.keywords.forEach(keyword => {
-      const keywordLower = keyword.toLowerCase();
+      const normalizedKeyword = normalizeText(keyword);
       
-      // Exact phrase match (highest score)
-      if (lowerMessage.includes(keywordLower)) {
-        score += 10;
+      // EXACT PHRASE MATCH (highest score)
+      if (normalized.includes(normalizedKeyword)) {
+        score += 20;
         matchedKeywords.push(keyword);
-      } 
-      // Individual word matches
+        console.log(`  ✅ Exact match: "${keyword}" (+20)`);
+      }
+      // PARTIAL WORD MATCHES
       else {
-        const keywordWords = keywordLower.split(/\s+/);
-        const matches = keywordWords.filter(kw => words.includes(kw));
-        if (matches.length > 0) {
-          score += matches.length * 2;
+        const keywordWords = normalizedKeyword.split(' ');
+        const matchCount = keywordWords.filter(kw => 
+          userPhrases.some(phrase => phrase.includes(kw))
+        ).length;
+        
+        if (matchCount > 0) {
+          score += matchCount * 5;
           matchedKeywords.push(keyword);
+          console.log(`  ✅ Partial match: "${keyword}" (+${matchCount * 5})`);
         }
       }
     });
 
-    // Add priority bonus
+    // Question similarity bonus
+    const normalizedQuestion = normalizeText(entry.question);
+    if (normalized.includes(normalizedQuestion) || normalizedQuestion.includes(normalized)) {
+      score += 15;
+      console.log(`  ✅ Question match (+15)`);
+    }
+
+    // Priority bonus
     score += entry.priority;
 
     return {
@@ -80,21 +130,42 @@ const searchKnowledgeBase = async (message) => {
     };
   });
 
-  // Filter and sort by score
-  const matches = scored.filter(entry => entry.score > 0);
-  matches.sort((a, b) => b.score - a.score);
+  // Sort by score
+  scored.sort((a, b) => b.score - a.score);
 
-  return matches.length > 0 ? matches[0] : null;
+  console.log('📊 Top 3 scores:', scored.slice(0, 3).map(e => ({
+    question: e.question,
+    score: e.score,
+    keywords: e.matchedKeywords,
+  })));
+
+  const bestMatch = scored[0];
+  
+  // Accept if score > 5 (very forgiving)
+  if (bestMatch && bestMatch.score > 5) {
+    console.log(`✅ MATCH FOUND: ${bestMatch.question} (score: ${bestMatch.score})`);
+    return bestMatch;
+  }
+
+  console.log('❌ No good match found');
+  return null;
 };
 
 // ═══════════════════════════════════════════════════════════
 // CALCULATE CONFIDENCE SCORE
 // ═══════════════════════════════════════════════════════════
 
-const calculateConfidence = (score, maxPossibleScore = 20) => {
-  // Normalize score to 0-1 range
-  const confidence = Math.min(score / maxPossibleScore, 1.0);
-  return parseFloat(confidence.toFixed(2));
+const calculateConfidence = (score) => {
+  // Score 40+ = 0.95 confidence
+  // Score 20-39 = 0.75 confidence
+  // Score 10-19 = 0.60 confidence
+  // Score 5-9 = 0.45 confidence
+  
+  if (score >= 40) return 0.95;
+  if (score >= 20) return 0.75;
+  if (score >= 10) return 0.60;
+  if (score >= 5) return 0.45;
+  return 0.30;
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -105,14 +176,15 @@ const generateAiResponse = async (message, conversationId) => {
   const startTime = Date.now();
 
   try {
-    // Step 1: Check for intent (greeting, urgent, etc.)
+    console.log('🤖 Processing message:', message);
+
+    // Step 1: Check for intent
     const intent = await detectIntent(message);
     
     if (intent) {
-      const confidence = 0.95; // High confidence for intent matches
+      const confidence = 0.95;
       const responseTime = Date.now() - startTime;
 
-      // If requires human, escalate
       if (intent.requiresHuman) {
         await escalateToHuman(conversationId, `Intent: ${intent.name}`);
       }
@@ -141,15 +213,12 @@ const generateAiResponse = async (message, conversationId) => {
         data: { usageCount: { increment: 1 } },
       });
 
-      // If confidence too low, suggest human
-      const shouldEscalate = confidence < 0.4;
+      const shouldEscalate = confidence < 0.5;
       
       let response = kbMatch.answer;
       
       if (shouldEscalate) {
-        response += '\n\n🤔 I\'m not 100% sure this answers your question. Would you like me to connect you with our support team for more detailed help?';
-      } else if (confidence < 0.7) {
-        response += '\n\n💡 Did this answer your question? If you need more help, I can connect you with our support team!';
+        response += '\n\n💭 Not sure if this fully answers your question? I can connect you with our support team for detailed help!';
       }
 
       return {
@@ -164,18 +233,19 @@ const generateAiResponse = async (message, conversationId) => {
       };
     }
 
-    // Step 3: No match found - offer to escalate
+    // Step 3: No match - offer options
     const responseTime = Date.now() - startTime;
     
     return {
-      response: "I'm not sure I understand your question, but I'd like to help! Here are a few things I can assist with:\n\n" +
-                "📤 **Uploading files** - How to add content\n" +
-                "📱 **QR Codes** - Creating and using QR codes\n" +
-                "🔗 **NFC Tags** - Setting up tap-to-view\n" +
+      response: "I'd be happy to help you! I can assist with:\n\n" +
+                "📤 **Uploading Content** - How to add images, videos, and files\n" +
+                "🎨 **Creating Streams** - Building content collections\n" +
+                "📱 **QR Codes** - Generating and downloading QR codes\n" +
+                "🔗 **NFC Tags** - Setting up tap-to-view experiences\n" +
                 "📊 **Analytics** - Tracking views and engagement\n" +
-                "👥 **Team** - Adding team members\n" +
-                "💳 **Billing** - Payments and subscriptions\n\n" +
-                "Or I can **connect you with our support team** for personalized help. What works best for you?",
+                "👥 **Team Management** - Adding and managing team members\n" +
+                "💳 **Billing & Plans** - Subscriptions and payments\n\n" +
+                "Which would you like to know more about? Or I can **connect you with our support team** for personalized help! 😊",
       isAiGenerated: true,
       confidence: 0.3,
       intent: 'no_match',
@@ -189,7 +259,7 @@ const generateAiResponse = async (message, conversationId) => {
     const responseTime = Date.now() - startTime;
     
     return {
-      response: "I'm having trouble processing your message right now. Let me connect you with our support team who can help! 👋",
+      response: "I'm having trouble processing your message. Let me connect you with our support team who can help! 👋",
       isAiGenerated: true,
       confidence: 0,
       intent: 'error',
@@ -216,10 +286,7 @@ const escalateToHuman = async (conversationId, reason) => {
       },
     });
 
-    console.log(`✅ Conversation ${conversationId} escalated to human: ${reason}`);
-    
-    // Could send notification to admin here
-    // await sendAdminEscalationNotification(conversationId, reason);
+    console.log(`✅ Conversation ${conversationId} escalated: ${reason}`);
 
   } catch (error) {
     console.error('Escalation error:', error);
@@ -249,34 +316,31 @@ const saveAnalytics = async (conversationId, messageId, analyticsData) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// MAIN FUNCTION: HANDLE USER MESSAGE WITH AI
+// HANDLE USER MESSAGE WITH AI
 // ═══════════════════════════════════════════════════════════
 
 const handleUserMessageWithAi = async (message, conversationId) => {
   try {
-    console.log('🤖 AI Bot processing message:', message);
+    console.log('🤖 AI Bot processing:', message);
 
-    // Check if conversation is still AI-handled
     const conversation = await prisma.chatConversation.findUnique({
       where: { id: conversationId },
       select: { isAiHandling: true },
     });
 
     if (!conversation || !conversation.isAiHandling) {
-      console.log('⏩ Conversation already escalated to human, skipping AI');
+      console.log('⏩ Conversation handled by human, skipping AI');
       return null;
     }
 
-    // Generate AI response
     const aiResult = await generateAiResponse(message, conversationId);
 
-    console.log('✅ AI Response generated:', {
+    console.log('✅ AI Response:', {
       confidence: aiResult.confidence,
       intent: aiResult.intent,
       requiresHuman: aiResult.requiresHuman,
     });
 
-    // If requires human, escalate
     if (aiResult.requiresHuman) {
       await escalateToHuman(conversationId, aiResult.intent || 'Low confidence');
     }
@@ -290,7 +354,7 @@ const handleUserMessageWithAi = async (message, conversationId) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// USER FEEDBACK ON AI RESPONSE
+// USER FEEDBACK
 // ═══════════════════════════════════════════════════════════
 
 const recordAiFeedback = async (messageId, wasHelpful) => {
@@ -300,14 +364,14 @@ const recordAiFeedback = async (messageId, wasHelpful) => {
       data: { wasHelpful },
     });
     
-    console.log(`✅ Feedback recorded for message ${messageId}: ${wasHelpful ? 'Helpful' : 'Not helpful'}`);
+    console.log(`✅ Feedback recorded: ${wasHelpful ? 'Helpful' : 'Not helpful'}`);
   } catch (error) {
-    console.error('Feedback recording error:', error);
+    console.error('Feedback error:', error);
   }
 };
 
 // ═══════════════════════════════════════════════════════════
-// GET AI STATISTICS
+// GET STATISTICS
 // ═══════════════════════════════════════════════════════════
 
 const getAiStatistics = async (days = 7) => {
@@ -316,9 +380,7 @@ const getAiStatistics = async (days = 7) => {
     startDate.setDate(startDate.getDate() - days);
 
     const analytics = await prisma.chatBotAnalytics.findMany({
-      where: {
-        createdAt: { gte: startDate },
-      },
+      where: { createdAt: { gte: startDate } },
     });
 
     const stats = {
