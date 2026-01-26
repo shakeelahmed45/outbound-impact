@@ -37,7 +37,7 @@ const getOrCreateConversation = async (req, res) => {
         data: {
           userId,
           status: 'ACTIVE',
-          isAiHandling: true, // Start with AI bot
+          isAiHandling: true,
         },
         include: {
           messages: {
@@ -242,8 +242,8 @@ const sendMessage = async (req, res) => {
         aiResponse = await prisma.chatMessage.create({
           data: {
             conversationId: targetConversationId,
-            senderId: 'system', // System/Bot sender
-            senderType: 'ADMIN', // Display as admin/support
+            senderId: 'system',
+            senderType: 'ADMIN',
             message: aiResult.response,
             isRead: false,
             isAiGenerated: true,
@@ -449,7 +449,129 @@ const getConversationById = async (req, res) => {
   }
 };
 
-// ... (rest of functions: closeConversation, reopenConversation, getUnreadCount, startNewConversation remain same as before)
+// ═══════════════════════════════════════════════════════════
+// ADMIN: Close Conversation
+// ═══════════════════════════════════════════════════════════
+const closeConversation = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const conversation = await prisma.chatConversation.update({
+      where: { id },
+      data: { status: 'CLOSED' },
+    });
+
+    res.json({
+      status: 'success',
+      conversation,
+    });
+  } catch (error) {
+    console.error('Close conversation error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to close conversation',
+    });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// ADMIN: Reopen Conversation
+// ═══════════════════════════════════════════════════════════
+const reopenConversation = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const conversation = await prisma.chatConversation.update({
+      where: { id },
+      data: { status: 'ACTIVE' },
+    });
+
+    res.json({
+      status: 'success',
+      conversation,
+    });
+  } catch (error) {
+    console.error('Reopen conversation error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to reopen conversation',
+    });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// ADMIN: Get Unread Message Count
+// ═══════════════════════════════════════════════════════════
+const getUnreadCount = async (req, res) => {
+  try {
+    const count = await prisma.chatMessage.count({
+      where: {
+        senderType: 'USER',
+        isRead: false,
+      },
+    });
+
+    res.json({
+      status: 'success',
+      count,
+    });
+  } catch (error) {
+    console.error('Get unread count error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get unread count',
+    });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// USER: Start New Conversation (Close current and create new)
+// ═══════════════════════════════════════════════════════════
+const startNewConversation = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Close all existing active conversations
+    await prisma.chatConversation.updateMany({
+      where: {
+        userId,
+        status: 'ACTIVE',
+      },
+      data: { status: 'CLOSED' },
+    });
+
+    // Create new conversation
+    const conversation = await prisma.chatConversation.create({
+      data: {
+        userId,
+        status: 'ACTIVE',
+        isAiHandling: true,
+      },
+      include: {
+        messages: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    res.json({
+      status: 'success',
+      conversation,
+      message: 'New conversation started',
+    });
+  } catch (error) {
+    console.error('Start new conversation error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to start new conversation',
+    });
+  }
+};
 
 // ═══════════════════════════════════════════════════════════
 // USER: Feedback on AI Response
