@@ -1,4 +1,5 @@
 const prisma = require('../lib/prisma');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // ═══════════════════════════════════════════════════════════
 // ENHANCED ADMIN STATS (with previous period comparison)
@@ -137,8 +138,8 @@ const getAnalytics = async (req, res) => {
     // User Growth Data
     const userGrowth = await getUserGrowthData(startDate, days);
     
-    // Revenue Analytics
-    const revenue = await getRevenueAnalytics();
+    // ✅ REAL Revenue Analytics from Stripe
+    const revenue = await getRealRevenueFromStripe();
     
     // Storage Analytics
     const storage = await getStorageAnalytics();
@@ -318,67 +319,101 @@ async function getUserGrowthData(startDate, days) {
   return userGrowth;
 }
 
-async function getRevenueAnalytics() {
-  const now = new Date();
-  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+// ═══════════════════════════════════════════════════════════
+// ✅ REAL REVENUE FROM STRIPE API
+// ═══════════════════════════════════════════════════════════
+async function getRealRevenueFromStripe() {
+  try {
+    console.log('💰 Fetching REAL revenue from Stripe...');
 
-  // Subscription pricing
-  const pricing = {
-    'INDIVIDUAL': 85,
-    'ORG_SMALL': 279,
-    'ORG_MEDIUM': 549,
-    'ORG_ENTERPRISE': 1299
-  };
+    const now = new Date();
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
 
-  // Active subscriptions by role
-  const activeByRole = await prisma.user.groupBy({
-    by: ['role'],
-    where: {
-      subscriptionStatus: 'active'
-    },
-    _count: {
-      role: true
-    }
-  });
+    // ✅ Calculate REAL MRR from active Stripe subscriptions
+    let mrr = 0;
+    let activeSubCount = 0;
+    
+    // Get all active subscriptions from Stripe
+    const subscriptions = await stripe.subscriptions.list({
+      status: 'active',
+      limit: 100,
+      expand: ['data.plan']
+    });
 
-  let mrr = 0;
-  activeByRole.forEach(item => {
-    const price = pricing[item.role] || 0;
-    mrr += price * item._count.role;
-  });
+    console.log(`📊 Found ${subscriptions.data.length} active subscriptions in Stripe`);
 
-  // This month's new subscriptions
-  const thisMonthSubs = await prisma.user.count({
-    where: {
-      subscriptionStatus: 'active',
-      currentPeriodStart: {
-        gte: thisMonthStart
+    // Calculate MRR from actual subscription prices
+    subscriptions.data.forEach(sub => {
+      if (sub.items && sub.items.data.length > 0) {
+        const price = sub.items.data[0].price;
+        if (price && price.recurring && price.recurring.interval === 'month') {
+          const monthlyAmount = price.unit_amount / 100; // Convert cents to dollars
+          mrr += monthlyAmount;
+          activeSubCount++;
+        }
       }
-    }
-  });
+    });
 
-  const thisMonthRevenue = thisMonthSubs * 85; // Average
+    console.log(`✅ Calculated MRR: $${mrr.toFixed(2)} from ${activeSubCount} subscriptions`);
 
-  // Last month's subscriptions
-  const lastMonthSubs = await prisma.user.count({
-    where: {
-      subscriptionStatus: 'active',
-      currentPeriodStart: {
-        gte: lastMonthStart,
-        lt: lastMonthEnd
-      }
-    }
-  });
+    // ✅ Get REAL payments for this month from Stripe invoices
+    const thisMonthPayments = await stripe.invoices.list({
+      created: {
+        gte: Math.floor(thisMonthStart.getTime() / 1000)
+      },
+      status: 'paid',
+      limit: 100
+    });
 
-  const lastMonthRevenue = lastMonthSubs * 85; // Average
+    let thisMonthRevenue = 0;
+    thisMonthPayments.data.forEach(invoice => {
+      thisMonthRevenue += invoice.amount_paid / 100; // Convert cents to dollars
+    });
 
-  return {
-    mrr,
-    thisMonth: thisMonthRevenue,
-    lastMonth: lastMonthRevenue
-  };
+    console.log(`✅ This month revenue: $${thisMonthRevenue.toFixed(2)} from ${thisMonthPayments.data.length} payments`);
+
+    // ✅ Get REAL payments for last month from Stripe invoices
+    const lastMonthPayments = await stripe.invoices.list({
+      created: {
+        gte: Math.floor(lastMonthStart.getTime() / 1000),
+        lte: Math.floor(lastMonthEnd.getTime() / 1000)
+      },
+      status: 'paid',
+      limit: 100
+    });
+
+    let lastMonthRevenue = 0;
+    lastMonthPayments.data.forEach(invoice => {
+      lastMonthRevenue += invoice.amount_paid / 100; // Convert cents to dollars
+    });
+
+    console.log(`✅ Last month revenue: $${lastMonthRevenue.toFixed(2)} from ${lastMonthPayments.data.length} payments`);
+
+    return {
+      mrr: parseFloat(mrr.toFixed(2)),
+      thisMonth: parseFloat(thisMonthRevenue.toFixed(2)),
+      lastMonth: parseFloat(lastMonthRevenue.toFixed(2)),
+      activeSubscriptions: activeSubCount,
+      thisMonthPayments: thisMonthPayments.data.length,
+      lastMonthPayments: lastMonthPayments.data.length
+    };
+
+  } catch (error) {
+    console.error('❌ Error fetching real revenue from Stripe:', error);
+    
+    // Fallback to basic calculation if Stripe API fails
+    return {
+      mrr: 0,
+      thisMonth: 0,
+      lastMonth: 0,
+      activeSubscriptions: 0,
+      thisMonthPayments: 0,
+      lastMonthPayments: 0,
+      error: 'Failed to fetch from Stripe'
+    };
+  }
 }
 
 async function getStorageAnalytics() {
