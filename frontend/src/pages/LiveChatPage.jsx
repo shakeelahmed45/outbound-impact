@@ -21,6 +21,7 @@ const LiveChatPage = () => {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [feedbackRating, setFeedbackRating] = useState(0);
   const [feedbackComment, setFeedbackComment] = useState('');
+  const [feedbackShown, setFeedbackShown] = useState(false);
   
   // FEATURE 6: Chat History
   const [showChatHistory, setShowChatHistory] = useState(false);
@@ -118,6 +119,7 @@ const LiveChatPage = () => {
       clearInterval(inactivityTimerRef.current);
     }
     setInactivityWarning(false);
+    setFeedbackShown(true); // Mark as shown
     setShowFeedbackModal(true);
   };
 
@@ -153,9 +155,31 @@ const LiveChatPage = () => {
         params: { after: afterTimestamp },
       });
       
-      if (response.data.status === 'success' && response.data.messages.length > 0) {
-        setMessages((prev) => [...prev, ...response.data.messages]);
-        resetInactivityTimer();
+      if (response.data.status === 'success') {
+        // Check if new messages arrived
+        if (response.data.messages.length > 0) {
+          const newMessages = response.data.messages;
+          setMessages((prev) => [...prev, ...newMessages]);
+          
+          // Check if any new message indicates auto-close
+          const hasAutoCloseMessage = newMessages.some(msg => 
+            msg.senderType === 'ADMIN' && 
+            msg.isAiGenerated && 
+            msg.message.includes('automatically closed due to inactivity')
+          );
+          
+          if (hasAutoCloseMessage && !feedbackShown) {
+            // Auto-close detected! Show feedback modal
+            console.log('🤖 Auto-close detected - showing feedback modal');
+            setConversation(prev => ({ ...prev, status: 'CLOSED' }));
+            setTimeout(() => {
+              setShowFeedbackModal(true);
+              setFeedbackShown(true);
+            }, 1500); // Give user time to see the message
+          } else {
+            resetInactivityTimer();
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to poll messages:', error);
@@ -243,6 +267,7 @@ const LiveChatPage = () => {
     const confirm = window.confirm('Are you sure you want to close this chat?');
     if (!confirm) return;
     
+    setFeedbackShown(true); // Mark as shown when manually closing
     setShowFeedbackModal(true);
   };
 
@@ -278,6 +303,7 @@ const LiveChatPage = () => {
       if (response.data.status === 'success') {
         setConversation(response.data.conversation);
         setMessages([]);
+        setFeedbackShown(false); // Reset feedback flag for new chat
         resetInactivityTimer();
       }
     } catch (error) {

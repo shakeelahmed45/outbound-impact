@@ -302,20 +302,19 @@ const sendMessage = async (req, res) => {
     }
 
     if (!isAdmin) {
-      if (!conversation?.isAiHandling || uploadedAttachments.length > 0) {
-        console.log('📧 Sending chat notification to admin...');
-        const notificationMessage = uploadedAttachments.length > 0 
-          ? `${message || ''}\n\n[User attached ${uploadedAttachments.length} file(s)]`
-          : message.trim();
-          
-        sendChatNotificationToAdmin(
-          {
-            userName: user.name,
-            userEmail: user.email,
-          },
-          notificationMessage
-        ).catch(err => console.error('Failed to send admin notification:', err));
-      }
+      // USER sent message → ALWAYS Notify ADMIN
+      console.log('📧 Sending chat notification to admin...');
+      const notificationMessage = uploadedAttachments.length > 0 
+        ? `${message || ''}\n\n[User attached ${uploadedAttachments.length} file(s)]`
+        : message.trim();
+        
+      sendChatNotificationToAdmin(
+        {
+          userName: user.name,
+          userEmail: user.email,
+        },
+        notificationMessage
+      ).catch(err => console.error('Failed to send admin notification:', err));
     } else {
       if (targetUserEmail && targetUserName) {
         console.log('📧 Sending reply notification to:', targetUserEmail);
