@@ -40,6 +40,11 @@ model User {
   refundReason       String?    @db.Text
   refundStatus       String?    // 'pending', 'processed'
 
+  // ✅ PHASE 2: USER MANAGEMENT FIELDS
+  status             String?    @default("active")  // active, suspended, banned, deleted
+  deletedAt          DateTime?                      // Timestamp when user was deleted
+  lastLoginAt        DateTime?                      // Last successful login timestamp
+
   items             Item[]
   campaigns         Campaign[]
   teamMembers       TeamMember[]       @relation("OrganizationMembers")
@@ -56,6 +61,7 @@ model User {
 
   @@index([email])
   @@index([resetToken])
+  @@index([status])  // ✅ PHASE 2: Index for faster status queries
 }
 
 enum Role {

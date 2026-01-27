@@ -3,23 +3,32 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/auth');
 
-// Import existing admin controller
-const {
-  getAllUsers,
-  getAllItems,
-  updateUser,
-  deleteUser,
-  deleteItem,
-  removeUserFromTeam,
-  sendPasswordReset
-} = require('../controllers/adminController');
-
-// Import new analytics controller
+// Import analytics controller
 const {
   getAdminStats,
   getAnalytics,
   getRecentActivities
 } = require('../controllers/adminAnalyticsController');
+
+// Import enhanced user controller
+const {
+  getAllUsers,
+  bulkUserActions,
+  suspendUser,
+  impersonateUser,
+  exportUsers,
+  getUserDetails,
+  updateUser,
+  deleteUser,
+  removeUserFromTeam,
+  sendPasswordReset
+} = require('../controllers/adminUserController');
+
+// Import existing item controller
+const {
+  getAllItems,
+  deleteItem
+} = require('../controllers/adminController');
 
 // ═══════════════════════════════════════════════════════════
 // MIDDLEWARE - All routes require authentication and admin role
@@ -35,11 +44,34 @@ router.get('/analytics', getAnalytics);
 router.get('/recent-activities', getRecentActivities);
 
 // ═══════════════════════════════════════════════════════════
-// USER MANAGEMENT ROUTES
+// USER MANAGEMENT ROUTES (Enhanced)
 // ═══════════════════════════════════════════════════════════
+
+// List & Filter Users
 router.get('/users', getAllUsers);
+
+// Bulk Actions
+router.post('/users/bulk-action', bulkUserActions);
+
+// Export Users
+router.get('/users/export', exportUsers);
+
+// User Details
+router.get('/users/:userId', getUserDetails);
+
+// Update User
 router.put('/users/:userId', updateUser);
+
+// Delete User
 router.delete('/users/:userId', deleteUser);
+
+// Suspend/Unsuspend User
+router.post('/users/:userId/suspend', suspendUser);
+
+// Impersonate User
+router.post('/users/:userId/impersonate', impersonateUser);
+
+// Password Reset
 router.post('/users/:userId/password-reset', sendPasswordReset);
 
 // ═══════════════════════════════════════════════════════════

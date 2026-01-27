@@ -1,77 +1,57 @@
 const prisma = require('../lib/prisma');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 
-// Get admin dashboard stats
-const getAdminStats = async (req, res) => {
-  try {
-    const [
-      totalUsers,
-      totalItems,
-      totalCampaigns,
-      activeSubscriptions,
-      totalStorageUsed
-    ] = await Promise.all([
-      prisma.user.count(),
-      prisma.item.count(),
-      prisma.campaign.count(),
-      prisma.user.count({
-        where: {
-          subscriptionStatus: 'active'
-        }
-      }),
-      prisma.user.aggregate({
-        _sum: {
-          storageUsed: true
-        }
-      })
-    ]);
-
-    const usersByRole = await prisma.user.groupBy({
-      by: ['role'],
-      _count: {
-        role: true
-      }
-    });
-
-    const roleStats = usersByRole.reduce((acc, item) => {
-      acc[item.role] = item._count.role;
-      return acc;
-    }, {});
-
-    res.json({
-      status: 'success',
-      stats: {
-        totalUsers,
-        totalItems,
-        totalCampaigns,
-        activeSubscriptions,
-        totalStorageUsed: totalStorageUsed._sum.storageUsed?.toString() || '0',
-        usersByRole: roleStats
-      }
-    });
-  } catch (error) {
-    console.error('Admin stats error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to fetch admin stats'
-    });
-  }
-};
-
+// ═══════════════════════════════════════════════════════════
+// GET ALL USERS (Enhanced with filters)
+// ═══════════════════════════════════════════════════════════
 const getAllUsers = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '', role = '' } = req.query;
+    const { 
+      page = 1, 
+      limit = 20, 
+      search = '', 
+      role = '',
+      status = '',
+      subscriptionStatus = '',
+      dateFrom = '',
+      dateTo = ''
+    } = req.query;
+    
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const where = {
-      ...(search && {
-        OR: [
-          { email: { contains: search, mode: 'insensitive' } },
-          { name: { contains: search, mode: 'insensitive' } }
-        ]
-      }),
-      ...(role && { role })
-    };
+    // Build where clause with all filters
+    const where = {};
+
+    // Search filter
+    if (search) {
+      where.OR = [
+        { email: { contains: search, mode: 'insensitive' } },
+        { name: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
+    // Role filter
+    if (role) {
+      where.role = role;
+    }
+
+    // Status filter
+    if (status) {
+      where.status = status;
+    }
+
+    // Subscription status filter
+    if (subscriptionStatus) {
+      where.subscriptionStatus = subscriptionStatus;
+    }
+
+    // Date range filter
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
+      if (dateTo) where.createdAt.lte = new Date(dateTo);
+    }
 
     const [users, total] = await Promise.all([
       prisma.user.findMany({
@@ -83,10 +63,12 @@ const getAllUsers = async (req, res) => {
           email: true,
           name: true,
           role: true,
+          status: true,
           storageUsed: true,
           storageLimit: true,
           subscriptionStatus: true,
           createdAt: true,
+          lastLoginAt: true,
           _count: {
             select: {
               items: true,
@@ -141,231 +123,119 @@ const getAllUsers = async (req, res) => {
   }
 };
 
-const getAllItems = async (req, res) => {
+// ═══════════════════════════════════════════════════════════
+// BULK ACTIONS
+// ═══════════════════════════════════════════════════════════
+const bulkUserActions = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '', type = '' } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const { action, userIds } = req.body;
 
-    const where = {
-      ...(search && {
-        OR: [
-          { title: { contains: search, mode: 'insensitive' } },
-          { description: { contains: search, mode: 'insensitive' } }
-        ]
-      }),
-      ...(type && { type })
-    };
+    if (!action || !userIds || userIds.length === 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Action and user IDs are required'
+      });
+    }
 
-    const [items, total] = await Promise.all([
-      prisma.item.findMany({
-        where,
-        skip,
-        take: parseInt(limit),
-        include: {
-          user: {
-            select: {
-              name: true,
-              email: true,
-              role: true
-            }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      }),
-      prisma.item.count({ where })
-    ]);
+    let result;
+    let message;
 
-    const itemsWithStringSize = items.map(item => ({
-      ...item,
-      fileSize: item.fileSize.toString()
-    }));
+    switch (action) {
+      case 'suspend':
+        result = await prisma.user.updateMany({
+          where: { id: { in: userIds } },
+          data: { status: 'suspended' }
+        });
+        message = `${result.count} user(s) suspended successfully`;
+        break;
+
+      case 'unsuspend':
+        result = await prisma.user.updateMany({
+          where: { id: { in: userIds } },
+          data: { status: 'active' }
+        });
+        message = `${result.count} user(s) unsuspended successfully`;
+        break;
+
+      case 'delete':
+        result = await prisma.user.updateMany({
+          where: { id: { in: userIds } },
+          data: { status: 'deleted' }
+        });
+        message = `${result.count} user(s) marked as deleted`;
+        break;
+
+      default:
+        return res.status(400).json({
+          status: 'error',
+          message: 'Invalid action'
+        });
+    }
 
     res.json({
       status: 'success',
-      items: itemsWithStringSize,
-      pagination: {
-        total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(total / parseInt(limit))
-      }
+      message,
+      count: result.count
     });
+
   } catch (error) {
-    console.error('Get items error:', error);
+    console.error('Bulk action error:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Failed to fetch items'
+      message: 'Failed to perform bulk action'
     });
   }
 };
 
-const updateUser = async (req, res) => {
+// ═══════════════════════════════════════════════════════════
+// SUSPEND/UNSUSPEND USER
+// ═══════════════════════════════════════════════════════════
+const suspendUser = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { role, storageLimit, subscriptionStatus } = req.body;
-
-    const updateData = {};
-    if (role) updateData.role = role;
-    if (storageLimit) updateData.storageLimit = BigInt(storageLimit);
-    if (subscriptionStatus) updateData.subscriptionStatus = subscriptionStatus;
+    const { suspend } = req.body;
 
     const user = await prisma.user.update({
       where: { id: userId },
-      data: updateData,
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        storageUsed: true,
-        storageLimit: true,
-        subscriptionStatus: true
+      data: { 
+        status: suspend ? 'suspended' : 'active'
       }
     });
 
     res.json({
       status: 'success',
-      message: 'User updated successfully',
+      message: `User ${suspend ? 'suspended' : 'unsuspended'} successfully`,
       user: {
-        ...user,
-        storageUsed: user.storageUsed.toString(),
-        storageLimit: user.storageLimit.toString()
+        id: user.id,
+        email: user.email,
+        status: user.status
       }
     });
+
   } catch (error) {
-    console.error('Update user error:', error);
+    console.error('Suspend user error:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Failed to update user'
+      message: 'Failed to suspend user'
     });
   }
 };
 
-const deleteUser = async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    await prisma.user.delete({
-      where: { id: userId }
-    });
-
-    res.json({
-      status: 'success',
-      message: 'User deleted successfully'
-    });
-  } catch (error) {
-    console.error('Delete user error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to delete user'
-    });
-  }
-};
-
-const deleteItem = async (req, res) => {
-  try {
-    const { itemId } = req.params;
-
-    const item = await prisma.item.findUnique({
-      where: { id: itemId },
-      include: { user: true }
-    });
-
-    if (!item) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Item not found'
-      });
-    }
-
-    await prisma.item.delete({
-      where: { id: itemId }
-    });
-
-    await prisma.user.update({
-      where: { id: item.userId },
-      data: {
-        storageUsed: {
-          decrement: item.fileSize
-        }
-      }
-    });
-
-    res.json({
-      status: 'success',
-      message: 'Item deleted successfully'
-    });
-  } catch (error) {
-    console.error('Delete item error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to delete item'
-    });
-  }
-};
-
-const removeUserFromTeam = async (req, res) => {
-  try {
-    const { teamMemberId } = req.params;
-
-    const teamMember = await prisma.teamMember.findUnique({
-      where: { id: teamMemberId },
-      include: {
-        user: {
-          select: { name: true, email: true }
-        }
-      }
-    });
-
-    if (!teamMember) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Team member not found'
-      });
-    }
-
-    if (teamMember.memberUserId) {
-      try {
-        await prisma.user.delete({
-          where: { id: teamMember.memberUserId }
-        });
-        console.log(`✅ Admin removed team member and deleted user: ${teamMember.email}`);
-        console.log(`   Organization: ${teamMember.user.name}`);
-      } catch (deleteError) {
-        await prisma.teamMember.delete({
-          where: { id: teamMemberId }
-        });
-        console.log(`✅ Admin removed team member: ${teamMember.email}`);
-      }
-    } else {
-      await prisma.teamMember.delete({
-        where: { id: teamMemberId }
-      });
-      console.log(`✅ Admin removed team member: ${teamMember.email}`);
-    }
-
-    res.json({
-      status: 'success',
-      message: 'User removed from team successfully'
-    });
-  } catch (error) {
-    console.error('Remove user from team error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to remove user from team'
-    });
-  }
-};
-
-const sendPasswordReset = async (req, res) => {
+// ═══════════════════════════════════════════════════════════
+// USER IMPERSONATION
+// ═══════════════════════════════════════════════════════════
+const impersonateUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, name: true }
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true
+      }
     });
 
     if (!user) {
@@ -375,47 +245,457 @@ const sendPasswordReset = async (req, res) => {
       });
     }
 
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetTokenExpiry = new Date(Date.now() + 3600000);
-
-    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-    
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        resetToken: hashedToken,
-        resetTokenExpiry: resetTokenExpiry
-      }
-    });
-
-    const frontendUrl = process.env.FRONTEND_URL || 'https://outbound-impact.vercel.app';
-    const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
-
-    console.log(`✅ Admin generated password reset for: ${user.email}`);
-    console.log(`🔗 Reset link: ${resetLink}`);
+    // Generate impersonation token (expires in 1 hour)
+    const token = jwt.sign(
+      { 
+        userId: user.id,
+        email: user.email,
+        impersonatedBy: req.user.id,
+        type: 'impersonation'
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
 
     res.json({
       status: 'success',
-      message: 'Password reset link generated',
-      resetLink: resetLink,
-      expiresIn: '1 hour'
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name
+      }
     });
+
   } catch (error) {
-    console.error('Send password reset error:', error);
+    console.error('Impersonate user error:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Failed to generate password reset link'
+      message: 'Failed to impersonate user'
+    });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// EXPORT USERS TO CSV
+// ═══════════════════════════════════════════════════════════
+const exportUsers = async (req, res) => {
+  try {
+    const { 
+      search = '', 
+      role = '',
+      status = '',
+      subscriptionStatus = ''
+    } = req.query;
+
+    // Build where clause
+    const where = {};
+    if (search) {
+      where.OR = [
+        { email: { contains: search, mode: 'insensitive' } },
+        { name: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+    if (role) where.role = role;
+    if (status) where.status = status;
+    if (subscriptionStatus) where.subscriptionStatus = subscriptionStatus;
+
+    const users = await prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        status: true,
+        subscriptionStatus: true,
+        storageUsed: true,
+        storageLimit: true,
+        createdAt: true,
+        lastLoginAt: true,
+        _count: {
+          select: {
+            items: true,
+            campaigns: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    // Convert to CSV
+    const headers = [
+      'ID', 'Name', 'Email', 'Role', 'Status', 'Subscription', 
+      'Storage Used (GB)', 'Storage Limit (GB)', 'Items', 'Campaigns',
+      'Created At', 'Last Login'
+    ];
+
+    const rows = users.map(user => [
+      user.id,
+      user.name,
+      user.email,
+      user.role,
+      user.status || 'active',
+      user.subscriptionStatus || 'none',
+      (Number(user.storageUsed) / (1024 * 1024 * 1024)).toFixed(2),
+      (Number(user.storageLimit) / (1024 * 1024 * 1024)).toFixed(2),
+      user._count.items,
+      user._count.campaigns,
+      new Date(user.createdAt).toISOString(),
+      user.lastLoginAt ? new Date(user.lastLoginAt).toISOString() : 'Never'
+    ]);
+
+    const csv = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=users_export_${new Date().toISOString()}.csv`);
+    res.send(csv);
+
+  } catch (error) {
+    console.error('Export users error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to export users'
+    });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// GET USER DETAILS (with activity logs)
+// ═══════════════════════════════════════════════════════════
+const getUserDetails = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        items: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            title: true,
+            type: true,
+            views: true,
+            createdAt: true
+          }
+        },
+        campaigns: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            name: true,
+            createdAt: true,
+            _count: {
+              select: { items: true }
+            }
+          }
+        },
+        teamMembers: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            status: true,
+            addedAt: true
+          }
+        },
+        memberOf: {
+          select: {
+            id: true,
+            role: true,
+            status: true,
+            addedAt: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        },
+        _count: {
+          select: {
+            items: true,
+            campaigns: true,
+            teamMembers: true
+          }
+        }
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    // Get activity logs
+    const activities = await getUserActivityLogs(userId);
+
+    res.json({
+      status: 'success',
+      user: {
+        ...user,
+        storageUsed: user.storageUsed.toString(),
+        storageLimit: user.storageLimit.toString()
+      },
+      activities
+    });
+
+  } catch (error) {
+    console.error('Get user details error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch user details'
+    });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// GET USER ACTIVITY LOGS
+// ═══════════════════════════════════════════════════════════
+async function getUserActivityLogs(userId) {
+  const activities = [];
+
+  // Recent items created
+  const recentItems = await prisma.item.findMany({
+    where: { userId },
+    take: 5,
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      title: true,
+      type: true,
+      createdAt: true
+    }
+  });
+
+  recentItems.forEach(item => {
+    activities.push({
+      type: 'item_created',
+      description: `Created ${item.type.toLowerCase()} "${item.title}"`,
+      timestamp: item.createdAt,
+      itemId: item.id
+    });
+  });
+
+  // Recent campaigns
+  const recentCampaigns = await prisma.campaign.findMany({
+    where: { userId },
+    take: 5,
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      name: true,
+      createdAt: true
+    }
+  });
+
+  recentCampaigns.forEach(campaign => {
+    activities.push({
+      type: 'campaign_created',
+      description: `Created campaign "${campaign.name}"`,
+      timestamp: campaign.createdAt,
+      campaignId: campaign.id
+    });
+  });
+
+  // Recent team member additions
+  const teamAdditions = await prisma.teamMember.findMany({
+    where: { 
+      OR: [
+        { userId },
+        { teamUserId: userId }
+      ]
+    },
+    take: 5,
+    orderBy: { addedAt: 'desc' },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      addedAt: true
+    }
+  });
+
+  teamAdditions.forEach(member => {
+    activities.push({
+      type: 'team_member_added',
+      description: `Added team member ${member.email}`,
+      timestamp: member.addedAt
+    });
+  });
+
+  // Sort all activities by timestamp
+  activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  return activities.slice(0, 20);
+}
+
+// ═══════════════════════════════════════════════════════════
+// UPDATE USER (existing function - enhanced)
+// ═══════════════════════════════════════════════════════════
+const updateUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const updateData = req.body;
+
+    // Remove fields that shouldn't be updated directly
+    delete updateData.password;
+    delete updateData.stripeCustomerId;
+    delete updateData.subscriptionId;
+
+    // Convert storage limit if provided
+    if (updateData.storageLimit) {
+      updateData.storageLimit = BigInt(updateData.storageLimit);
+    }
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: updateData
+    });
+
+    res.json({
+      status: 'success',
+      message: 'User updated successfully',
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role
+      }
+    });
+
+  } catch (error) {
+    console.error('Update user error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to update user'
+    });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// DELETE USER (existing function)
+// ═══════════════════════════════════════════════════════════
+const deleteUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Soft delete - just mark as deleted
+    await prisma.user.update({
+      where: { id: userId },
+      data: { 
+        status: 'deleted',
+        deletedAt: new Date()
+      }
+    });
+
+    res.json({
+      status: 'success',
+      message: 'User deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to delete user'
+    });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// REMOVE USER FROM TEAM (existing function)
+// ═══════════════════════════════════════════════════════════
+const removeUserFromTeam = async (req, res) => {
+  try {
+    const { teamMemberId } = req.params;
+
+    await prisma.teamMember.delete({
+      where: { id: teamMemberId }
+    });
+
+    res.json({
+      status: 'success',
+      message: 'User removed from team successfully'
+    });
+
+  } catch (error) {
+    console.error('Remove from team error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to remove user from team'
+    });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// PASSWORD RESET (existing function)
+// ═══════════════════════════════════════════════════════════
+const sendPasswordReset = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        resetToken,
+        resetTokenExpiry
+      }
+    });
+
+    const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+
+    res.json({
+      status: 'success',
+      resetLink
+    });
+
+  } catch (error) {
+    console.error('Password reset error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to generate reset link'
     });
   }
 };
 
 module.exports = {
-  getAdminStats,
   getAllUsers,
-  getAllItems,
+  bulkUserActions,
+  suspendUser,
+  impersonateUser,
+  exportUsers,
+  getUserDetails,
   updateUser,
   deleteUser,
-  deleteItem,
   removeUserFromTeam,
   sendPasswordReset
 };
