@@ -3,31 +3,16 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/auth');
 
-// Import analytics controller
+// Import from EXISTING adminController.js (NOT adminUserController!)
 const {
   getAdminStats,
-  getAnalytics,
-  getRecentActivities
-} = require('../controllers/adminAnalyticsController');
-
-// Import enhanced user controller
-const {
   getAllUsers,
-  bulkUserActions,
-  suspendUser,
-  impersonateUser,
-  exportUsers,
-  getUserDetails,
+  getAllItems,
   updateUser,
   deleteUser,
+  deleteItem,
   removeUserFromTeam,
   sendPasswordReset
-} = require('../controllers/adminController');
-
-// Import existing item controller
-const {
-  getAllItems,
-  deleteItem
 } = require('../controllers/adminController');
 
 // ═══════════════════════════════════════════════════════════
@@ -40,38 +25,13 @@ router.use(requireAdmin);
 // DASHBOARD & ANALYTICS ROUTES
 // ═══════════════════════════════════════════════════════════
 router.get('/stats', getAdminStats);
-router.get('/analytics', getAnalytics);
-router.get('/recent-activities', getRecentActivities);
 
 // ═══════════════════════════════════════════════════════════
-// USER MANAGEMENT ROUTES (Enhanced)
+// USER MANAGEMENT ROUTES
 // ═══════════════════════════════════════════════════════════
-
-// List & Filter Users
 router.get('/users', getAllUsers);
-
-// Bulk Actions
-router.post('/users/bulk-action', bulkUserActions);
-
-// Export Users
-router.get('/users/export', exportUsers);
-
-// User Details
-router.get('/users/:userId', getUserDetails);
-
-// Update User
 router.put('/users/:userId', updateUser);
-
-// Delete User
 router.delete('/users/:userId', deleteUser);
-
-// Suspend/Unsuspend User
-router.post('/users/:userId/suspend', suspendUser);
-
-// Impersonate User
-router.post('/users/:userId/impersonate', impersonateUser);
-
-// Password Reset
 router.post('/users/:userId/password-reset', sendPasswordReset);
 
 // ═══════════════════════════════════════════════════════════
