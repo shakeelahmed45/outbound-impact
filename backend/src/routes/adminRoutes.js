@@ -22,7 +22,7 @@ const {
   deleteUser,
   removeUserFromTeam,
   sendPasswordReset
-} = require('../controllers/adminUserController');
+} = require('../controllers/adminController');
 
 // Import existing item controller
 const {
