@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
+const { requireAdmin } = require('../middleware/auth');
+
+// Import existing admin controller
 const {
-  getAdminStats,
   getAllUsers,
   getAllItems,
   updateUser,
@@ -12,26 +14,43 @@ const {
   sendPasswordReset
 } = require('../controllers/adminController');
 
-// All routes require authentication and admin role
+// Import new analytics controller
+const {
+  getAdminStats,
+  getAnalytics,
+  getRecentActivities
+} = require('../controllers/adminAnalyticsController');
+
+// ═══════════════════════════════════════════════════════════
+// MIDDLEWARE - All routes require authentication and admin role
+// ═══════════════════════════════════════════════════════════
 router.use(authMiddleware);
-router.use(authMiddleware.requireAdmin);
+router.use(requireAdmin);
 
-// Admin dashboard stats
+// ═══════════════════════════════════════════════════════════
+// DASHBOARD & ANALYTICS ROUTES
+// ═══════════════════════════════════════════════════════════
 router.get('/stats', getAdminStats);
+router.get('/analytics', getAnalytics);
+router.get('/recent-activities', getRecentActivities);
 
-// User management
+// ═══════════════════════════════════════════════════════════
+// USER MANAGEMENT ROUTES
+// ═══════════════════════════════════════════════════════════
 router.get('/users', getAllUsers);
 router.put('/users/:userId', updateUser);
 router.delete('/users/:userId', deleteUser);
+router.post('/users/:userId/password-reset', sendPasswordReset);
 
-// Item management
+// ═══════════════════════════════════════════════════════════
+// ITEM MANAGEMENT ROUTES
+// ═══════════════════════════════════════════════════════════
 router.get('/items', getAllItems);
 router.delete('/items/:itemId', deleteItem);
 
-// ✅ NEW: Team management
+// ═══════════════════════════════════════════════════════════
+// TEAM MANAGEMENT ROUTES
+// ═══════════════════════════════════════════════════════════
 router.delete('/team-members/:teamMemberId', removeUserFromTeam);
-
-// ✅ NEW: Password reset
-router.post('/users/:userId/password-reset', sendPasswordReset);
 
 module.exports = router;
