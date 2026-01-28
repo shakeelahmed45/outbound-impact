@@ -80,6 +80,7 @@ const getAllUsers = async (req, res) => {
               id: true,
               role: true,
               status: true,
+              createdAt: true,
               user: {
                 select: {
                   id: true,
@@ -402,10 +403,16 @@ const getUserDetails = async (req, res) => {
           select: {
             id: true,
             email: true,
-            name: true,
             role: true,
             status: true,
-            addedAt: true
+            createdAt: true,
+            memberUser: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
           }
         },
         memberOf: {
@@ -413,7 +420,7 @@ const getUserDetails = async (req, res) => {
             id: true,
             role: true,
             status: true,
-            addedAt: true,
+            createdAt: true,
             user: {
               select: {
                 id: true,
@@ -516,16 +523,16 @@ async function getUserActivityLogs(userId) {
     where: { 
       OR: [
         { userId },
-        { teamUserId: userId }
+        { memberUserId: userId }
       ]
     },
     take: 5,
-    orderBy: { addedAt: 'desc' },
+    orderBy: { createdAt: 'desc' },
     select: {
       id: true,
       email: true,
       role: true,
-      addedAt: true
+      createdAt: true
     }
   });
 
@@ -533,7 +540,7 @@ async function getUserActivityLogs(userId) {
     activities.push({
       type: 'team_member_added',
       description: `Added team member ${member.email}`,
-      timestamp: member.addedAt
+      timestamp: member.createdAt
     });
   });
 
