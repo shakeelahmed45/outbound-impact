@@ -25,6 +25,7 @@ import AdminUsers from './pages/admin/AdminUsers';
 import AdminItems from './pages/admin/AdminItems';
 import AdminFeedbackPage from './pages/admin/AdminFeedbackPage';
 import AdminLiveChatPage from './pages/admin/AdminLiveChatPage';
+import UserDetailPage from './pages/admin/UserDetailPage';
 import ApiAccessPage from './pages/enterprise/ApiAccessPage';
 import WhiteLabelPage from './pages/enterprise/WhiteLabelPage';
 import IntegrationsPage from './pages/enterprise/IntegrationsPage';
@@ -94,6 +95,7 @@ function App() {
         <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/admin-panel" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
         <Route path="/admin-panel/users" element={<ProtectedRoute><AdminUsers /></ProtectedRoute>} />
+        <Route path="/admin-panel/users/:userId" element={<ProtectedRoute><UserDetailPage /></ProtectedRoute>} />
         <Route path="/admin-panel/items" element={<ProtectedRoute><AdminItems /></ProtectedRoute>} />
         <Route path="/admin-panel/feedback" element={<ProtectedRoute><AdminFeedbackPage /></ProtectedRoute>} />
         <Route path="/admin-panel/live-chat" element={<ProtectedRoute><AdminLiveChatPage /></ProtectedRoute>} />

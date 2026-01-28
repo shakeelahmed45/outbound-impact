@@ -10,9 +10,14 @@ const {
   getRecentActivities
 } = require('../controllers/adminAnalyticsController');
 
-// Import user management from adminUserController (NOT adminController!)
+// Import user management from adminUserController
 const {
   getAllUsers,
+  bulkUserActions,
+  suspendUser,
+  impersonateUser,
+  exportUsers,
+  getUserDetails,
   updateUser,
   deleteUser,
   removeUserFromTeam,
@@ -39,11 +44,43 @@ router.get('/analytics', getAnalytics);
 router.get('/recent-activities', getRecentActivities);
 
 // ═══════════════════════════════════════════════════════════
-// USER MANAGEMENT ROUTES
+// USER MANAGEMENT ROUTES (Enhanced Phase 2)
 // ═══════════════════════════════════════════════════════════
+
+// List & Filter Users
 router.get('/users', getAllUsers);
+
+// Export Users
+router.get('/users/export', exportUsers);
+
+// Bulk Actions
+router.post('/users/bulk-action', bulkUserActions);
+
+// User Details
+router.get('/users/:userId', getUserDetails);
+
+// Get User Activity (alias for getUserDetails)
+router.get('/users/:userId/activity', getUserDetails);
+
+// Update User
 router.put('/users/:userId', updateUser);
+
+// Update Storage Limit
+router.put('/users/:userId/storage', updateUser);
+
+// Delete User
 router.delete('/users/:userId', deleteUser);
+
+// Suspend/Unsuspend User
+router.post('/users/:userId/suspend', suspendUser);
+
+// Ban User (alias for suspend)
+router.post('/users/:userId/ban', suspendUser);
+
+// Impersonate User
+router.post('/users/:userId/impersonate', impersonateUser);
+
+// Password Reset
 router.post('/users/:userId/password-reset', sendPasswordReset);
 
 // ═══════════════════════════════════════════════════════════

@@ -141,7 +141,7 @@ const AdminUsers = () => {
   // USER ACTIONS
   // ═══════════════════════════════════════════════════════════
   const handleViewDetails = (userId) => {
-    navigate(`/admin/users/${userId}`);
+    navigate(`/admin-panel/users/${userId}`);
   };
 
   const handleViewPreview = async (user) => {
@@ -446,8 +446,9 @@ const AdminUsers = () => {
   };
 
   const getStoragePercent = (used, limit) => {
-    if (!limit || limit === '0') return 0;
-    return ((Number(used) / Number(limit)) * 100).toFixed(1);
+    if (!limit || limit === '0' || Number(limit) === 0) return '0.0';
+    const percent = ((Number(used) / Number(limit)) * 100).toFixed(1);
+    return percent;
   };
 
   if (loading && users.length === 0) {
