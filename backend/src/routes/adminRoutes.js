@@ -3,23 +3,27 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/auth');
 
-// Import existing admin controller
-const {
-  getAllUsers,
-  getAllItems,
-  updateUser,
-  deleteUser,
-  deleteItem,
-  removeUserFromTeam,
-  sendPasswordReset
-} = require('../controllers/adminController');
-
-// Import new analytics controller
+// Import analytics controller
 const {
   getAdminStats,
   getAnalytics,
   getRecentActivities
 } = require('../controllers/adminAnalyticsController');
+
+// Import user management from adminUserController (NOT adminController!)
+const {
+  getAllUsers,
+  updateUser,
+  deleteUser,
+  removeUserFromTeam,
+  sendPasswordReset
+} = require('../controllers/adminUserController');
+
+// Import item management from adminController
+const {
+  getAllItems,
+  deleteItem
+} = require('../controllers/adminController');
 
 // ═══════════════════════════════════════════════════════════
 // MIDDLEWARE - All routes require authentication and admin role
