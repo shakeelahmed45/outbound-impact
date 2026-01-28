@@ -80,7 +80,7 @@ const UserDetailPage = () => {
       const response = await api.delete(`/admin/users/${userId}`);
       if (response.data.status === 'success') {
         alert('User deleted successfully');
-        navigate('/admin/users');
+        navigate('/admin-panel/users');
       }
     } catch (error) {
       console.error('Failed to delete user:', error);
@@ -119,7 +119,7 @@ const UserDetailPage = () => {
         <div className="text-center py-12">
           <p className="text-gray-600">User not found</p>
           <button
-            onClick={() => navigate('/admin/users')}
+            onClick={() => navigate('/admin-panel/users')}
             className="mt-4 text-purple-600 hover:text-purple-800"
           >
             Back to Users
@@ -137,7 +137,7 @@ const UserDetailPage = () => {
         {/* Header */}
         <div className="mb-6">
           <button
-            onClick={() => navigate('/admin/users')}
+            onClick={() => navigate('/admin-panel/users')}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
           >
             <ArrowLeft size={20} />
