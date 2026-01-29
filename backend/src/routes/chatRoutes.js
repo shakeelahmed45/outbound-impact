@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const chatController = require('../controllers/chatController');
 const authMiddleware = require('../middleware/auth');
-const { requireAdmin } = require('../middleware/auth');
+const { requireAdmin, requireSupportAccess } = require('../middleware/auth');
 const { resolveEffectiveUserId } = require('../middleware/resolveEffectiveUserId');
 
 // ═══════════════════════════════════════════════════════════
@@ -56,7 +56,7 @@ router.get(
   chatController.getOrCreateConversation
 );
 
-// 🆕 NEW: Get messages for a conversation (for polling)
+// Get messages for a conversation (for polling)
 router.get(
   '/conversation/:conversationId/messages',
   authMiddleware,
@@ -97,7 +97,7 @@ router.post(
   chatController.requestHumanSupport
 );
 
-// 🆕 NEW: Get chat history
+// Get chat history
 router.get(
   '/history',
   authMiddleware,
@@ -105,7 +105,7 @@ router.get(
   chatController.getChatHistory
 );
 
-// 🆕 NEW: Submit conversation feedback (rating + comment)
+// Submit conversation feedback (rating + comment)
 router.post(
   '/conversation/:conversationId/feedback',
   authMiddleware,
@@ -114,15 +114,16 @@ router.post(
 );
 
 // ═══════════════════════════════════════════════════════════
-// ADMIN ROUTES
+// ADMIN ROUTES (ADMIN + CUSTOMER_SUPPORT)
 // ═══════════════════════════════════════════════════════════
 
 // Get all conversations with optional status filter
+// 🆕 CHANGED: Use requireSupportAccess instead of requireAdmin
 router.get(
   '/all-conversations',
   authMiddleware,
   resolveEffectiveUserId,
-  requireAdmin,
+  requireSupportAccess,  // 🆕 CUSTOMER_SUPPORT can access
   chatController.getAllConversations
 );
 
@@ -131,8 +132,17 @@ router.get(
   '/conversation/:id',
   authMiddleware,
   resolveEffectiveUserId,
-  requireAdmin,
+  requireSupportAccess,  // 🆕 CUSTOMER_SUPPORT can access
   chatController.getConversationById
+);
+
+// 🆕 NEW: Get user's complete chat history
+router.get(
+  '/user/:userId/history',
+  authMiddleware,
+  resolveEffectiveUserId,
+  requireSupportAccess,  // 🆕 CUSTOMER_SUPPORT can access
+  chatController.getUserChatHistory
 );
 
 // Close conversation
@@ -140,7 +150,7 @@ router.patch(
   '/conversation/:id/close',
   authMiddleware,
   resolveEffectiveUserId,
-  requireAdmin,
+  requireSupportAccess,  // 🆕 CUSTOMER_SUPPORT can access
   chatController.closeConversation
 );
 
@@ -149,7 +159,7 @@ router.patch(
   '/conversation/:id/reopen',
   authMiddleware,
   resolveEffectiveUserId,
-  requireAdmin,
+  requireSupportAccess,  // 🆕 CUSTOMER_SUPPORT can access
   chatController.reopenConversation
 );
 
@@ -158,7 +168,7 @@ router.get(
   '/unread-count',
   authMiddleware,
   resolveEffectiveUserId,
-  requireAdmin,
+  requireSupportAccess,  // 🆕 CUSTOMER_SUPPORT can access
   chatController.getUnreadCount
 );
 

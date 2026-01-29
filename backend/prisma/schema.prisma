@@ -32,18 +32,18 @@ model User {
   twoFactorEnabled   Boolean   @default(false)
   twoFactorSecret    String?
 
-  // ✅ REFUND TRACKING FIELDS (Account will be deleted after refund)
+  // REFUND TRACKING FIELDS
   refundRequested    Boolean?   @default(false)
   refundRequestedAt  DateTime?
   refundProcessedAt  DateTime?
   refundAmount       Decimal?   @db.Decimal(10, 2)
   refundReason       String?    @db.Text
-  refundStatus       String?    // 'pending', 'processed'
+  refundStatus       String?
 
-  // ✅ PHASE 2: USER MANAGEMENT FIELDS
-  status             String?    @default("active")  // active, suspended, banned, deleted
-  deletedAt          DateTime?                      // Timestamp when user was deleted
-  lastLoginAt        DateTime?                      // Last successful login timestamp
+  // PHASE 2: USER MANAGEMENT FIELDS
+  status             String?    @default("active")
+  deletedAt          DateTime?
+  lastLoginAt        DateTime?
 
   items             Item[]
   campaigns         Campaign[]
@@ -51,6 +51,9 @@ model User {
   memberOf          TeamMember[]       @relation("MemberOf")
   feedback          Feedback[]
   chatConversations ChatConversation[]
+
+  // 🆕 PHASE 3: Admin invitation relation
+  adminInvitations  AdminInvitation[]
 
   // Enterprise features relations
   apiKeys              ApiKey[]
@@ -61,7 +64,8 @@ model User {
 
   @@index([email])
   @@index([resetToken])
-  @@index([status])  // ✅ PHASE 2: Index for faster status queries
+  @@index([status])
+  @@index([role])  // 🆕 PHASE 3: Index for role-based queries
 }
 
 enum Role {
@@ -70,6 +74,7 @@ enum Role {
   ORG_MEDIUM
   ORG_ENTERPRISE
   ADMIN
+  CUSTOMER_SUPPORT  // 🆕 PHASE 3: New role for limited access
 }
 
 model Item {
@@ -94,7 +99,6 @@ model Item {
   buttonUrl   String?
   attachments Json?   @db.JsonB
 
-  // ✅ NEW: Sharing control field
   sharingEnabled Boolean @default(true)
 
   createdAt DateTime @default(now())
@@ -129,7 +133,6 @@ model Campaign {
   qrCodeUrl   String?
   userId      String
   
-  // 🔒 PASSWORD PROTECTION FIELDS
   passwordProtected Boolean  @default(false)
   passwordHash      String?
   
@@ -205,7 +208,7 @@ enum FeedbackStatus {
 }
 
 // ========================================
-// 💬 LIVE CHAT MODELS (UPDATED WITH AI)
+// 💬 LIVE CHAT MODELS
 // ========================================
 
 model ChatConversation {
@@ -214,14 +217,12 @@ model ChatConversation {
   status        ChatStatus @default(ACTIVE)
   lastMessageAt DateTime   @default(now())
   
-  // 🤖 AI CHATBOT FIELDS
-  isAiHandling        Boolean   @default(true)   // Is AI bot handling this conversation?
-  escalatedToHumanAt  DateTime?                  // When escalated to human support
-  escalationReason    String?                    // Why it was escalated
+  isAiHandling        Boolean   @default(true)
+  escalatedToHumanAt  DateTime?
+  escalationReason    String?
   
-  // 🆕 NEW: FEEDBACK FIELDS (Feature 4: Feedback Modal)
-  feedbackRating      Int?                       // 1-5 star rating
-  feedbackComment     String?   @db.Text         // Optional feedback comment
+  feedbackRating      Int?
+  feedbackComment     String?   @db.Text
   
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
@@ -234,6 +235,7 @@ model ChatConversation {
   @@index([status])
   @@index([lastMessageAt])
   @@index([isAiHandling])
+  @@index([feedbackRating])  // 🆕 PHASE 3: Index for feedback queries
 }
 
 enum ChatStatus {
@@ -249,10 +251,9 @@ model ChatMessage {
   message        String     @db.Text
   isRead         Boolean    @default(false)
   
-  // 🤖 AI AND FILE FIELDS
-  isAiGenerated  Boolean   @default(false)           // Was this message from AI bot?
-  hasAttachments Boolean   @default(false)           // Does message have file attachments?
-  aiConfidence   Decimal?  @db.Decimal(3, 2)        // AI confidence score (0.00-1.00)
+  isAiGenerated  Boolean   @default(false)
+  hasAttachments Boolean   @default(false)
+  aiConfidence   Decimal?  @db.Decimal(3, 2)
   
   createdAt      DateTime  @default(now())
 
@@ -271,19 +272,15 @@ enum SenderType {
   ADMIN
 }
 
-// ========================================
-// 🤖 AI CHATBOT KNOWLEDGE BASE
-// ========================================
-
 model ChatKnowledgeBase {
   id          String   @id @default(uuid())
-  category    String   // Upload, QR Codes, NFC, Billing, etc.
-  question    String   @db.Text // The FAQ question
-  answer      String   @db.Text // The answer
-  keywords    String[] // Keywords for matching
-  priority    Int      @default(0) // Higher = better match
+  category    String
+  question    String   @db.Text
+  answer      String   @db.Text
+  keywords    String[]
+  priority    Int      @default(0)
   isActive    Boolean  @default(true)
-  usageCount  Int      @default(0) // Track how often used
+  usageCount  Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -291,17 +288,13 @@ model ChatKnowledgeBase {
   @@index([isActive])
 }
 
-// ========================================
-// 🎯 AI INTENT DETECTION
-// ========================================
-
 model ChatIntent {
   id            String   @id @default(uuid())
-  name          String   @unique // e.g., "help_upload", "billing_issue"
+  name          String   @unique
   description   String   @db.Text
-  patterns      String[] // Text patterns to detect intent
-  response      String   @db.Text // Auto-response for this intent
-  requiresHuman Boolean  @default(false) // Auto-escalate to human?
+  patterns      String[]
+  response      String   @db.Text
+  requiresHuman Boolean  @default(false)
   priority      Int      @default(0)
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
@@ -311,19 +304,15 @@ model ChatIntent {
   @@index([isActive])
 }
 
-// ========================================
-// 📎 CHAT FILE ATTACHMENTS
-// ========================================
-
 model ChatAttachment {
   id           String      @id @default(uuid())
   messageId    String
   fileName     String
-  fileType     String      // MIME type: image/png, application/pdf, etc.
-  fileSize     BigInt      // File size in bytes
-  fileUrl      String      @db.Text // CDN URL (Bunny.net)
-  thumbnailUrl String?     // Thumbnail for images
-  uploadedBy   String      // User ID who uploaded
+  fileType     String
+  fileSize     BigInt
+  fileUrl      String      @db.Text
+  thumbnailUrl String?
+  uploadedBy   String
   createdAt    DateTime    @default(now())
 
   message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
@@ -332,20 +321,16 @@ model ChatAttachment {
   @@index([uploadedBy])
 }
 
-// ========================================
-// 📊 AI BOT ANALYTICS
-// ========================================
-
 model ChatBotAnalytics {
   id              String   @id @default(uuid())
   conversationId  String
   messageId       String   @unique
-  intent          String?  // Detected intent
-  knowledgeBaseId String?  // Which FAQ was used
-  confidence      Decimal? @db.Decimal(3, 2) // Bot confidence (0.00-1.00)
-  wasHelpful      Boolean? // User feedback
+  intent          String?
+  knowledgeBaseId String?
+  confidence      Decimal? @db.Decimal(3, 2)
+  wasHelpful      Boolean?
   escalated       Boolean  @default(false)
-  responseTime    Int?     // Response time in milliseconds
+  responseTime    Int?
   createdAt       DateTime @default(now())
 
   conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -353,6 +338,28 @@ model ChatBotAnalytics {
 
   @@index([conversationId])
   @@index([createdAt])
+}
+
+// ========================================
+// 🆕 PHASE 3: ADMIN INVITATION MODEL
+// ========================================
+
+model AdminInvitation {
+  id          String   @id @default(uuid())
+  email       String
+  role        Role     // ADMIN or CUSTOMER_SUPPORT
+  token       String   @unique
+  invitedBy   String
+  status      String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  
+  inviter     User @relation(fields: [invitedBy], references: [id], onDelete: Cascade)
+  
+  @@unique([email, status])
+  @@index([token])
+  @@index([email])
+  @@index([status])
 }
 
 // ========================================

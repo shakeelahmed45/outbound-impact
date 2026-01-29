@@ -10,10 +10,19 @@ const useAuthStore = create(
       token: null,
       isAuthenticated: false,
       _hasHydrated: false, // ✅ Track if state has been restored from localStorage
+      permissions: null,   // 🆕 NEW: Store user permissions
       
       setUser: (user) => {
         console.log('🔵 authStore.setUser called:', user ? 'User data exists' : 'No user data');
-        set({ user, isAuthenticated: true });
+        
+        // 🆕 NEW: Calculate permissions based on role
+        const permissions = getUserPermissionsFromRole(user?.role);
+        
+        set({ 
+          user, 
+          isAuthenticated: true,
+          permissions  // 🆕 NEW: Store permissions
+        });
       },
       
       setToken: (token) => {
@@ -23,7 +32,12 @@ const useAuthStore = create(
       
       logout: () => {
         console.log('🔵 authStore.logout called');
-        set({ user: null, token: null, isAuthenticated: false });
+        set({ 
+          user: null, 
+          token: null, 
+          isAuthenticated: false,
+          permissions: null  // 🆕 NEW: Clear permissions
+        });
       },
       
       // ✅ Called after rehydration completes
@@ -40,6 +54,7 @@ const useAuthStore = create(
         user: state.user,
         token: state.token,
         isAuthenticated: state.isAuthenticated,
+        permissions: state.permissions,  // 🆕 NEW: Persist permissions
         // Don't persist _hasHydrated (reset to false on reload)
       }),
       onRehydrateStorage: () => {
@@ -53,7 +68,8 @@ const useAuthStore = create(
             console.log('📊 Restored state:', {
               hasUser: !!state?.user,
               hasToken: !!state?.token,
-              isAuthenticated: state?.isAuthenticated
+              isAuthenticated: state?.isAuthenticated,
+              role: state?.user?.role,  // 🆕 NEW: Log role
             });
             
             // ✅ CRITICAL: Set hydration complete
@@ -65,9 +81,46 @@ const useAuthStore = create(
   )
 );
 
+// ═══════════════════════════════════════════════════════════
+// 🆕 NEW: Get permissions based on role
+// ═══════════════════════════════════════════════════════════
+const getUserPermissionsFromRole = (role) => {
+  const permissionsMap = {
+    ADMIN: {
+      canViewDashboard: true,
+      canManageUsers: true,
+      canManageItems: true,
+      canManageFeedback: true,
+      canManageLiveChat: true,
+      canManageTeam: true,
+      canViewAnalytics: true,
+      canManageSettings: true,
+    },
+    CUSTOMER_SUPPORT: {
+      canViewDashboard: false,
+      canManageUsers: false,
+      canManageItems: false,
+      canManageFeedback: false,
+      canManageLiveChat: true,  // ONLY THIS!
+      canManageTeam: false,
+      canViewAnalytics: false,
+      canManageSettings: false,
+    },
+    // Regular users have no admin permissions
+    INDIVIDUAL: {},
+    ORG_SMALL: {},
+    ORG_MEDIUM: {},
+    ORG_ENTERPRISE: {},
+  };
+
+  return permissionsMap[role] || {};
+};
+
 export default useAuthStore;
 
-// Helper functions remain the same
+// ═══════════════════════════════════════════════════════════
+// EXISTING Helper functions
+// ═══════════════════════════════════════════════════════════
 export const getEffectiveUserId = () => {
   const user = useAuthStore.getState().user;
   
@@ -106,4 +159,43 @@ export const canManageTeam = () => {
   }
   
   return user?.teamRole === 'ADMIN';
+};
+
+// ═══════════════════════════════════════════════════════════
+// 🆕 NEW: Permission checking helpers
+// ═══════════════════════════════════════════════════════════
+export const isAdmin = () => {
+  const user = useAuthStore.getState().user;
+  return user?.role === 'ADMIN';
+};
+
+export const isCustomerSupport = () => {
+  const user = useAuthStore.getState().user;
+  return user?.role === 'CUSTOMER_SUPPORT';
+};
+
+export const isAdminOrSupport = () => {
+  const user = useAuthStore.getState().user;
+  return user?.role === 'ADMIN' || user?.role === 'CUSTOMER_SUPPORT';
+};
+
+export const hasPermission = (permission) => {
+  const permissions = useAuthStore.getState().permissions;
+  return permissions?.[permission] === true;
+};
+
+// Get all permissions
+export const getPermissions = () => {
+  return useAuthStore.getState().permissions || {};
+};
+
+// Check multiple permissions at once
+export const hasAllPermissions = (...requiredPermissions) => {
+  const permissions = getPermissions();
+  return requiredPermissions.every(perm => permissions[perm] === true);
+};
+
+export const hasAnyPermission = (...requiredPermissions) => {
+  const permissions = getPermissions();
+  return requiredPermissions.some(perm => permissions[perm] === true);
 };

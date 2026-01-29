@@ -71,7 +71,7 @@ const getOrCreateConversation = async (req, res) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// 🆕 NEW: Get Messages (for polling)
+// Get Messages (for polling)
 // ═══════════════════════════════════════════════════════════
 const getMessages = async (req, res) => {
   try {
@@ -152,7 +152,7 @@ const sendMessage = async (req, res) => {
       },
     });
 
-    const isAdmin = user.role === 'ADMIN';
+    const isAdmin = user.role === 'ADMIN' || user.role === 'CUSTOMER_SUPPORT';
     const senderType = isAdmin ? 'ADMIN' : 'USER';
 
     console.log('💬 Send Message:', {
@@ -302,7 +302,6 @@ const sendMessage = async (req, res) => {
     }
 
     if (!isAdmin) {
-      // USER sent message → ALWAYS Notify ADMIN
       console.log('📧 Sending chat notification to admin...');
       const notificationMessage = uploadedAttachments.length > 0 
         ? `${message || ''}\n\n[User attached ${uploadedAttachments.length} file(s)]`
@@ -345,7 +344,7 @@ const sendMessage = async (req, res) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// ADMIN: Get All Conversations
+// 🆕 ENHANCED: ADMIN - Get All Conversations (with feedback)
 // ═══════════════════════════════════════════════════════════
 const getAllConversations = async (req, res) => {
   try {
@@ -387,23 +386,60 @@ const getAllConversations = async (req, res) => {
       orderBy: { lastMessageAt: 'desc' },
     });
 
+    // 🆕 NEW: Group conversations by user to show chat count
+    const userChatCounts = {};
+    for (const conv of conversations) {
+      const userId = conv.userId;
+      if (!userChatCounts[userId]) {
+        userChatCounts[userId] = {
+          total: 0,
+          active: 0,
+          closed: 0,
+        };
+      }
+      userChatCounts[userId].total++;
+      if (conv.status === 'ACTIVE') {
+        userChatCounts[userId].active++;
+      } else {
+        userChatCounts[userId].closed++;
+      }
+    }
+
+    // Add chat counts to each conversation
+    const conversationsWithCounts = conversations.map(conv => ({
+      ...conv,
+      userChatCount: userChatCounts[conv.userId],
+    }));
+
     const stats = {
       total: await prisma.chatConversation.count(),
       active: await prisma.chatConversation.count({ where: { status: 'ACTIVE' } }),
       closed: await prisma.chatConversation.count({ where: { status: 'CLOSED' } }),
-      aiHandling: await prisma.chatConversation.count({ where: { isAiHandling: true, status: 'ACTIVE' } }),
-      humanHandling: await prisma.chatConversation.count({ where: { isAiHandling: false, status: 'ACTIVE' } }),
+      aiHandling: await prisma.chatConversation.count({ 
+        where: { isAiHandling: true, status: 'ACTIVE' } 
+      }),
+      humanHandling: await prisma.chatConversation.count({ 
+        where: { isAiHandling: false, status: 'ACTIVE' } 
+      }),
       unread: await prisma.chatMessage.count({
         where: {
           senderType: 'USER',
           isRead: false,
         },
       }),
+      // 🆕 NEW: Feedback stats
+      withFeedback: await prisma.chatConversation.count({
+        where: { feedbackRating: { not: null } }
+      }),
+      averageRating: await prisma.chatConversation.aggregate({
+        where: { feedbackRating: { not: null } },
+        _avg: { feedbackRating: true }
+      }).then(result => result._avg.feedbackRating || 0),
     };
 
     res.json({
       status: 'success',
-      conversations,
+      conversations: conversationsWithCounts,
       stats,
     });
   } catch (error) {
@@ -466,6 +502,68 @@ const getConversationById = async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to get conversation',
+    });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// 🆕 NEW: ADMIN - Get User's Complete Chat History
+// ═══════════════════════════════════════════════════════════
+const getUserChatHistory = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Get all conversations for this user
+    const conversations = await prisma.chatConversation.findMany({
+      where: {
+        userId: userId
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        },
+        messages: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            attachments: true,
+          },
+        },
+        _count: {
+          select: {
+            messages: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Calculate stats
+    const stats = {
+      totalChats: conversations.length,
+      activeChats: conversations.filter(c => c.status === 'ACTIVE').length,
+      closedChats: conversations.filter(c => c.status === 'CLOSED').length,
+      totalMessages: conversations.reduce((sum, c) => sum + c._count.messages, 0),
+      averageRating: conversations
+        .filter(c => c.feedbackRating)
+        .reduce((sum, c, idx, arr) => sum + c.feedbackRating / arr.length, 0) || 0,
+      chatsWithFeedback: conversations.filter(c => c.feedbackRating).length,
+    };
+
+    res.json({
+      status: 'success',
+      user: conversations[0]?.user || null,
+      conversations,
+      stats,
+    });
+  } catch (error) {
+    console.error('Get user chat history error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get chat history',
     });
   }
 };
@@ -671,7 +769,7 @@ const requestHumanSupport = async (req, res) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// 🆕 NEW: Get Chat History
+// USER: Get Chat History
 // ═══════════════════════════════════════════════════════════
 const getChatHistory = async (req, res) => {
   try {
@@ -716,7 +814,7 @@ const getChatHistory = async (req, res) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// 🆕 NEW: Submit Conversation Feedback
+// USER: Submit Conversation Feedback
 // ═══════════════════════════════════════════════════════════
 const submitConversationFeedback = async (req, res) => {
   try {
@@ -765,6 +863,7 @@ module.exports = {
   sendMessage,
   getAllConversations,
   getConversationById,
+  getUserChatHistory,     // 🆕 NEW
   closeConversation,
   reopenConversation,
   getUnreadCount,
