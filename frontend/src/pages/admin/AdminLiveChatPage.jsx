@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Send, Users, XCircle } from 'lucide-react';
+import { MessageSquare, Send, Users, XCircle, Star, History, ThumbsUp, AlertCircle } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import api from '../../services/api';
 
@@ -10,8 +10,11 @@ const AdminLiveChatPage = () => {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [stats, setStats] = useState({ total: 0, active: 0, closed: 0 });
+  const [stats, setStats] = useState({ total: 0, active: 0, closed: 0, withFeedback: 0, averageRating: 0 });
   const [filterStatus, setFilterStatus] = useState('');
+  const [showHistory, setShowHistory] = useState(false);
+  const [userHistory, setUserHistory] = useState(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const messagesEndRef = useRef(null);
   const pollInterval = useRef(null);
 
@@ -61,14 +64,34 @@ const AdminLiveChatPage = () => {
       const response = await api.get(`/chat/conversation/${conversationId}`);
       if (response.data.status === 'success') {
         setMessages(response.data.conversation.messages || []);
+        // Update selected conversation with full data
+        setSelectedConversation(response.data.conversation);
       }
     } catch (error) {
       console.error('Failed to fetch messages:', error);
     }
   };
 
+  // 🆕 NEW: Fetch user's complete chat history
+  const fetchUserHistory = async (userId) => {
+    setLoadingHistory(true);
+    try {
+      const response = await api.get(`/chat/user/${userId}/history`);
+      if (response.data.status === 'success') {
+        setUserHistory(response.data);
+        setShowHistory(true);
+      }
+    } catch (error) {
+      console.error('Failed to fetch user history:', error);
+      alert('Failed to load chat history');
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   const handleSelectConversation = async (conversation) => {
     setSelectedConversation(conversation);
+    setShowHistory(false);
     await fetchConversationMessages(conversation.id);
   };
 
@@ -100,7 +123,7 @@ const AdminLiveChatPage = () => {
     if (!confirm('Close this conversation?')) return;
 
     try {
-      await api.put(`/chat/conversation/${conversationId}/close`);
+      await api.patch(`/chat/conversation/${conversationId}/close`);
       fetchConversations();
       if (selectedConversation?.id === conversationId) {
         setSelectedConversation(null);
@@ -111,6 +134,22 @@ const AdminLiveChatPage = () => {
       console.error('Failed to close conversation:', error);
       alert('Failed to close conversation');
     }
+  };
+
+  // 🆕 NEW: Render star rating
+  const renderStars = (rating) => {
+    if (!rating) return null;
+    return (
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <Star
+            key={star}
+            size={14}
+            className={star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
+          />
+        ))}
+      </div>
+    );
   };
 
   const formatTime = (date) => {
@@ -152,7 +191,7 @@ const AdminLiveChatPage = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-2xl shadow-lg p-6">
             <div className="flex items-center justify-between mb-2">
               <Users size={24} className="text-gray-600" />
@@ -175,6 +214,15 @@ const AdminLiveChatPage = () => {
             </div>
             <p className="text-3xl font-bold mb-1">{stats.closed}</p>
             <p className="text-sm opacity-90">Closed</p>
+          </div>
+
+          {/* 🆕 NEW: Feedback Stats Card */}
+          <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl shadow-lg p-6 text-white">
+            <div className="flex items-center justify-between mb-2">
+              <ThumbsUp size={24} />
+            </div>
+            <p className="text-3xl font-bold mb-1">{stats.averageRating?.toFixed(1) || '0.0'}</p>
+            <p className="text-sm opacity-90">Avg Rating ({stats.withFeedback} reviews)</p>
           </div>
         </div>
 
@@ -213,13 +261,33 @@ const AdminLiveChatPage = () => {
                       }`}
                     >
                       <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <h4 className="font-semibold text-gray-800">{conv.user.name}</h4>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-semibold text-gray-800">{conv.user.name}</h4>
+                            {/* 🆕 NEW: User chat count badge */}
+                            {conv.userChatCount && conv.userChatCount.total > 1 && (
+                              <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded">
+                                {conv.userChatCount.total} chats
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-gray-500">{conv.user.email}</p>
+                          
+                          {/* 🆕 NEW: Feedback rating display */}
+                          {conv.feedbackRating && (
+                            <div className="flex items-center gap-2 mt-1">
+                              {renderStars(conv.feedbackRating)}
+                              {conv.feedbackComment && (
+                                <span className="text-xs text-gray-500" title={conv.feedbackComment}>
+                                  💬
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
-                        {conv.unreadCount > 0 && (
+                        {conv._count?.messages > 0 && conv.status === 'ACTIVE' && (
                           <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                            {conv.unreadCount}
+                            {conv._count.messages}
                           </span>
                         )}
                       </div>
@@ -251,93 +319,144 @@ const AdminLiveChatPage = () => {
               {selectedConversation ? (
                 <>
                   {/* Chat Header */}
-                  <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-primary to-secondary text-white">
-                    <div>
-                      <h3 className="font-semibold">{selectedConversation.user.name}</h3>
-                      <p className="text-sm opacity-90">{selectedConversation.user.email}</p>
+                  <div className="p-4 border-b border-gray-200 bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold text-gray-800">{selectedConversation.user.name}</h3>
+                        <p className="text-xs text-gray-500">{selectedConversation.user.email}</p>
+                        
+                        {/* 🆕 NEW: Show feedback if exists */}
+                        {selectedConversation.feedbackRating && (
+                          <div className="flex items-center gap-2 mt-2">
+                            {renderStars(selectedConversation.feedbackRating)}
+                            {selectedConversation.feedbackComment && (
+                              <p className="text-xs text-gray-600 italic">
+                                "{selectedConversation.feedbackComment}"
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {/* 🆕 NEW: View History Button */}
+                        <button
+                          onClick={() => fetchUserHistory(selectedConversation.userId)}
+                          disabled={loadingHistory}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+                        >
+                          <History size={16} />
+                          {loadingHistory ? 'Loading...' : 'View History'}
+                        </button>
+                        
+                        {selectedConversation.status === 'ACTIVE' && (
+                          <button
+                            onClick={() => handleCloseConversation(selectedConversation.id)}
+                            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                          >
+                            Close Chat
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    {selectedConversation.status === 'ACTIVE' && (
-                      <button
-                        onClick={() => handleCloseConversation(selectedConversation.id)}
-                        className="px-4 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg text-sm font-medium transition-all flex items-center gap-2"
-                      >
-                        <XCircle size={16} />
-                        Close Chat
-                      </button>
-                    )}
                   </div>
 
-                  {/* Messages */}
-                  <div className="flex-1 overflow-y-auto p-6">
-                    {messages.length === 0 ? (
-                      <div className="text-center py-12">
-                        <p className="text-gray-500">No messages yet</p>
+                  {/* 🆕 NEW: User History Modal */}
+                  {showHistory && userHistory && (
+                    <div className="p-4 bg-yellow-50 border-b border-yellow-200">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle size={20} className="text-yellow-600" />
+                          <h4 className="font-semibold text-gray-800">Chat History for {userHistory.user?.name}</h4>
+                        </div>
+                        <button
+                          onClick={() => setShowHistory(false)}
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          ✕
+                        </button>
                       </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {messages.map((msg) => (
-                          <div
-                            key={msg.id}
-                            className={`flex ${msg.senderType === 'ADMIN' ? 'justify-end' : 'justify-start'}`}
-                          >
-                            <div
-                              className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${
-                                msg.senderType === 'ADMIN'
-                                  ? 'bg-gradient-to-r from-primary to-secondary text-white rounded-br-none'
-                                  : 'bg-gray-100 text-gray-800 rounded-bl-none'
-                              }`}
-                            >
-                              <p className="break-words">{msg.message}</p>
-                              <p
-                                className={`text-xs mt-1 ${
-                                  msg.senderType === 'ADMIN' ? 'text-white opacity-75' : 'text-gray-500'
-                                }`}
-                              >
-                                {formatTime(msg.createdAt)}
-                              </p>
-                            </div>
+                      <div className="grid grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-600">Total Chats:</p>
+                          <p className="font-bold text-gray-800">{userHistory.stats.totalChats}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">Active:</p>
+                          <p className="font-bold text-green-600">{userHistory.stats.activeChats}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">Closed:</p>
+                          <p className="font-bold text-gray-600">{userHistory.stats.closedChats}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">Avg Rating:</p>
+                          <p className="font-bold text-yellow-600">{userHistory.stats.averageRating.toFixed(1)} ⭐</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 max-h-32 overflow-y-auto">
+                        <p className="text-xs text-gray-600 font-semibold mb-2">Past Conversations:</p>
+                        {userHistory.conversations.slice(0, 5).map((conv) => (
+                          <div key={conv.id} className="text-xs text-gray-700 py-1 border-b border-yellow-100">
+                            {formatDate(conv.createdAt)} - {conv.status} 
+                            {conv.feedbackRating && ` - ${conv.feedbackRating}⭐`}
                           </div>
                         ))}
-                        <div ref={messagesEndRef} />
                       </div>
-                    )}
+                    </div>
+                  )}
+
+                  {/* Messages */}
+                  <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+                    {messages.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`mb-4 flex ${msg.senderType === 'ADMIN' ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div
+                          className={`max-w-[70%] rounded-lg px-4 py-2 ${
+                            msg.senderType === 'ADMIN'
+                              ? 'bg-primary text-white'
+                              : 'bg-white border border-gray-200 text-gray-800'
+                          }`}
+                        >
+                          <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                          <p className={`text-xs mt-1 ${msg.senderType === 'ADMIN' ? 'text-gray-200' : 'text-gray-500'}`}>
+                            {formatTime(msg.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                    <div ref={messagesEndRef} />
                   </div>
 
                   {/* Message Input */}
                   {selectedConversation.status === 'ACTIVE' && (
-                    <div className="p-4 border-t border-gray-200">
-                      <form onSubmit={handleSendMessage} className="flex gap-2">
+                    <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 bg-white">
+                      <div className="flex gap-2">
                         <input
                           type="text"
                           value={newMessage}
                           onChange={(e) => setNewMessage(e.target.value)}
-                          placeholder="Type your reply..."
-                          className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                          disabled={sending}
+                          placeholder="Type your message..."
+                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                         />
                         <button
                           type="submit"
                           disabled={sending || !newMessage.trim()}
-                          className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
+                          className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center gap-2"
                         >
-                          {sending ? (
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                          ) : (
-                            <>
-                              <Send size={20} />
-                              <span className="hidden sm:inline">Send</span>
-                            </>
-                          )}
+                          <Send size={18} />
+                          {sending ? 'Sending...' : 'Send'}
                         </button>
-                      </form>
-                    </div>
+                      </div>
+                    </form>
                   )}
                 </>
               ) : (
-                <div className="flex-1 flex items-center justify-center text-gray-400">
+                <div className="flex-1 flex items-center justify-center">
                   <div className="text-center">
-                    <MessageSquare size={64} className="mx-auto mb-4 opacity-50" />
-                    <p>Select a conversation to start chatting</p>
+                    <MessageSquare size={64} className="mx-auto text-gray-300 mb-4" />
+                    <p className="text-gray-500">Select a conversation to start chatting</p>
                   </div>
                 </div>
               )}
