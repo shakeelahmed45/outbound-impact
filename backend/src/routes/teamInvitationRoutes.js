@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const teamInvitationController = require('../controllers/teamInvitationController');
-const { authMiddleware, requireFullAdmin } = require('../middleware/auth');
+const authMiddleware = require('../middleware/auth');
+const { requireAdmin } = require('../middleware/auth');
 
 // ═══════════════════════════════════════════════════════════
 // PUBLIC ROUTES (No auth required)
@@ -10,10 +11,10 @@ const { authMiddleware, requireFullAdmin } = require('../middleware/auth');
 router.post('/accept-invitation', teamInvitationController.acceptInvitation);
 
 // ═══════════════════════════════════════════════════════════
-// PROTECTED ROUTES (Require FULL ADMIN only)
+// PROTECTED ROUTES (Require ADMIN only)
 // ═══════════════════════════════════════════════════════════
 router.use(authMiddleware);
-router.use(requireFullAdmin); // Only ADMIN role, not CUSTOMER_SUPPORT
+router.use(requireAdmin); // Only ADMIN role
 
 // Invite new team member
 router.post('/invite', teamInvitationController.inviteTeamMember);
