@@ -12,6 +12,7 @@ const uploadRoutes = require('./routes/uploadRoutes');
 const itemsRoutes = require('./routes/itemsRoutes');
 const campaignRoutes = require('./routes/campaignRoutes');
 const teamRoutes = require('./routes/teamRoutes');
+const teamInvitationRoutes = require('./routes/teamInvitationRoutes');  // 🆕 NEW
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const advancedAnalyticsRoutes = require('./routes/advancedAnalyticsRoutes');
@@ -190,6 +191,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/items', itemsRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/team', teamRoutes);
+app.use('/api/team-invitation', teamInvitationRoutes);  // 🆕 NEW
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/advanced-analytics', advancedAnalyticsRoutes);
@@ -260,6 +262,7 @@ if (process.env.VERCEL) {
     console.log('🔄 Refund system enabled! (7-day policy)');
     console.log('🛍️ Multi-platform e-commerce integration ready!');
     console.log('🔍 Debug routes active at /api/debug');
+    console.log('👥 Admin team management enabled!');  // 🆕 NEW
     console.log('═══════════════════════════════════════════════\n');
   });
 }
