@@ -1,5 +1,5 @@
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { LogOut, LayoutDashboard, Users, FileText, Shield, MessageSquare, MessagesSquare } from 'lucide-react';
+import { LogOut, LayoutDashboard, Users as UsersIcon, FileText, Shield, MessageSquare, MessagesSquare, UserPlus } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 
 const AdminLayout = ({ children }) => {
@@ -12,18 +12,56 @@ const AdminLayout = ({ children }) => {
     navigate('/signin');
   };
 
-  if (user?.role !== 'ADMIN') {
+  // ✅ ENHANCED: Support both ADMIN and CUSTOMER_SUPPORT roles
+  if (user?.role !== 'ADMIN' && user?.role !== 'CUSTOMER_SUPPORT') {
     navigate('/dashboard');
     return null;
   }
 
-  const menuItems = [
-    { path: '/admin-panel', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/admin-panel/users', icon: Users, label: 'Manage Users' },
-    { path: '/admin-panel/items', icon: FileText, label: 'Manage Items' },
-    { path: '/admin-panel/feedback', icon: MessageSquare, label: 'User Feedback' },
-    { path: '/admin-panel/live-chat', icon: MessagesSquare, label: 'Live Chat' },
+  // 🆕 ENHANCED: Role-based menu items
+  const allMenuItems = [
+    { 
+      path: '/admin-panel', 
+      icon: LayoutDashboard, 
+      label: 'Dashboard',
+      roles: ['ADMIN']  // Only ADMIN can see
+    },
+    { 
+      path: '/admin-panel/users', 
+      icon: UsersIcon, 
+      label: 'Manage Users',
+      roles: ['ADMIN']  // Only ADMIN can see
+    },
+    { 
+      path: '/admin-panel/items', 
+      icon: FileText, 
+      label: 'Manage Items',
+      roles: ['ADMIN']  // Only ADMIN can see
+    },
+    { 
+      path: '/admin-panel/feedback', 
+      icon: MessageSquare, 
+      label: 'User Feedback',
+      roles: ['ADMIN']  // Only ADMIN can see
+    },
+    { 
+      path: '/admin-panel/live-chat', 
+      icon: MessagesSquare, 
+      label: 'Live Chat',
+      roles: ['ADMIN', 'CUSTOMER_SUPPORT']  // Both can see
+    },
+    { 
+      path: '/admin-panel/team', 
+      icon: UserPlus, 
+      label: 'Team',
+      roles: ['ADMIN']  // 🆕 NEW: Only ADMIN can see
+    },
   ];
+
+  // Filter menu items based on user role
+  const menuItems = allMenuItems.filter(item => 
+    item.roles.includes(user?.role)
+  );
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
@@ -66,6 +104,16 @@ const AdminLayout = ({ children }) => {
           <div className="mb-3 px-4">
             <p className="text-sm font-medium text-white">{user?.name}</p>
             <p className="text-xs text-gray-400">{user?.email}</p>
+            {/* 🆕 NEW: Show user role badge */}
+            <div className="mt-2">
+              <span className={`text-xs font-semibold px-2 py-1 rounded ${
+                user?.role === 'ADMIN' 
+                  ? 'bg-purple-600 text-white' 
+                  : 'bg-blue-600 text-white'
+              }`}>
+                {user?.role === 'ADMIN' ? 'Admin' : 'Support'}
+              </span>
+            </div>
           </div>
           <button
             onClick={handleLogout}
