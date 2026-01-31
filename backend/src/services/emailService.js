@@ -1233,7 +1233,7 @@ const sendAdminTeamInvitationEmail = async ({ email, role, inviterName, invitati
                 <a href="${invitationLink}" class="button">Accept Invitation & Create Account</a>
               </div>
               
-              <p style="margin-top: 20px; font-size: 14px; color: #666;">
+              <p style="margin-top: 20px; font-size: 14px; color: #fefefeff;">
                 Or copy and paste this link into your browser:<br>
                 <a href="${invitationLink}" style="color: #800080; word-break: break-all;">${invitationLink}</a>
               </p>

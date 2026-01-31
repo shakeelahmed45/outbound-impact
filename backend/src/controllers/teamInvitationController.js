@@ -157,6 +157,72 @@ const getAllInvitations = async (req, res) => {
 };
 
 // ═══════════════════════════════════════════════════════════
+// GET INVITATION BY TOKEN (for accept invitation page)
+// ═══════════════════════════════════════════════════════════
+const getInvitationByToken = async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    // Find invitation
+    const invitation = await prisma.adminInvitation.findUnique({
+      where: { token },
+      include: {
+        inviter: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!invitation) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Invalid invitation token',
+      });
+    }
+
+    // Check if already used
+    if (invitation.status !== 'PENDING') {
+      return res.status(400).json({
+        status: 'error',
+        message: 'This invitation has already been used or expired',
+      });
+    }
+
+    // Check if expired
+    if (new Date() > invitation.expiresAt) {
+      await prisma.adminInvitation.update({
+        where: { id: invitation.id },
+        data: { status: 'EXPIRED' },
+      });
+      return res.status(400).json({
+        status: 'error',
+        message: 'This invitation has expired',
+      });
+    }
+
+    // Return invitation details (without sensitive data)
+    res.json({
+      status: 'success',
+      invitation: {
+        email: invitation.email,
+        role: invitation.role,
+        inviterName: invitation.inviter.name,
+        expiresAt: invitation.expiresAt,
+      },
+    });
+  } catch (error) {
+    console.error('Get invitation by token error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch invitation details',
+    });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
 // ACCEPT INVITATION & CREATE ACCOUNT
 // ═══════════════════════════════════════════════════════════
 const acceptInvitation = async (req, res) => {
@@ -444,6 +510,7 @@ const removeTeamMember = async (req, res) => {
 module.exports = {
   inviteTeamMember,
   getAllInvitations,
+  getInvitationByToken,
   acceptInvitation,
   resendInvitation,
   deleteInvitation,
