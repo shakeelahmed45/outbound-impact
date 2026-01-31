@@ -190,9 +190,13 @@ app.use('/api/user', userRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/items', itemsRoutes);
 app.use('/api/campaigns', campaignRoutes);
-app.use('/api/team', teamRoutes);
-app.use('/api/team-invitation', teamInvitationRoutes);  // 🆕 NEW
-app.use('/api/team', teamInvitationRoutes);
+
+// ✅ FIXED: teamInvitationRoutes MUST come BEFORE teamRoutes
+// Both have /invitation/:token route - admin uses AdminInvitation table, regular uses TeamMember table
+app.use('/api/team', teamInvitationRoutes);  // ✅ FIRST - Admin invitations (AdminInvitation table)
+app.use('/api/team', teamRoutes);             // ✅ SECOND - Regular team (TeamMember table)
+app.use('/api/team-invitation', teamInvitationRoutes);  // Alternative path for admin panel
+
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/advanced-analytics', advancedAnalyticsRoutes);
