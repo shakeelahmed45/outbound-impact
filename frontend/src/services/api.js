@@ -69,7 +69,6 @@ api.interceptors.request.use(
           const parsed = JSON.parse(authStorage);
           if (parsed?.state?.token) {
             config.headers.Authorization = `Bearer ${parsed.state.token}`;
-            console.log('✅ Using token from auth-storage');
             return config;
           }
         }
@@ -107,7 +106,7 @@ api.interceptors.request.use(
   }
 );
 
-// ✅ ENHANCED: Response interceptor with better error handling
+// ✅ FIXED: Response interceptor with SMART redirect based on user role
 api.interceptors.response.use(
   (response) => {
     // Cache successful GET responses
@@ -131,21 +130,47 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    // ✅ ENHANCED: Better 401 handling
+    // ✅ FIXED: Better 401 handling with SMART redirect
     if (error.response?.status === 401) {
-      console.log('🚨 401 Unauthorized - Clearing auth and redirecting to signin');
+      console.log('🚨 401 Unauthorized - Clearing auth');
+      
+      // ✅ Check if user was an admin BEFORE clearing auth
+      let wasAdminUser = false;
+      try {
+        const authStorage = localStorage.getItem('auth-storage');
+        if (authStorage) {
+          const parsed = JSON.parse(authStorage);
+          const userRole = parsed?.state?.user?.role;
+          wasAdminUser = userRole === 'ADMIN' || userRole === 'CUSTOMER_SUPPORT';
+          console.log('User role before logout:', userRole, 'Was admin:', wasAdminUser);
+        }
+      } catch (e) {
+        console.error('Error checking user role:', e);
+      }
       
       // Clear all auth data
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      localStorage.removeItem('auth-storage'); // ✅ Clear Zustand persist storage too
+      localStorage.removeItem('auth-storage');
       
       // Clear cache
       api.clearCache();
       
-      // Only redirect if not already on signin page
-      if (!window.location.pathname.includes('/signin')) {
-        window.location.href = '/signin';
+      // ✅ FIXED: Smart redirect based on user role AND current path
+      const currentPath = window.location.pathname;
+      const isOnAdminPage = currentPath.includes('/admin');
+      const isOnLoginPage = currentPath.includes('/signin') || currentPath.includes('/admin-login');
+      
+      // Don't redirect if already on a login page
+      if (!isOnLoginPage) {
+        // Redirect admin users to admin login
+        if (wasAdminUser || isOnAdminPage) {
+          console.log('🔐 Redirecting to admin-login');
+          window.location.href = '/admin-login';
+        } else {
+          console.log('🔐 Redirecting to signin');
+          window.location.href = '/signin';
+        }
       }
     }
     

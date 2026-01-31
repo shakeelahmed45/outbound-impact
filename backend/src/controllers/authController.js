@@ -377,6 +377,15 @@ const signIn = async (req, res) => {
       });
     }
 
+    // ✅ NEW: Check if user account is deleted or inactive
+    if (user.status === 'deleted' || user.status === 'inactive') {
+      console.log(`❌ Login blocked: User ${user.email} has status: ${user.status}`);
+      return res.status(401).json({
+        status: 'error',
+        message: 'This account has been deactivated. Please contact support.'
+      });
+    }
+
     // ✅ CHECK IF 2FA IS ENABLED
     if (user.twoFactorEnabled) {
       // If no 2FA code provided, send one

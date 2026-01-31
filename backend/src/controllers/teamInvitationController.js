@@ -613,9 +613,26 @@ const getAllTeamMembers = async (req, res) => {
   try {
     const teamMembers = await prisma.user.findMany({
       where: {
-        OR: [
-          { role: 'ADMIN' },
-          { role: 'CUSTOMER_SUPPORT' },
+        AND: [
+          {
+            OR: [
+              { role: 'ADMIN' },
+              { role: 'CUSTOMER_SUPPORT' },
+            ],
+          },
+          // ✅ FIXED: Exclude deleted users
+          {
+            OR: [
+              { status: null },
+              { status: 'active' },
+            ],
+          },
+          // ✅ Also exclude users with scrambled deleted emails
+          {
+            NOT: {
+              email: { contains: '@deleted.local' }
+            }
+          }
         ],
       },
       select: {
@@ -634,7 +651,7 @@ const getAllTeamMembers = async (req, res) => {
       total: teamMembers.length,
       admins: teamMembers.filter(m => m.role === 'ADMIN').length,
       customerSupport: teamMembers.filter(m => m.role === 'CUSTOMER_SUPPORT').length,
-      active: teamMembers.filter(m => m.status === 'active').length,
+      active: teamMembers.filter(m => !m.status || m.status === 'active').length,
     };
 
     res.json({
@@ -652,7 +669,7 @@ const getAllTeamMembers = async (req, res) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// REMOVE TEAM MEMBER
+// REMOVE TEAM MEMBER (HARD DELETE)
 // ═══════════════════════════════════════════════════════════
 const removeTeamMember = async (req, res) => {
   try {
@@ -667,21 +684,70 @@ const removeTeamMember = async (req, res) => {
       });
     }
 
-    // Soft delete - mark as deleted
-    await prisma.user.update({
+    // Get user info before deletion
+    const userToDelete = await prisma.user.findUnique({
       where: { id: userId },
-      data: {
-        status: 'deleted',
-        deletedAt: new Date(),
-      },
+      select: { id: true, email: true, name: true, role: true }
     });
+
+    if (!userToDelete) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found',
+      });
+    }
+
+    console.log(`🗑️ Removing team member: ${userToDelete.email} (${userToDelete.role})`);
+
+    // ✅ Delete related AdminInvitation records first (if any)
+    try {
+      await prisma.adminInvitation.deleteMany({
+        where: { email: userToDelete.email.toLowerCase() }
+      });
+      console.log(`✅ Deleted related invitations for: ${userToDelete.email}`);
+    } catch (inviteError) {
+      console.log(`ℹ️ No invitations found for: ${userToDelete.email}`);
+    }
+
+    // ✅ HARD DELETE the user - completely removes from database
+    await prisma.user.delete({
+      where: { id: userId }
+    });
+
+    console.log(`✅ Team member PERMANENTLY deleted: ${userToDelete.email}`);
 
     res.json({
       status: 'success',
-      message: 'Team member removed successfully',
+      message: 'Team member permanently removed',
     });
   } catch (error) {
     console.error('Remove team member error:', error);
+    
+    // Check if it's a foreign key constraint error
+    if (error.code === 'P2003') {
+      // If hard delete fails due to foreign keys, do soft delete instead
+      try {
+        await prisma.user.update({
+          where: { id: req.params.userId },
+          data: {
+            status: 'deleted',
+            deletedAt: new Date(),
+            // Scramble email to prevent login
+            email: `deleted_${Date.now()}_${req.params.userId}@deleted.local`,
+          },
+        });
+        
+        console.log(`⚠️ Soft deleted user due to dependencies: ${req.params.userId}`);
+        
+        return res.json({
+          status: 'success',
+          message: 'Team member removed (account deactivated)',
+        });
+      } catch (softDeleteError) {
+        console.error('Soft delete also failed:', softDeleteError);
+      }
+    }
+    
     res.status(500).json({
       status: 'error',
       message: 'Failed to remove team member',
