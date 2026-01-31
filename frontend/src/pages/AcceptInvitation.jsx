@@ -28,6 +28,27 @@ const AcceptInvitation = () => {
     fetchInvitationDetails();
   }, [token]);
 
+  // ✅ FIXED: Helper to check if this is an admin role invitation
+  const isAdminRole = (role) => {
+    return role === 'ADMIN' || role === 'CUSTOMER_SUPPORT';
+  };
+
+  // ✅ FIXED: Get the appropriate sign-in URL based on role
+  const getSignInUrl = () => {
+    if (invitation && isAdminRole(invitation.role)) {
+      return '/admin-login';
+    }
+    return '/signin';
+  };
+
+  // ✅ FIXED: Get the sign-in button text
+  const getSignInButtonText = () => {
+    if (invitation && isAdminRole(invitation.role)) {
+      return 'Go to Admin Login';
+    }
+    return 'Sign In to Continue';
+  };
+
   const fetchInvitationDetails = async () => {
     try {
       const response = await api.get(`/team/invitation/${token}`);
@@ -39,31 +60,6 @@ const AcceptInvitation = () => {
       setError(error.response?.data?.message || 'Invalid or expired invitation');
     } finally {
       setLoading(false);
-    }
-  };
-
-  // ✅ Helper function to check if this is an admin role
-  const isAdminRole = (role) => {
-    return role === 'ADMIN' || role === 'CUSTOMER_SUPPORT';
-  };
-
-  // ✅ Helper function to get the correct login path
-  const getLoginPath = () => {
-    if (invitation && isAdminRole(invitation.role)) {
-      return '/admin-login';  // ✅ FIXED: Correct URL
-    }
-    return '/signin';
-  };
-
-  // ✅ Helper function to get friendly role name
-  const getRoleName = (role) => {
-    switch (role) {
-      case 'ADMIN':
-        return 'Administrator';
-      case 'CUSTOMER_SUPPORT':
-        return 'Customer Support Agent';
-      default:
-        return role;
     }
   };
 
@@ -174,50 +170,55 @@ const AcceptInvitation = () => {
   }
 
   if (actionComplete) {
+    const isAdmin = invitation && isAdminRole(invitation.role);
+    
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl p-12 max-w-md w-full text-center">
           {actionType === 'accepted' ? (
             <>
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <CheckCircle size={40} className="text-green-600" />
+              <div className={`w-20 h-20 ${isAdmin ? 'bg-purple-100' : 'bg-green-100'} rounded-full flex items-center justify-center mx-auto mb-6`}>
+                {isAdmin ? (
+                  <Shield size={40} className="text-purple-600" />
+                ) : (
+                  <CheckCircle size={40} className="text-green-600" />
+                )}
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-3">Welcome to the Team! 🎉</h1>
+              <h1 className="text-2xl font-bold text-gray-900 mb-3">
+                {isAdmin ? 'Welcome to the Admin Team! 🎉' : 'Welcome to the Team! 🎉'}
+              </h1>
               <p className="text-gray-600 mb-6">
-                You have successfully joined <strong>{invitation.organizationName}</strong> as a <strong>{getRoleName(invitation.role)}</strong>.
+                {isAdmin ? (
+                  <>You have successfully joined as <strong className="text-purple-600">{invitation.role === 'ADMIN' ? 'Admin' : 'Customer Support'}</strong>.</>
+                ) : (
+                  <>You have successfully joined <strong>{invitation.organizationName}</strong> team as a <strong>{invitation.role}</strong>.</>
+                )}
+              </p>
+              <p className="text-sm text-gray-500 mb-6">
+                {userExists 
+                  ? `Please sign in with your existing credentials to access ${isAdmin ? 'the admin panel' : 'your team content'}.`
+                  : `Your account has been created! Please sign in with your new credentials.`}
               </p>
               
-              {/* ✅ Show different message for admin roles */}
-              {isAdminRole(invitation.role) ? (
-                <>
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6 flex items-center gap-3">
-                    <Shield className="text-purple-600 flex-shrink-0" size={20} />
-                    <p className="text-purple-800 text-sm font-medium text-left">
-                      You now have admin access. Please sign in through the Admin Portal.
-                    </p>
+              {/* ✅ FIXED: Show appropriate badge for admin roles */}
+              {isAdmin && (
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-center justify-center gap-2">
+                    <Shield className="text-purple-600" size={20} />
+                    <span className="text-purple-800 font-semibold">
+                      {invitation.role === 'ADMIN' ? 'Full Admin Access' : 'Customer Support Access'}
+                    </span>
                   </div>
-                  <button
-                    onClick={() => navigate('/admin-login')}
-                    className="gradient-btn text-white px-6 py-3 rounded-lg font-semibold w-full"
-                  >
-                    Go to Admin Login
-                  </button>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm text-gray-500 mb-6">
-                    {userExists 
-                      ? 'Please sign in with your existing credentials to access your team content.'
-                      : 'Your account has been created! Please sign in with your new credentials.'}
-                  </p>
-                  <button
-                    onClick={() => navigate('/signin')}
-                    className="gradient-btn text-white px-6 py-3 rounded-lg font-semibold w-full"
-                  >
-                    Sign In to Continue
-                  </button>
-                </>
+                </div>
               )}
+
+              {/* ✅ FIXED: Redirect to admin-login for admin roles */}
+              <button
+                onClick={() => navigate(getSignInUrl())}
+                className="gradient-btn text-white px-6 py-3 rounded-lg font-semibold w-full"
+              >
+                {getSignInButtonText()}
+              </button>
             </>
           ) : (
             <>
@@ -226,7 +227,7 @@ const AcceptInvitation = () => {
               </div>
               <h1 className="text-2xl font-bold text-gray-900 mb-3">Invitation Declined</h1>
               <p className="text-gray-600 mb-6">
-                You have declined the invitation from <strong>{invitation.organizationName}</strong>.
+                You have declined the invitation{invitation.organizationName ? ` from ${invitation.organizationName}` : ''}.
               </p>
               <button
                 onClick={() => navigate('/')}
@@ -242,53 +243,44 @@ const AcceptInvitation = () => {
   }
 
   if (showPasswordSetup) {
+    const isAdmin = invitation && isAdminRole(invitation.role);
+    
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl p-12 max-w-md w-full">
           <div className="text-center mb-8">
-            <div className="w-20 h-20 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <Lock className="text-white" size={32} />
+            <div className={`w-20 h-20 ${isAdmin ? 'bg-gradient-to-br from-purple-600 to-violet-600' : 'bg-gradient-to-br from-primary to-secondary'} rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg`}>
+              {isAdmin ? <Shield className="text-white" size={36} /> : <Lock className="text-white" size={36} />}
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Create Your Account</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              {isAdmin ? 'Setup Admin Account' : 'Setup Your Account'}
+            </h1>
             <p className="text-gray-600">
-              Set up your account to join as <strong>{getRoleName(invitation.role)}</strong>
+              {isAdmin 
+                ? `Create your ${invitation.role === 'ADMIN' ? 'Admin' : 'Support'} account`
+                : `Create your account to join ${invitation.organizationName}`
+              }
             </p>
+            
+            {/* ✅ Show admin role badge during registration */}
+            {isAdmin && (
+              <div className="mt-4 inline-flex items-center gap-2 bg-purple-100 text-purple-800 px-4 py-2 rounded-full text-sm font-semibold">
+                <Shield size={16} />
+                {invitation.role === 'ADMIN' ? 'Admin Role' : 'Customer Support Role'}
+              </div>
+            )}
           </div>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-center gap-3">
-              <AlertCircle className="text-red-600 flex-shrink-0" size={20} />
-              <p className="text-red-800 text-sm">{error}</p>
-            </div>
-          )}
-
-          {/* ✅ Show admin badge for admin roles */}
-          {isAdminRole(invitation.role) && (
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6 flex items-center gap-3">
-              <Shield className="text-purple-600 flex-shrink-0" size={20} />
-              <p className="text-purple-800 text-sm font-medium">
-                You're creating an admin account with elevated privileges.
-              </p>
-            </div>
-          )}
-
           <form onSubmit={handlePasswordSetup} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
-              </label>
-              <input
-                type="email"
-                value={invitation.email}
-                disabled
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
-              />
-            </div>
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2">
+                <AlertCircle className="text-red-600 flex-shrink-0" size={18} />
+                <p className="text-red-800 text-sm">{error}</p>
+              </div>
+            )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Your Name
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
               <input
                 type="text"
                 value={name}
@@ -300,15 +292,23 @@ const AcceptInvitation = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Create Password
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input
+                type="email"
+                value={invitation?.email || ''}
+                disabled
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Create a secure password"
+                  placeholder="Create a password"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent pr-12"
                   required
                 />
@@ -323,9 +323,7 @@ const AcceptInvitation = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Confirm Password
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
               <div className="relative">
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
@@ -396,6 +394,7 @@ const AcceptInvitation = () => {
   const isExpired = invitation.isExpired;
   const alreadyAccepted = invitation.status === 'ACCEPTED';
   const alreadyDeclined = invitation.status === 'DECLINED';
+  const isAdmin = isAdminRole(invitation.role);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center p-4">
@@ -408,8 +407,16 @@ const AcceptInvitation = () => {
             onError={(e) => e.target.style.display = 'none'}
           />
           <h1 className="text-3xl font-bold text-primary mb-2">
-            {isAdminRole(invitation.role) ? 'Admin Team Invitation' : 'Team Invitation'}
+            {isAdmin ? 'Admin Team Invitation' : 'Team Invitation'}
           </h1>
+          
+          {/* ✅ Show admin badge */}
+          {isAdmin && (
+            <div className="mt-2 inline-flex items-center gap-2 bg-purple-100 text-purple-800 px-4 py-2 rounded-full text-sm font-semibold">
+              <Shield size={16} />
+              {invitation.role === 'ADMIN' ? 'Admin Access' : 'Support Access'}
+            </div>
+          )}
         </div>
 
         {isExpired && (
@@ -452,8 +459,19 @@ const AcceptInvitation = () => {
         )}
 
         <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-lg p-6 mb-6">
-          <p className="text-sm text-gray-600 mb-2">You have been invited to join:</p>
-          <h2 className="text-2xl font-bold text-primary mb-4">{invitation.organizationName}</h2>
+          {invitation.organizationName && (
+            <>
+              <p className="text-sm text-gray-600 mb-2">You have been invited to join:</p>
+              <h2 className="text-2xl font-bold text-primary mb-4">{invitation.organizationName}</h2>
+            </>
+          )}
+          
+          {isAdmin && !invitation.organizationName && (
+            <>
+              <p className="text-sm text-gray-600 mb-2">You have been invited to join:</p>
+              <h2 className="text-2xl font-bold text-primary mb-4">Admin Team</h2>
+            </>
+          )}
           
           <div className="space-y-3">
             <div className="flex items-center gap-2">
@@ -463,14 +481,17 @@ const AcceptInvitation = () => {
             
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">Role:</span>
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                isAdminRole(invitation.role) 
-                  ? 'bg-purple-100 text-purple-800' 
-                  : 'bg-purple-100 text-primary'
-              }`}>
-                {getRoleName(invitation.role)}
+              <span className={`px-3 py-1 ${isAdmin ? 'bg-purple-100 text-purple-800' : 'bg-purple-100 text-primary'} rounded-full text-sm font-medium`}>
+                {invitation.role === 'CUSTOMER_SUPPORT' ? 'Customer Support' : invitation.role}
               </span>
             </div>
+
+            {invitation.inviterName && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">Invited by:</span>
+                <span className="text-sm font-medium text-gray-900">{invitation.inviterName}</span>
+              </div>
+            )}
 
             {!isExpired && invitation.daysRemaining > 0 && (
               <div className="flex items-center gap-2 text-sm">
@@ -485,11 +506,11 @@ const AcceptInvitation = () => {
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
           <p className="text-xs text-blue-800">
-            <strong>As a {getRoleName(invitation.role)}:</strong>{' '}
+            <strong>As {invitation.role === 'CUSTOMER_SUPPORT' ? 'Customer Support' : `a ${invitation.role}`}:</strong>{' '}
             {invitation.role === 'VIEWER' && 'You can view all content, campaigns, and analytics.'}
             {invitation.role === 'EDITOR' && 'You can view and edit content, create campaigns, and manage media.'}
-            {invitation.role === 'ADMIN' && 'You have full administrative access to the platform including user management, system settings, and all features.'}
-            {invitation.role === 'CUSTOMER_SUPPORT' && 'You can access the admin panel to help users, manage support tickets, and view user information.'}
+            {invitation.role === 'ADMIN' && 'You have full access to all features including team management and settings.'}
+            {invitation.role === 'CUSTOMER_SUPPORT' && 'You can access the live chat system to help users.'}
           </p>
         </div>
 
@@ -533,12 +554,13 @@ const AcceptInvitation = () => {
           </div>
         )}
 
+        {/* ✅ FIXED: Show appropriate sign-in button for expired/accepted/declined states */}
         {(isExpired || alreadyAccepted || alreadyDeclined) && (
           <button
-            onClick={() => navigate(getLoginPath())}
+            onClick={() => navigate(getSignInUrl())}
             className="w-full gradient-btn text-white px-6 py-3 rounded-lg font-semibold"
           >
-            {isAdminRole(invitation.role) ? 'Go to Admin Login' : 'Go to Sign In'}
+            {isAdmin ? 'Go to Admin Login' : 'Go to Sign In'}
           </button>
         )}
       </div>

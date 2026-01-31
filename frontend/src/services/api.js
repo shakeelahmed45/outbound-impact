@@ -132,9 +132,9 @@ api.interceptors.response.use(
   (error) => {
     // ✅ FIXED: Better 401 handling with SMART redirect
     if (error.response?.status === 401) {
-      console.log('🚨 401 Unauthorized - Clearing auth');
+      console.log('🚨 401 Unauthorized detected');
       
-      // ✅ Check if user was an admin BEFORE clearing auth
+      // ✅ CRITICAL: Check user role BEFORE clearing auth data
       let wasAdminUser = false;
       try {
         const authStorage = localStorage.getItem('auth-storage');
@@ -142,13 +142,13 @@ api.interceptors.response.use(
           const parsed = JSON.parse(authStorage);
           const userRole = parsed?.state?.user?.role;
           wasAdminUser = userRole === 'ADMIN' || userRole === 'CUSTOMER_SUPPORT';
-          console.log('User role before logout:', userRole, 'Was admin:', wasAdminUser);
+          console.log('📋 User role before logout:', userRole, '| Was admin:', wasAdminUser);
         }
       } catch (e) {
         console.error('Error checking user role:', e);
       }
       
-      // Clear all auth data
+      // Clear all auth data AFTER checking role
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('auth-storage');
@@ -165,10 +165,10 @@ api.interceptors.response.use(
       if (!isOnLoginPage) {
         // Redirect admin users to admin login
         if (wasAdminUser || isOnAdminPage) {
-          console.log('🔐 Redirecting to admin-login');
+          console.log('🔐 Redirecting to /admin-login');
           window.location.href = '/admin-login';
         } else {
-          console.log('🔐 Redirecting to signin');
+          console.log('🔐 Redirecting to /signin');
           window.location.href = '/signin';
         }
       }

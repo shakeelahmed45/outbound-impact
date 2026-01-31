@@ -11,14 +11,14 @@ const { requireAdmin } = require('../middleware/auth');
 // ✅ Get invitation details by token (for the accept page)
 router.get('/invitation/:token', teamInvitationController.getInvitationByToken);
 
-// ✅ Accept invitation (token in URL - matches frontend pattern)
+// ✅ Accept invitation - token in body (legacy)
+router.post('/accept-invitation', teamInvitationController.acceptInvitation);
+
+// ✅ NEW: Accept invitation - token in URL params (matches frontend)
 router.post('/invitation/:token/accept', teamInvitationController.acceptInvitationWithParams);
 
-// ✅ Decline invitation (token in URL - matches frontend pattern)
+// ✅ NEW: Decline invitation - token in URL params
 router.post('/invitation/:token/decline', teamInvitationController.declineInvitation);
-
-// Legacy route (token in body)
-router.post('/accept-invitation', teamInvitationController.acceptInvitation);
 
 // ═══════════════════════════════════════════════════════════
 // PROTECTED ROUTES (Require ADMIN only)
