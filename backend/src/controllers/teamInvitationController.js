@@ -24,7 +24,7 @@ const inviteTeamMember = async (req, res) => {
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { email: email.toLowerCase().trim() },
     });
 
     if (existingUser) {
@@ -37,7 +37,7 @@ const inviteTeamMember = async (req, res) => {
     // Check for pending invitation
     const pendingInvite = await prisma.adminInvitation.findFirst({
       where: {
-        email,
+        email: email.toLowerCase().trim(),
         status: 'PENDING',
       },
     });
@@ -56,7 +56,7 @@ const inviteTeamMember = async (req, res) => {
     // Create invitation
     const invitation = await prisma.adminInvitation.create({
       data: {
-        email,
+        email: email.toLowerCase().trim(),
         role,
         token,
         invitedBy: inviterId,
@@ -81,7 +81,7 @@ const inviteTeamMember = async (req, res) => {
     try {
       // Send invitation email using sendAdminTeamInvitationEmail
       const emailResult = await emailService.sendAdminTeamInvitationEmail({
-        email: email,
+        email: email.toLowerCase().trim(),
         role: role,
         inviterName: invitation.inviter.name,
         invitationLink: inviteLink,
@@ -192,7 +192,8 @@ const getInvitationByToken = async (req, res) => {
     }
 
     // Check if expired
-    if (new Date() > invitation.expiresAt) {
+    const isExpired = new Date() > invitation.expiresAt;
+    if (isExpired) {
       await prisma.adminInvitation.update({
         where: { id: invitation.id },
         data: { status: 'EXPIRED' },
@@ -203,6 +204,15 @@ const getInvitationByToken = async (req, res) => {
       });
     }
 
+    // Check if user already exists with this email
+    const existingUser = await prisma.user.findUnique({
+      where: { email: invitation.email.toLowerCase().trim() },
+    });
+
+    // Calculate days remaining
+    const now = new Date();
+    const daysRemaining = Math.max(0, Math.ceil((invitation.expiresAt - now) / (1000 * 60 * 60 * 24)));
+
     // Return invitation details (without sensitive data)
     res.json({
       status: 'success',
@@ -210,8 +220,13 @@ const getInvitationByToken = async (req, res) => {
         email: invitation.email,
         role: invitation.role,
         inviterName: invitation.inviter.name,
+        organizationName: 'Outbound Impact Admin Team',
         expiresAt: invitation.expiresAt,
+        status: invitation.status,
+        isExpired: false,
+        daysRemaining,
       },
+      userExists: !!existingUser,
     });
   } catch (error) {
     console.error('Get invitation by token error:', error);
@@ -223,7 +238,129 @@ const getInvitationByToken = async (req, res) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// ACCEPT INVITATION & CREATE ACCOUNT
+// ACCEPT INVITATION WITH TOKEN IN URL PARAMS (matches frontend)
+// ═══════════════════════════════════════════════════════════
+const acceptInvitationWithParams = async (req, res) => {
+  try {
+    const { token } = req.params;  // ✅ Token from URL
+    const { name, password } = req.body;
+
+    console.log('📝 Accept invitation request:', { token: token?.substring(0, 10) + '...', name });
+
+    if (!name || !password) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Name and password are required',
+      });
+    }
+
+    // Find invitation
+    const invitation = await prisma.adminInvitation.findUnique({
+      where: { token },
+      include: {
+        inviter: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!invitation) {
+      console.log('❌ Invalid invitation token');
+      return res.status(404).json({
+        status: 'error',
+        message: 'Invalid invitation token',
+      });
+    }
+
+    if (invitation.status !== 'PENDING') {
+      console.log('❌ Invitation already used:', invitation.status);
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invitation already used or expired',
+      });
+    }
+
+    if (new Date() > invitation.expiresAt) {
+      await prisma.adminInvitation.update({
+        where: { id: invitation.id },
+        data: { status: 'EXPIRED' },
+      });
+      console.log('❌ Invitation expired');
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invitation has expired',
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email: invitation.email.toLowerCase().trim() },
+    });
+
+    if (existingUser) {
+      console.log('❌ User already exists:', invitation.email);
+      return res.status(400).json({
+        status: 'error',
+        message: 'Account already exists with this email',
+      });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create user account
+    const user = await prisma.user.create({
+      data: {
+        email: invitation.email.toLowerCase().trim(),
+        name: name.trim(),
+        password: hashedPassword,
+        role: invitation.role,
+        status: 'active',
+      },
+    });
+
+    console.log('✅ User created:', { id: user.id, email: user.email, role: user.role });
+
+    // Mark invitation as accepted
+    await prisma.adminInvitation.update({
+      where: { id: invitation.id },
+      data: { status: 'ACCEPTED' },
+    });
+
+    // Generate JWT token
+    const authToken = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    console.log('✅ Invitation accepted successfully for:', user.email);
+
+    res.json({
+      status: 'success',
+      message: 'Account created successfully',
+      token: authToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error('Accept invitation error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to accept invitation',
+    });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// ACCEPT INVITATION (LEGACY - token in body)
 // ═══════════════════════════════════════════════════════════
 const acceptInvitation = async (req, res) => {
   try {
@@ -313,6 +450,51 @@ const acceptInvitation = async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to accept invitation',
+    });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// DECLINE INVITATION
+// ═══════════════════════════════════════════════════════════
+const declineInvitation = async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    const invitation = await prisma.adminInvitation.findUnique({
+      where: { token },
+    });
+
+    if (!invitation) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Invalid invitation token',
+      });
+    }
+
+    if (invitation.status !== 'PENDING') {
+      return res.status(400).json({
+        status: 'error',
+        message: 'This invitation has already been processed',
+      });
+    }
+
+    await prisma.adminInvitation.update({
+      where: { id: invitation.id },
+      data: { status: 'DECLINED' },
+    });
+
+    console.log('❌ Invitation declined:', invitation.email);
+
+    res.json({
+      status: 'success',
+      message: 'Invitation declined',
+    });
+  } catch (error) {
+    console.error('Decline invitation error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to decline invitation',
     });
   }
 };
@@ -512,6 +694,8 @@ module.exports = {
   getAllInvitations,
   getInvitationByToken,
   acceptInvitation,
+  acceptInvitationWithParams,  // ✅ NEW
+  declineInvitation,           // ✅ NEW
   resendInvitation,
   deleteInvitation,
   getAllTeamMembers,

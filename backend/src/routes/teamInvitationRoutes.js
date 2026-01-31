@@ -8,10 +8,16 @@ const { requireAdmin } = require('../middleware/auth');
 // PUBLIC ROUTES (No auth required)
 // ═══════════════════════════════════════════════════════════
 
-// ✅ NEW: Get invitation details by token (for the accept page)
+// ✅ Get invitation details by token (for the accept page)
 router.get('/invitation/:token', teamInvitationController.getInvitationByToken);
 
-// Accept invitation and create account
+// ✅ Accept invitation (token in URL - matches frontend pattern)
+router.post('/invitation/:token/accept', teamInvitationController.acceptInvitationWithParams);
+
+// ✅ Decline invitation (token in URL - matches frontend pattern)
+router.post('/invitation/:token/decline', teamInvitationController.declineInvitation);
+
+// Legacy route (token in body)
 router.post('/accept-invitation', teamInvitationController.acceptInvitation);
 
 // ═══════════════════════════════════════════════════════════
