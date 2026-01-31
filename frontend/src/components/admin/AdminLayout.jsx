@@ -9,7 +9,7 @@ const AdminLayout = ({ children }) => {
 
   const handleLogout = () => {
     logout();
-    navigate('/signin');
+    navigate('/admin-login');
   };
 
   // ✅ ENHANCED: Support both ADMIN and CUSTOMER_SUPPORT roles

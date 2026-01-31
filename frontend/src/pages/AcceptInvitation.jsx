@@ -50,7 +50,7 @@ const AcceptInvitation = () => {
   // ✅ Helper function to get the correct login path
   const getLoginPath = () => {
     if (invitation && isAdminRole(invitation.role)) {
-      return '/admin/login';
+      return '/admin-login';  // ✅ FIXED: Correct URL
     }
     return '/signin';
   };
@@ -197,7 +197,7 @@ const AcceptInvitation = () => {
                     </p>
                   </div>
                   <button
-                    onClick={() => navigate('/admin/login')}
+                    onClick={() => navigate('/admin-login')}
                     className="gradient-btn text-white px-6 py-3 rounded-lg font-semibold w-full"
                   >
                     Go to Admin Login
