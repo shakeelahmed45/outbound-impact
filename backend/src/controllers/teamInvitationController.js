@@ -4,7 +4,7 @@ const prisma = require('../lib/prisma');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const emailService = require('../services/emailService'); // 🆕 ADD THIS
+const emailService = require('../services/emailService');
 
 // ═══════════════════════════════════════════════════════════
 // INVITE TEAM MEMBER (ADMIN or CUSTOMER_SUPPORT)
@@ -79,70 +79,20 @@ const inviteTeamMember = async (req, res) => {
     console.log('🔗 Invitation link:', inviteLink);
 
     try {
-      // Send invitation email
-      await emailService.sendEmail({
-        to: email,
-        subject: `You've been invited to join Outbound Impact Admin Team`,
-        html: `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <style>
-              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-              .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-              .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-              .button { display: inline-block; background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold; }
-              .info-box { background: white; padding: 20px; border-left: 4px solid #667eea; margin: 20px 0; }
-              .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>🎉 Admin Team Invitation</h1>
-              </div>
-              <div class="content">
-                <p>Hi there!</p>
-                
-                <p><strong>${invitation.inviter.name}</strong> has invited you to join the Outbound Impact admin team as a <strong>${role === 'ADMIN' ? 'Full Admin' : 'Customer Support'}</strong>.</p>
-                
-                <div class="info-box">
-                  <h3>Your Role: ${role === 'ADMIN' ? '👑 Admin' : '💬 Customer Support'}</h3>
-                  ${role === 'ADMIN' 
-                    ? '<p>As an Admin, you\'ll have full access to manage users, items, analytics, and team members.</p>'
-                    : '<p>As Customer Support, you\'ll have access to manage live chat conversations and help users.</p>'
-                  }
-                </div>
-                
-                <p>Click the button below to accept the invitation and create your account:</p>
-                
-                <div style="text-align: center;">
-                  <a href="${inviteLink}" class="button">Accept Invitation & Create Account</a>
-                </div>
-                
-                <p style="margin-top: 20px; font-size: 14px; color: #666;">
-                  Or copy and paste this link into your browser:<br>
-                  <a href="${inviteLink}" style="color: #667eea;">${inviteLink}</a>
-                </p>
-                
-                <div class="info-box">
-                  <p><strong>⏰ Important:</strong> This invitation expires in 7 days (${new Date(expiresAt).toLocaleDateString()}).</p>
-                </div>
-                
-                <p>If you have any questions, please contact the admin who invited you.</p>
-              </div>
-              <div class="footer">
-                <p>© 2026 Outbound Impact. All rights reserved.</p>
-                <p>If you didn't expect this invitation, you can safely ignore this email.</p>
-              </div>
-            </div>
-          </body>
-          </html>
-        `,
+      // Send invitation email using sendAdminTeamInvitationEmail
+      const emailResult = await emailService.sendAdminTeamInvitationEmail({
+        email: email,
+        role: role,
+        inviterName: invitation.inviter.name,
+        invitationLink: inviteLink,
+        expiresAt: invitation.expiresAt
       });
 
-      console.log('✅ Invitation email sent successfully to:', email);
+      if (emailResult.success) {
+        console.log('✅ Invitation email sent successfully to:', email);
+      } else {
+        console.error('❌ Failed to send invitation email:', emailResult.error);
+      }
     } catch (emailError) {
       console.error('❌ Failed to send invitation email:', emailError);
       // Don't fail the whole request if email fails
@@ -353,57 +303,20 @@ const resendInvitation = async (req, res) => {
     console.log('🔗 New invitation link:', inviteLink);
 
     try {
-      // Send invitation email
-      await emailService.sendEmail({
-        to: invitation.email,
-        subject: `Reminder: Admin Team Invitation - Outbound Impact`,
-        html: `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <style>
-              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-              .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-              .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-              .button { display: inline-block; background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold; }
-              .info-box { background: white; padding: 20px; border-left: 4px solid #667eea; margin: 20px 0; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>🔔 Invitation Reminder</h1>
-              </div>
-              <div class="content">
-                <p>Hi there!</p>
-                
-                <p>This is a reminder that <strong>${invitation.inviter.name}</strong> invited you to join the Outbound Impact admin team.</p>
-                
-                <div class="info-box">
-                  <h3>Your Role: ${invitation.role === 'ADMIN' ? '👑 Admin' : '💬 Customer Support'}</h3>
-                </div>
-                
-                <div style="text-align: center;">
-                  <a href="${inviteLink}" class="button">Accept Invitation & Create Account</a>
-                </div>
-                
-                <p style="margin-top: 20px; font-size: 14px; color: #666;">
-                  Or copy and paste this link:<br>
-                  <a href="${inviteLink}" style="color: #667eea;">${inviteLink}</a>
-                </p>
-                
-                <div class="info-box">
-                  <p><strong>⏰ New Expiry:</strong> This invitation now expires on ${new Date(newExpiresAt).toLocaleDateString()}.</p>
-                </div>
-              </div>
-            </div>
-          </body>
-          </html>
-        `,
+      // Send invitation email using sendAdminTeamInvitationEmail
+      const emailResult = await emailService.sendAdminTeamInvitationEmail({
+        email: invitation.email,
+        role: invitation.role,
+        inviterName: invitation.inviter.name,
+        invitationLink: inviteLink,
+        expiresAt: newExpiresAt
       });
 
-      console.log('✅ Invitation email resent successfully');
+      if (emailResult.success) {
+        console.log('✅ Invitation email resent successfully');
+      } else {
+        console.error('❌ Failed to resend invitation email:', emailResult.error);
+      }
     } catch (emailError) {
       console.error('❌ Failed to resend invitation email:', emailError);
     }

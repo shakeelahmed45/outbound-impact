@@ -1169,7 +1169,114 @@ const sendAdminRefundNotification = async ({ userName, userEmail, refundAmount, 
     return { success: false, error };
   }
 };
+// ✨ NEW: Send ADMIN/CUSTOMER_SUPPORT team invitation email
+const sendAdminTeamInvitationEmail = async ({ email, role, inviterName, invitationLink, expiresAt }) => {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.log('⚠️ Resend not configured - skipping admin invitation email');
+      return { success: false, error: 'Resend not configured' };
+    }
 
+    const roleInfo = role === 'ADMIN' 
+      ? {
+          emoji: '👑',
+          title: 'Full Admin',
+          description: 'As an Admin, you\'ll have full access to manage users, items, feedback, analytics, and team members.'
+        }
+      : {
+          emoji: '💬',
+          title: 'Customer Support',
+          description: 'As Customer Support, you\'ll have access to manage live chat conversations and help users.'
+        };
+
+    const { data, error } = await resend.emails.send({
+      from: 'Outbound Impact <noreply@outboundimpact.org>',
+      to: [email],
+      replyTo: 'support@outboundimpact.org',
+      subject: `🎉 You've been invited to join Outbound Impact Admin Team`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #800080 0%, #9333EA 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #ffffff; padding: 40px 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; }
+            .button { display: inline-block; background: linear-gradient(135deg, #800080 0%, #9333EA 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold; }
+            .info-box { background: white; padding: 20px; border-left: 4px solid #800080; margin: 20px 0; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+            .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; padding: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1 style="margin: 0; font-size: 32px; color: white;">🎉 Admin Team Invitation</h1>
+              <p style="margin: 10px 0 0 0; font-size: 16px; color: white;">Join the Outbound Impact team</p>
+            </div>
+            
+            <div class="content">
+              <p style="font-size: 16px; margin: 0 0 20px;">Hi there!</p>
+              
+              <p style="font-size: 16px; margin: 0 0 25px;"><strong>${inviterName}</strong> has invited you to join the Outbound Impact admin team as a <strong>${roleInfo.title}</strong>.</p>
+              
+              <div class="info-box">
+                <h3 style="color: #800080; margin: 0 0 15px;">${roleInfo.emoji} Your Role: ${roleInfo.title}</h3>
+                <p style="margin: 0; color: #666;">${roleInfo.description}</p>
+              </div>
+              
+              <p style="font-size: 16px; margin: 25px 0;">Click the button below to accept the invitation and create your account:</p>
+              
+              <div style="text-align: center;">
+                <a href="${invitationLink}" class="button">Accept Invitation & Create Account</a>
+              </div>
+              
+              <p style="margin-top: 20px; font-size: 14px; color: #666;">
+                Or copy and paste this link into your browser:<br>
+                <a href="${invitationLink}" style="color: #800080; word-break: break-all;">${invitationLink}</a>
+              </p>
+              
+              <div style="background: #FFF3CD; padding: 15px; border-radius: 4px; border-left: 4px solid #FFC107; margin: 25px 0;">
+                <p style="margin: 0; color: #856404;">
+                  <strong>⏰ Important:</strong> This invitation expires on ${new Date(expiresAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}.
+                </p>
+              </div>
+              
+              <p style="font-size: 14px; color: #666; margin: 25px 0 0;">
+                If you have any questions, please contact the admin who invited you or reach out to our support team at <a href="mailto:support@outboundimpact.org" style="color: #800080;">support@outboundimpact.org</a>
+              </p>
+              
+              <p style="font-size: 16px; margin: 25px 0 0;">
+                Best regards,<br>
+                <strong>The Outbound Impact Team</strong>
+              </p>
+            </div>
+            
+            <div class="footer">
+              <p style="margin: 0 0 10px;">Questions? Email us at <a href="mailto:support@outboundimpact.org" style="color: #800080;">support@outboundimpact.org</a></p>
+              <p style="color: #999; font-size: 12px; margin: 0;">© ${new Date().getFullYear()} Outbound Impact. All rights reserved.</p>
+              <p style="color: #999; font-size: 11px; margin: 5px 0 0;">If you didn't expect this invitation, you can safely ignore this email.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Failed to send admin invitation email:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('✅ Admin invitation email sent to:', email, '(ID:', data.id, ')');
+    return { success: true, messageId: data.id };
+  } catch (error) {
+    console.error('❌ Failed to send admin invitation email:', error.message);
+    return { success: false, error: error.message };
+  }
+};
 // Test connection when service loads
 testConnection();
 
@@ -1347,5 +1454,6 @@ module.exports = {
   sendAdminRefundNotification,
   sendChatNotificationToAdmin,
   sendChatReplyToUser,
+  sendAdminTeamInvitationEmail,
   testConnection
 };
