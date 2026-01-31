@@ -192,6 +192,7 @@ app.use('/api/items', itemsRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/team-invitation', teamInvitationRoutes);  // 🆕 NEW
+app.use('/api/team', teamInvitationRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/advanced-analytics', advancedAnalyticsRoutes);
