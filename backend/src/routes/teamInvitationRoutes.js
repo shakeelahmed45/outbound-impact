@@ -7,6 +7,10 @@ const { requireAdmin } = require('../middleware/auth');
 // ═══════════════════════════════════════════════════════════
 // PUBLIC ROUTES (No auth required)
 // ═══════════════════════════════════════════════════════════
+
+// ✅ NEW: Get invitation details by token (for the accept page)
+router.get('/invitation/:token', teamInvitationController.getInvitationByToken);
+
 // Accept invitation and create account
 router.post('/accept-invitation', teamInvitationController.acceptInvitation);
 
