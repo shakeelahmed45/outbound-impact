@@ -298,6 +298,7 @@ const acceptInvitation = async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // ✅ FIX: Set default storage values for admin team members
     // Create user account
     const user = await prisma.user.create({
       data: {
@@ -306,6 +307,10 @@ const acceptInvitation = async (req, res) => {
         password: hashedPassword,
         role: invitation.role,
         status: 'active',
+        storageUsed: BigInt(0),                    // ✅ Set default
+        storageLimit: BigInt(2147483648),          // ✅ Set default (2GB)
+        subscriptionStatus: null,                  // ✅ Admin users don't need subscription
+        subscriptionId: null,
       },
     });
 
