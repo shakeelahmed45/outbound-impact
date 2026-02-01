@@ -8,8 +8,10 @@ const AdminLayout = ({ children }) => {
   const { user, logout } = useAuthStore();
 
   const handleLogout = () => {
+    // ✅ FIX: Navigate FIRST, then logout
+    // This prevents ProtectedRoute from intercepting with its own redirect
+    window.location.href = '/admin-login';
     logout();
-    navigate('/admin-login');
   };
 
   // ✅ ENHANCED: Support both ADMIN and CUSTOMER_SUPPORT roles
