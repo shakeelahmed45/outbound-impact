@@ -347,7 +347,7 @@ IMPORTANT:
 
     // Call Groq AI API (100% FREE!)
     const response = await groq.chat.completions.create({
-      model: 'llama-3.1-70b-versatile', // FREE! Fast! Powerful!
+      model: 'llama-3.3-70b-versatile', // FREE! Fast! Powerful! (Updated model)
       messages: messages,
       temperature: 0.7,
       max_tokens: 1024,
@@ -374,7 +374,7 @@ IMPORTANT:
       response: aiResponse,
       isAiGenerated: true,
       confidence: 0.95,
-      model: 'llama-3.1-70b-versatile (FREE)',
+      model: 'llama-3.3-70b-versatile (FREE)',
       requiresHuman,
       responseTime,
       usage: {
