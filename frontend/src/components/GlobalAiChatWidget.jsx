@@ -15,6 +15,9 @@ const GlobalAiChatWidget = ({ showBlinkingPrompt = false }) => {
   
   const messagesEndRef = useRef(null);
   const pollInterval = useRef(null);
+  const messagesContainerRef = useRef(null);
+  const previousMessageCountRef = useRef(0);
+  const shouldAutoScrollRef = useRef(true);
 
   // Initialize conversation when widget opens
   useEffect(() => {
@@ -38,9 +41,25 @@ const GlobalAiChatWidget = ({ showBlinkingPrompt = false }) => {
     };
   }, [isOpen, conversationId]);
 
-  // Auto-scroll to bottom
+  // Smart auto-scroll - only scroll when new message added and user is near bottom
   useEffect(() => {
-    scrollToBottom();
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    // Check if user is near bottom (within 100px)
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+    
+    // Only auto-scroll if:
+    // 1. New message was added (count increased)
+    // 2. User is near bottom OR shouldAutoScroll flag is true (for sent messages)
+    const messageCountIncreased = messages.length > previousMessageCountRef.current;
+    
+    if (messageCountIncreased && (isNearBottom || shouldAutoScrollRef.current)) {
+      scrollToBottom();
+      shouldAutoScrollRef.current = false;
+    }
+    
+    previousMessageCountRef.current = messages.length;
   }, [messages]);
 
   // Hide blinking prompt after 30 seconds
@@ -134,6 +153,9 @@ What can I help you with today?`,
     const messageContent = newMessage.trim();
     setNewMessage('');
     setSending(true);
+    
+    // Enable auto-scroll for this message
+    shouldAutoScrollRef.current = true;
 
     // Add user message optimistically
     const userMsg = {
@@ -309,7 +331,10 @@ What can I help you with today?`,
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+      <div 
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50"
+      >
         {messages.map((message) => {
           // ✅ FIXED: Support both 'message' and 'content' fields
           const messageText = message.message || message.content || '';
