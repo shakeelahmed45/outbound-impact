@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Send, MessageSquare, ChevronRight, Bot, Loader2, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { X, Send, MessageSquare, ChevronRight, ChevronLeft, Bot, Loader2, ThumbsUp, ThumbsDown, Minimize2 } from 'lucide-react';
 import api from '../services/api';
 import useAuthStore from '../store/authStore';
 
@@ -187,7 +187,7 @@ What can I help you with today?`,
   // Blinking Prompt (Dashboard only)
   if (showPrompt && !isOpen && !isMinimized) {
     return (
-      <div className="fixed bottom-24 right-6 z-50 animate-bounce">
+      <div className="fixed bottom-24 right-6 z-[9999] animate-bounce">
         <div 
           onClick={openWidget}
           className="bg-gradient-to-r from-purple-600 to-violet-600 text-white px-6 py-4 rounded-2xl shadow-2xl cursor-pointer hover:scale-105 transition-transform duration-200 flex items-center gap-3"
@@ -216,13 +216,11 @@ What can I help you with today?`,
     return (
       <button
         onClick={openWidget}
-        className="fixed bottom-24 right-0 z-50 bg-gradient-to-r from-purple-600 to-violet-600 text-white p-4 rounded-l-2xl shadow-2xl hover:pr-6 transition-all duration-300 group"
+        className="fixed bottom-24 right-0 z-[9999] bg-gradient-to-r from-purple-600 to-violet-600 text-white p-4 rounded-l-2xl shadow-2xl hover:pr-6 transition-all duration-300 group flex items-center gap-2"
         title="Open AI Assistant"
       >
-        <div className="flex items-center gap-2">
-          <ChevronRight size={24} className="group-hover:-translate-x-1 transition-transform" />
-          <Bot size={24} />
-        </div>
+        <ChevronLeft size={24} className="group-hover:-translate-x-1 transition-transform" />
+        <Bot size={24} />
       </button>
     );
   }
@@ -232,7 +230,7 @@ What can I help you with today?`,
     return (
       <button
         onClick={openWidget}
-        className="fixed bottom-24 right-6 z-50 bg-gradient-to-r from-purple-600 to-violet-600 text-white p-5 rounded-full shadow-2xl hover:scale-110 transition-transform duration-200 group"
+        className="fixed bottom-24 right-6 z-[9999] bg-gradient-to-r from-purple-600 to-violet-600 text-white p-5 rounded-full shadow-2xl hover:scale-110 transition-transform duration-200 group"
         title="Open AI Assistant"
       >
         <Bot size={32} className="group-hover:rotate-12 transition-transform" />
@@ -242,7 +240,7 @@ What can I help you with today?`,
 
   // Full Chat Widget (Open state)
   return (
-    <div className="fixed bottom-24 right-6 z-50 w-96 h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200">
+    <div className="fixed bottom-24 right-6 z-[9999] w-96 h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200">
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-600 to-violet-600 text-white p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">

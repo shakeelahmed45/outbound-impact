@@ -1,11 +1,360 @@
 const prisma = require('../lib/prisma');
 const { sendChatNotificationToAdmin, sendChatReplyToUser } = require('../services/emailService');
-const { handleUserMessageWithAi, saveAnalytics, recordAiFeedback } = require('../services/aiChatService');
+const { handleUserMessageWithFreeAi, saveAiAnalytics } = require('../services/freeAiChatService');  // ✨ UPDATED: Use FREE AI
 const { uploadChatAttachment, getMessageAttachments } = require('../services/chatFileService');
 
 // ═══════════════════════════════════════════════════════════
-// USER: Get or Create Conversation
+// 🆕 NEW: AI CHATBOT WIDGET FUNCTIONS
 // ═══════════════════════════════════════════════════════════
+
+// Create conversation (for widget)
+const createConversation = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Check if user already has an active conversation
+    let conversation = await prisma.chatConversation.findFirst({
+      where: {
+        userId,
+        status: 'ACTIVE',
+      },
+    });
+
+    // If exists, return it
+    if (conversation) {
+      return res.json({
+        status: 'success',
+        conversation,
+      });
+    }
+
+    // Create new conversation
+    conversation = await prisma.chatConversation.create({
+      data: {
+        userId,
+        status: 'ACTIVE',
+        isAiHandling: true, // Start with AI
+      },
+    });
+
+    res.json({
+      status: 'success',
+      conversation,
+    });
+  } catch (error) {
+    console.error('Create conversation error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to create conversation',
+    });
+  }
+};
+
+// Get conversation (for widget)
+const getConversation = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+
+    const conversation = await prisma.chatConversation.findFirst({
+      where: {
+        id,
+        userId,
+      },
+      include: {
+        messages: {
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Conversation not found',
+      });
+    }
+
+    res.json({
+      status: 'success',
+      conversation,
+    });
+  } catch (error) {
+    console.error('Get conversation error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get conversation',
+    });
+  }
+};
+
+// Get messages for conversation (for widget)
+const getConversationMessages = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+
+    const conversation = await prisma.chatConversation.findFirst({
+      where: {
+        id,
+        userId,
+      },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Conversation not found',
+      });
+    }
+
+    const messages = await prisma.chatMessage.findMany({
+      where: {
+        conversationId: id,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    res.json({
+      status: 'success',
+      messages,
+    });
+  } catch (error) {
+    console.error('Get messages error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get messages',
+    });
+  }
+};
+
+// Send message to conversation (for widget with FREE AI)
+const sendConversationMessage = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+    const { content } = req.body;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Message content is required',
+      });
+    }
+
+    // Verify conversation belongs to user
+    const conversation = await prisma.chatConversation.findFirst({
+      where: {
+        id,
+        userId,
+      },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Conversation not found',
+      });
+    }
+
+    // Create user message (using ChatMessage model)
+    const userMessage = await prisma.chatMessage.create({
+      data: {
+        conversationId: id,
+        senderId: userId,
+        senderType: 'USER',
+        message: content.trim(),
+        isUser: true,
+        isAi: false,
+        isRead: false,
+      },
+    });
+
+    // Update conversation's last message time
+    await prisma.chatConversation.update({
+      where: { id },
+      data: { lastMessageAt: new Date() },
+    });
+
+    // Get FREE AI response if AI is handling
+    let aiResponse = null;
+    if (conversation.isAiHandling) {
+      try {
+        console.log('🤖 Requesting FREE AI response...');
+        const aiResult = await handleUserMessageWithFreeAi(prisma, content.trim(), id);
+        
+        if (aiResult && aiResult.response) {
+          // Create AI message
+          const aiMessage = await prisma.chatMessage.create({
+            data: {
+              conversationId: id,
+              senderId: 'system',
+              senderType: 'ADMIN',
+              message: aiResult.response,
+              isUser: false,
+              isAi: true,
+              isRead: false,
+              isAiGenerated: true,
+              aiConfidence: aiResult.confidence,
+            },
+          });
+
+          // Save analytics
+          await saveAiAnalytics(prisma, id, aiMessage.id, aiResult);
+
+          aiResponse = {
+            id: aiMessage.id,
+            response: aiResult.response,
+            confidence: aiResult.confidence,
+            model: aiResult.model,
+          };
+
+          console.log('✅ FREE AI response sent!');
+        }
+      } catch (aiError) {
+        console.error('AI response error:', aiError);
+        // Continue without AI response - don't fail the whole request
+      }
+    }
+
+    res.json({
+      status: 'success',
+      message: userMessage,
+      aiResponse,
+    });
+  } catch (error) {
+    console.error('Send message error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to send message',
+    });
+  }
+};
+
+// Submit feedback on message (for widget)
+const submitMessageFeedback = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+    const { wasHelpful } = req.body;
+
+    // Find the message
+    const message = await prisma.chatMessage.findUnique({
+      where: { id },
+      include: {
+        conversation: true,
+      },
+    });
+
+    if (!message) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Message not found',
+      });
+    }
+
+    // Verify message belongs to user's conversation
+    if (message.conversation.userId !== userId) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Unauthorized',
+      });
+    }
+
+    // Update analytics with feedback
+    await prisma.chatBotAnalytics.updateMany({
+      where: { messageId: id },
+      data: { wasHelpful },
+    });
+
+    res.json({
+      status: 'success',
+      message: 'Feedback recorded',
+    });
+  } catch (error) {
+    console.error('Submit feedback error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to submit feedback',
+    });
+  }
+};
+
+// Get user conversations (for widget)
+const getUserConversations = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const conversations = await prisma.chatConversation.findMany({
+      where: { userId },
+      orderBy: { lastMessageAt: 'desc' },
+      include: {
+        messages: {
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    res.json({
+      status: 'success',
+      conversations,
+    });
+  } catch (error) {
+    console.error('Get conversations error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get conversations',
+    });
+  }
+};
+
+// Close conversation (for widget)
+const closeConversationWidget = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+
+    const conversation = await prisma.chatConversation.findFirst({
+      where: {
+        id,
+        userId,
+      },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Conversation not found',
+      });
+    }
+
+    await prisma.chatConversation.update({
+      where: { id },
+      data: {
+        status: 'CLOSED',
+        closedAt: new Date(),
+      },
+    });
+
+    res.json({
+      status: 'success',
+      message: 'Conversation closed',
+    });
+  } catch (error) {
+    console.error('Close conversation error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to close conversation',
+    });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// EXISTING USER FUNCTIONS (KEEP ALL EXISTING FUNCTIONALITY)
+// ═══════════════════════════════════════════════════════════
+
+// USER: Get or Create Conversation
 const getOrCreateConversation = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -70,9 +419,7 @@ const getOrCreateConversation = async (req, res) => {
   }
 };
 
-// ═══════════════════════════════════════════════════════════
 // Get Messages (for polling)
-// ═══════════════════════════════════════════════════════════
 const getMessages = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -125,9 +472,7 @@ const getMessages = async (req, res) => {
   }
 };
 
-// ═══════════════════════════════════════════════════════════
-// USER & ADMIN: Send Message (with AI and File Support)
-// ═══════════════════════════════════════════════════════════
+// USER & ADMIN: Send Message (with AI and File Support) - ✨ UPDATED to use FREE AI
 const sendMessage = async (req, res) => {
   try {
     const actualUserId = req.user.userId;
@@ -268,10 +613,11 @@ const sendMessage = async (req, res) => {
 
     let aiResponse = null;
     
+    // ✨ UPDATED: Use FREE AI service
     if (!isAdmin && conversation && conversation.isAiHandling && message?.trim()) {
-      console.log('🤖 Generating AI response...');
+      console.log('🤖 Generating FREE AI response...');
       
-      const aiResult = await handleUserMessageWithAi(message.trim(), targetConversationId);
+      const aiResult = await handleUserMessageWithFreeAi(prisma, message.trim(), targetConversationId);
       
       if (aiResult && aiResult.response) {
         aiResponse = await prisma.chatMessage.create({
@@ -286,14 +632,14 @@ const sendMessage = async (req, res) => {
           },
         });
 
-        await saveAnalytics(targetConversationId, aiResponse.id, aiResult);
+        await saveAiAnalytics(prisma, targetConversationId, aiResponse.id, aiResult);
 
         await prisma.chatConversation.update({
           where: { id: targetConversationId },
           data: { lastMessageAt: new Date() },
         });
 
-        console.log('✅ AI response sent:', {
+        console.log('✅ FREE AI response sent:', {
           messageId: aiResponse.id,
           confidence: aiResult.confidence,
           escalated: aiResult.requiresHuman,
@@ -343,9 +689,8 @@ const sendMessage = async (req, res) => {
   }
 };
 
-// ═══════════════════════════════════════════════════════════
-// 🆕 ENHANCED: ADMIN - Get All Conversations (with feedback)
-// ═══════════════════════════════════════════════════════════
+// (Keep all remaining existing functions exactly as they are)
+// ADMIN - Get All Conversations (with feedback)
 const getAllConversations = async (req, res) => {
   try {
     const { status } = req.query;
@@ -386,7 +731,6 @@ const getAllConversations = async (req, res) => {
       orderBy: { lastMessageAt: 'desc' },
     });
 
-    // 🆕 NEW: Group conversations by user to show chat count
     const userChatCounts = {};
     for (const conv of conversations) {
       const userId = conv.userId;
@@ -405,7 +749,6 @@ const getAllConversations = async (req, res) => {
       }
     }
 
-    // Add chat counts to each conversation
     const conversationsWithCounts = conversations.map(conv => ({
       ...conv,
       userChatCount: userChatCounts[conv.userId],
@@ -427,7 +770,6 @@ const getAllConversations = async (req, res) => {
           isRead: false,
         },
       }),
-      // 🆕 NEW: Feedback stats
       withFeedback: await prisma.chatConversation.count({
         where: { feedbackRating: { not: null } }
       }),
@@ -451,9 +793,7 @@ const getAllConversations = async (req, res) => {
   }
 };
 
-// ═══════════════════════════════════════════════════════════
 // ADMIN: Get Single Conversation with All Messages
-// ═══════════════════════════════════════════════════════════
 const getConversationById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -506,14 +846,11 @@ const getConversationById = async (req, res) => {
   }
 };
 
-// ═══════════════════════════════════════════════════════════
-// 🆕 NEW: ADMIN - Get User's Complete Chat History
-// ═══════════════════════════════════════════════════════════
+// ADMIN - Get User's Complete Chat History
 const getUserChatHistory = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    // Get all conversations for this user
     const conversations = await prisma.chatConversation.findMany({
       where: {
         userId: userId
@@ -541,7 +878,6 @@ const getUserChatHistory = async (req, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Calculate stats
     const stats = {
       totalChats: conversations.length,
       activeChats: conversations.filter(c => c.status === 'ACTIVE').length,
@@ -568,9 +904,7 @@ const getUserChatHistory = async (req, res) => {
   }
 };
 
-// ═══════════════════════════════════════════════════════════
 // ADMIN: Close Conversation
-// ═══════════════════════════════════════════════════════════
 const closeConversation = async (req, res) => {
   try {
     const { id } = req.params;
@@ -593,9 +927,7 @@ const closeConversation = async (req, res) => {
   }
 };
 
-// ═══════════════════════════════════════════════════════════
 // ADMIN: Reopen Conversation
-// ═══════════════════════════════════════════════════════════
 const reopenConversation = async (req, res) => {
   try {
     const { id } = req.params;
@@ -618,9 +950,7 @@ const reopenConversation = async (req, res) => {
   }
 };
 
-// ═══════════════════════════════════════════════════════════
 // ADMIN: Get Unread Message Count
-// ═══════════════════════════════════════════════════════════
 const getUnreadCount = async (req, res) => {
   try {
     const count = await prisma.chatMessage.count({
@@ -643,9 +973,7 @@ const getUnreadCount = async (req, res) => {
   }
 };
 
-// ═══════════════════════════════════════════════════════════
 // USER: Start New Conversation (Close current and create new)
-// ═══════════════════════════════════════════════════════════
 const startNewConversation = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -690,14 +1018,15 @@ const startNewConversation = async (req, res) => {
   }
 };
 
-// ═══════════════════════════════════════════════════════════
 // USER: Feedback on AI Response
-// ═══════════════════════════════════════════════════════════
 const submitAiFeedback = async (req, res) => {
   try {
     const { messageId, wasHelpful } = req.body;
 
-    await recordAiFeedback(messageId, wasHelpful);
+    await prisma.chatBotAnalytics.updateMany({
+      where: { messageId },
+      data: { wasHelpful },
+    });
 
     res.json({
       status: 'success',
@@ -712,9 +1041,7 @@ const submitAiFeedback = async (req, res) => {
   }
 };
 
-// ═══════════════════════════════════════════════════════════
 // USER: Request Human Support (Escalate from AI)
-// ═══════════════════════════════════════════════════════════
 const requestHumanSupport = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -768,9 +1095,7 @@ const requestHumanSupport = async (req, res) => {
   }
 };
 
-// ═══════════════════════════════════════════════════════════
 // USER: Get Chat History
-// ═══════════════════════════════════════════════════════════
 const getChatHistory = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -813,9 +1138,7 @@ const getChatHistory = async (req, res) => {
   }
 };
 
-// ═══════════════════════════════════════════════════════════
 // USER: Submit Conversation Feedback
-// ═══════════════════════════════════════════════════════════
 const submitConversationFeedback = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -858,12 +1181,22 @@ const submitConversationFeedback = async (req, res) => {
 };
 
 module.exports = {
+  // 🆕 NEW: Widget functions
+  createConversation,
+  getConversation,
+  getConversationMessages,
+  sendConversationMessage,
+  submitMessageFeedback,
+  getUserConversations,
+  closeConversationWidget,
+  
+  // Existing functions
   getOrCreateConversation,
   getMessages,
   sendMessage,
   getAllConversations,
   getConversationById,
-  getUserChatHistory,     // 🆕 NEW
+  getUserChatHistory,
   closeConversation,
   reopenConversation,
   getUnreadCount,
