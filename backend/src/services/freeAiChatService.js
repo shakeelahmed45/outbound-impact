@@ -336,8 +336,8 @@ IMPORTANT:
 - Reference specific features from the knowledge base when relevant`
       },
       ...conversationHistory.map(msg => ({
-        role: msg.isUser ? 'user' : 'assistant',
-        content: msg.content
+        role: msg.senderType === 'USER' ? 'user' : 'assistant',
+        content: msg.message
       })),
       {
         role: 'user',
@@ -469,8 +469,8 @@ const handleUserMessageWithFreeAi = async (prisma, message, conversationId) => {
       orderBy: { createdAt: 'desc' },
       take: 10, // Last 10 messages for context
       select: {
-        content: true,
-        isUser: true,
+        message: true,
+        senderType: true,
       },
     });
 
