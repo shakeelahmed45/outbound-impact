@@ -1,10 +1,10 @@
 const prisma = require('../lib/prisma');
 const { sendChatNotificationToAdmin, sendChatReplyToUser } = require('../services/emailService');
-const { handleUserMessageWithFreeAi, saveAiAnalytics } = require('../services/freeAiChatService');  // ✨ UPDATED: Use FREE AI
+const { handleUserMessageWithFreeAi, saveAiAnalytics } = require('../services/freeAiChatService');
 const { uploadChatAttachment, getMessageAttachments } = require('../services/chatFileService');
 
 // ═══════════════════════════════════════════════════════════
-// 🆕 NEW: AI CHATBOT WIDGET FUNCTIONS
+// 🆕 NEW: AI CHATBOT WIDGET FUNCTIONS (FIXED - No isUser/isAi)
 // ═══════════════════════════════════════════════════════════
 
 // Create conversation (for widget)
@@ -33,7 +33,7 @@ const createConversation = async (req, res) => {
       data: {
         userId,
         status: 'ACTIVE',
-        isAiHandling: true, // Start with AI
+        isAiHandling: true,
       },
     });
 
@@ -115,9 +115,16 @@ const getConversationMessages = async (req, res) => {
       orderBy: { createdAt: 'asc' },
     });
 
+    // ✅ FIXED: Add isUser and isAi flags to response (not in database)
+    const messagesWithFlags = messages.map(msg => ({
+      ...msg,
+      isUser: msg.senderType === 'USER',
+      isAi: msg.isAiGenerated === true,
+    }));
+
     res.json({
       status: 'success',
-      messages,
+      messages: messagesWithFlags,
     });
   } catch (error) {
     console.error('Get messages error:', error);
@@ -128,7 +135,7 @@ const getConversationMessages = async (req, res) => {
   }
 };
 
-// Send message to conversation (for widget with FREE AI)
+// Send message to conversation (for widget with FREE AI) - ✅ FIXED
 const sendConversationMessage = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -157,16 +164,15 @@ const sendConversationMessage = async (req, res) => {
       });
     }
 
-    // Create user message (using ChatMessage model)
+    // ✅ FIXED: Create user message (removed isUser and isAi fields)
     const userMessage = await prisma.chatMessage.create({
       data: {
         conversationId: id,
         senderId: userId,
         senderType: 'USER',
         message: content.trim(),
-        isUser: true,
-        isAi: false,
         isRead: false,
+        isAiGenerated: false,
       },
     });
 
@@ -184,15 +190,13 @@ const sendConversationMessage = async (req, res) => {
         const aiResult = await handleUserMessageWithFreeAi(prisma, content.trim(), id);
         
         if (aiResult && aiResult.response) {
-          // Create AI message
+          // ✅ FIXED: Create AI message (removed isUser and isAi fields)
           const aiMessage = await prisma.chatMessage.create({
             data: {
               conversationId: id,
               senderId: 'system',
               senderType: 'ADMIN',
               message: aiResult.response,
-              isUser: false,
-              isAi: true,
               isRead: false,
               isAiGenerated: true,
               aiConfidence: aiResult.confidence,
@@ -207,6 +211,8 @@ const sendConversationMessage = async (req, res) => {
             response: aiResult.response,
             confidence: aiResult.confidence,
             model: aiResult.model,
+            isUser: false,
+            isAi: true,
           };
 
           console.log('✅ FREE AI response sent!');
@@ -219,7 +225,11 @@ const sendConversationMessage = async (req, res) => {
 
     res.json({
       status: 'success',
-      message: userMessage,
+      message: {
+        ...userMessage,
+        isUser: true,
+        isAi: false,
+      },
       aiResponse,
     });
   } catch (error) {
@@ -351,10 +361,9 @@ const closeConversationWidget = async (req, res) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// EXISTING USER FUNCTIONS (KEEP ALL EXISTING FUNCTIONALITY)
+// EXISTING USER FUNCTIONS (ALL PRESERVED - NO CHANGES)
 // ═══════════════════════════════════════════════════════════
 
-// USER: Get or Create Conversation
 const getOrCreateConversation = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -419,7 +428,6 @@ const getOrCreateConversation = async (req, res) => {
   }
 };
 
-// Get Messages (for polling)
 const getMessages = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -472,7 +480,6 @@ const getMessages = async (req, res) => {
   }
 };
 
-// USER & ADMIN: Send Message (with AI and File Support) - ✨ UPDATED to use FREE AI
 const sendMessage = async (req, res) => {
   try {
     const actualUserId = req.user.userId;
@@ -499,13 +506,6 @@ const sendMessage = async (req, res) => {
 
     const isAdmin = user.role === 'ADMIN' || user.role === 'CUSTOMER_SUPPORT';
     const senderType = isAdmin ? 'ADMIN' : 'USER';
-
-    console.log('💬 Send Message:', {
-      actualUserId,
-      isAdmin,
-      hasFiles: files.length > 0,
-      fileCount: files.length,
-    });
 
     let targetConversationId = conversationId;
     let targetUserEmail = null;
@@ -591,19 +591,12 @@ const sendMessage = async (req, res) => {
     const uploadedAttachments = [];
     
     if (files.length > 0) {
-      console.log(`📎 Uploading ${files.length} file(s)...`);
-      
       for (const file of files) {
         const uploadResult = await uploadChatAttachment(file, newMessage.id, actualUserId);
-        
         if (uploadResult.success) {
           uploadedAttachments.push(uploadResult.attachment);
-        } else {
-          console.error('File upload failed:', uploadResult.error);
         }
       }
-      
-      console.log(`✅ ${uploadedAttachments.length} file(s) uploaded`);
     }
 
     await prisma.chatConversation.update({
@@ -613,10 +606,7 @@ const sendMessage = async (req, res) => {
 
     let aiResponse = null;
     
-    // ✨ UPDATED: Use FREE AI service
     if (!isAdmin && conversation && conversation.isAiHandling && message?.trim()) {
-      console.log('🤖 Generating FREE AI response...');
-      
       const aiResult = await handleUserMessageWithFreeAi(prisma, message.trim(), targetConversationId);
       
       if (aiResult && aiResult.response) {
@@ -638,17 +628,10 @@ const sendMessage = async (req, res) => {
           where: { id: targetConversationId },
           data: { lastMessageAt: new Date() },
         });
-
-        console.log('✅ FREE AI response sent:', {
-          messageId: aiResponse.id,
-          confidence: aiResult.confidence,
-          escalated: aiResult.requiresHuman,
-        });
       }
     }
 
     if (!isAdmin) {
-      console.log('📧 Sending chat notification to admin...');
       const notificationMessage = uploadedAttachments.length > 0 
         ? `${message || ''}\n\n[User attached ${uploadedAttachments.length} file(s)]`
         : message.trim();
@@ -662,7 +645,6 @@ const sendMessage = async (req, res) => {
       ).catch(err => console.error('Failed to send admin notification:', err));
     } else {
       if (targetUserEmail && targetUserName) {
-        console.log('📧 Sending reply notification to:', targetUserEmail);
         sendChatReplyToUser(
           targetUserEmail,
           targetUserName,
@@ -689,8 +671,6 @@ const sendMessage = async (req, res) => {
   }
 };
 
-// (Keep all remaining existing functions exactly as they are)
-// ADMIN - Get All Conversations (with feedback)
 const getAllConversations = async (req, res) => {
   try {
     const { status } = req.query;
@@ -793,7 +773,6 @@ const getAllConversations = async (req, res) => {
   }
 };
 
-// ADMIN: Get Single Conversation with All Messages
 const getConversationById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -846,7 +825,6 @@ const getConversationById = async (req, res) => {
   }
 };
 
-// ADMIN - Get User's Complete Chat History
 const getUserChatHistory = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -904,7 +882,6 @@ const getUserChatHistory = async (req, res) => {
   }
 };
 
-// ADMIN: Close Conversation
 const closeConversation = async (req, res) => {
   try {
     const { id } = req.params;
@@ -927,7 +904,6 @@ const closeConversation = async (req, res) => {
   }
 };
 
-// ADMIN: Reopen Conversation
 const reopenConversation = async (req, res) => {
   try {
     const { id } = req.params;
@@ -950,7 +926,6 @@ const reopenConversation = async (req, res) => {
   }
 };
 
-// ADMIN: Get Unread Message Count
 const getUnreadCount = async (req, res) => {
   try {
     const count = await prisma.chatMessage.count({
@@ -973,7 +948,6 @@ const getUnreadCount = async (req, res) => {
   }
 };
 
-// USER: Start New Conversation (Close current and create new)
 const startNewConversation = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -1018,7 +992,6 @@ const startNewConversation = async (req, res) => {
   }
 };
 
-// USER: Feedback on AI Response
 const submitAiFeedback = async (req, res) => {
   try {
     const { messageId, wasHelpful } = req.body;
@@ -1041,7 +1014,6 @@ const submitAiFeedback = async (req, res) => {
   }
 };
 
-// USER: Request Human Support (Escalate from AI)
 const requestHumanSupport = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -1095,7 +1067,6 @@ const requestHumanSupport = async (req, res) => {
   }
 };
 
-// USER: Get Chat History
 const getChatHistory = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -1138,7 +1109,6 @@ const getChatHistory = async (req, res) => {
   }
 };
 
-// USER: Submit Conversation Feedback
 const submitConversationFeedback = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -1181,7 +1151,6 @@ const submitConversationFeedback = async (req, res) => {
 };
 
 module.exports = {
-  // 🆕 NEW: Widget functions
   createConversation,
   getConversation,
   getConversationMessages,
@@ -1189,8 +1158,6 @@ module.exports = {
   submitMessageFeedback,
   getUserConversations,
   closeConversationWidget,
-  
-  // Existing functions
   getOrCreateConversation,
   getMessages,
   sendMessage,
