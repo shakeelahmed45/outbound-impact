@@ -63,11 +63,12 @@ const GlobalAiChatWidget = ({ showBlinkingPrompt = false }) => {
       const response = await api.post('/chat/conversations');
       if (response.data.status === 'success') {
         setConversationId(response.data.conversation.id);
+        console.log('✅ Conversation created:', response.data.conversation.id);
         
         // Add welcome message
         setMessages([{
           id: 'welcome',
-          content: `Hello${user?.name ? ' ' + user.name.split(' ')[0] : ''}! 👋 
+          message: `Hello${user?.name ? ' ' + user.name.split(' ')[0] : ''}! 👋 
 
 I'm your AI assistant for Outbound Impact. I can help you with:
 
@@ -79,6 +80,8 @@ I'm your AI assistant for Outbound Impact. I can help you with:
 💳 **Billing & Plans** - Subscriptions and account management
 
 What can I help you with today?`,
+          senderType: 'ADMIN',
+          isAiGenerated: true,
           isUser: false,
           isAi: true,
           createdAt: new Date().toISOString(),
@@ -95,7 +98,28 @@ What can I help you with today?`,
     try {
       const response = await api.get(`/chat/conversations/${conversationId}/messages`);
       if (response.data.status === 'success') {
-        setMessages(response.data.messages);
+        console.log('📥 Polled messages from API:', response.data.messages);
+        
+        // ✅ FIXED: Merge messages instead of replacing
+        const newMessages = response.data.messages;
+        setMessages(prev => {
+          // Keep welcome message if it exists
+          const welcomeMsg = prev.find(m => m.id === 'welcome');
+          const welcomeArray = welcomeMsg ? [welcomeMsg] : [];
+          
+          // Merge with API messages, avoiding duplicates
+          const messageMap = new Map();
+          [...welcomeArray, ...newMessages].forEach(msg => {
+            messageMap.set(msg.id, msg);
+          });
+          
+          const merged = Array.from(messageMap.values()).sort((a, b) => 
+            new Date(a.createdAt) - new Date(b.createdAt)
+          );
+          
+          console.log('💬 Merged messages:', merged.length, 'total');
+          return merged;
+        });
       }
     } catch (error) {
       console.error('Failed to poll messages:', error);
@@ -114,7 +138,9 @@ What can I help you with today?`,
     // Add user message optimistically
     const userMsg = {
       id: `temp-${Date.now()}`,
-      content: messageContent,
+      message: messageContent,  // ✅ FIXED: Use 'message' not 'content'
+      senderType: 'USER',
+      isAiGenerated: false,
       isUser: true,
       isAi: false,
       createdAt: new Date().toISOString(),
@@ -126,23 +152,35 @@ What can I help you with today?`,
         content: messageContent,
       });
 
+      console.log('📤 Send message response:', response.data);
+
       if (response.data.status === 'success') {
-        // Replace temp message with real one
+        console.log('✅ User message from API:', response.data.message);
+        
+        // Replace temp message with real one from API
         setMessages(prev => {
           const filtered = prev.filter(m => m.id !== userMsg.id);
           return [...filtered, response.data.message];
         });
 
-        // Add AI response
+        // Add AI response if available
         if (response.data.aiResponse) {
+          console.log('🤖 AI response from API:', response.data.aiResponse);
+          
           const aiMsg = {
             id: response.data.aiResponse.id || `ai-${Date.now()}`,
-            content: response.data.aiResponse.response,
+            message: response.data.aiResponse.response,  // ✅ FIXED: Use 'message' not 'content'
+            senderType: 'ADMIN',
+            isAiGenerated: true,
             isUser: false,
             isAi: true,
             createdAt: new Date().toISOString(),
           };
+          
+          console.log('🤖 Adding AI message to display:', aiMsg);
           setMessages(prev => [...prev, aiMsg]);
+        } else {
+          console.log('⚠️ No AI response in API reply');
         }
       }
     } catch (error) {
@@ -236,7 +274,7 @@ What can I help you with today?`,
         <Bot size={32} className="group-hover:rotate-12 transition-transform" />
       </button>
     );
-  }
+  };
 
   // Full Chat Widget (Open state)
   return (
@@ -272,68 +310,79 @@ What can I help you with today?`,
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}
-          >
-            <div className={`max-w-[80%] ${message.isUser ? 'order-2' : 'order-1'}`}>
-              {/* Message Bubble */}
-              <div
-                className={`rounded-2xl px-4 py-3 ${
-                  message.isUser
-                    ? 'bg-gradient-to-r from-purple-600 to-violet-600 text-white'
-                    : 'bg-white border border-gray-200 text-gray-800'
-                }`}
-              >
-                {message.isAi && (
-                  <div className="flex items-center gap-2 mb-2 text-sm opacity-75">
-                    <Bot size={16} />
-                    <span className="font-medium">AI Assistant</span>
+        {messages.map((message) => {
+          // ✅ FIXED: Support both 'message' and 'content' fields
+          const messageText = message.message || message.content || '';
+          const isUser = message.isUser || message.senderType === 'USER';
+          const isAi = message.isAi || message.isAiGenerated;
+          
+          if (!messageText) {
+            console.warn('⚠️ Empty message:', message);
+          }
+          
+          return (
+            <div
+              key={message.id}
+              className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
+            >
+              <div className={`max-w-[80%] ${isUser ? 'order-2' : 'order-1'}`}>
+                {/* Message Bubble */}
+                <div
+                  className={`rounded-2xl px-4 py-3 ${
+                    isUser
+                      ? 'bg-gradient-to-r from-purple-600 to-violet-600 text-white'
+                      : 'bg-white border border-gray-200 text-gray-800'
+                  }`}
+                >
+                  {isAi && (
+                    <div className="flex items-center gap-2 mb-2 text-sm opacity-75">
+                      <Bot size={16} />
+                      <span className="font-medium">AI Assistant</span>
+                    </div>
+                  )}
+                  <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                    {messageText}
+                  </div>
+                </div>
+
+                {/* Feedback Buttons (AI messages only) */}
+                {isAi && !message.feedbackGiven && message.id !== 'welcome' && (
+                  <div className="flex items-center gap-2 mt-2 ml-2">
+                    <span className="text-xs text-gray-500">Was this helpful?</span>
+                    <button
+                      onClick={() => handleFeedback(message.id, true)}
+                      className="text-gray-400 hover:text-green-600 transition-colors"
+                      title="Helpful"
+                    >
+                      <ThumbsUp size={14} />
+                    </button>
+                    <button
+                      onClick={() => handleFeedback(message.id, false)}
+                      className="text-gray-400 hover:text-red-600 transition-colors"
+                      title="Not Helpful"
+                    >
+                      <ThumbsDown size={14} />
+                    </button>
                   </div>
                 )}
-                <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                  {message.content}
-                </div>
-              </div>
 
-              {/* Feedback Buttons (AI messages only) */}
-              {message.isAi && !message.feedbackGiven && (
-                <div className="flex items-center gap-2 mt-2 ml-2">
-                  <span className="text-xs text-gray-500">Was this helpful?</span>
-                  <button
-                    onClick={() => handleFeedback(message.id, true)}
-                    className="text-gray-400 hover:text-green-600 transition-colors"
-                    title="Helpful"
-                  >
-                    <ThumbsUp size={14} />
-                  </button>
-                  <button
-                    onClick={() => handleFeedback(message.id, false)}
-                    className="text-gray-400 hover:text-red-600 transition-colors"
-                    title="Not Helpful"
-                  >
-                    <ThumbsDown size={14} />
-                  </button>
-                </div>
-              )}
+                {message.feedbackGiven && (
+                  <div className="text-xs text-gray-400 mt-1 ml-2">
+                    ✓ Thank you for your feedback!
+                  </div>
+                )}
 
-              {message.feedbackGiven && (
+                {/* Timestamp */}
                 <div className="text-xs text-gray-400 mt-1 ml-2">
-                  ✓ Thank you for your feedback!
+                  {new Date(message.createdAt).toLocaleTimeString([], { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  })}
                 </div>
-              )}
-
-              {/* Timestamp */}
-              <div className="text-xs text-gray-400 mt-1 ml-2">
-                {new Date(message.createdAt).toLocaleTimeString([], { 
-                  hour: '2-digit', 
-                  minute: '2-digit' 
-                })}
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         
         {sending && (
           <div className="flex justify-start">
