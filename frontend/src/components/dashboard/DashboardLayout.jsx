@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import DashboardHeader from './DashboardHeader';
 import BottomNav from './BottomNav';
 import SubscriptionBlockedModal from '../SubscriptionBlockedModal';
+import GlobalAiChatWidget from '../GlobalAiChatWidget';  // ✨ NEW: AI Chat Widget
 import useAuthStore from '../../store/authStore';
 
 const DashboardLayout = ({ children }) => {
@@ -53,6 +54,9 @@ const DashboardLayout = ({ children }) => {
         {children}
       </main>
       <BottomNav />
+      
+      {/* ✨ NEW: AI Chat Widget with blinking prompt on dashboard */}
+      <GlobalAiChatWidget showBlinkingPrompt={true} />
     </div>
   );
 };

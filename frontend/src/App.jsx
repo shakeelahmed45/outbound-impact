@@ -4,6 +4,7 @@ import NetworkWarning from './components/common/NetworkWarning';
 import SplashScreen from './components/common/SplashScreen';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import RootRedirect from './components/common/RootRedirect';
+import GlobalAiChatWidget from './components/GlobalAiChatWidget';  // ✨ NEW: AI Chat Widget
 import SignUp from './pages/SignUp';
 import SignIn from './pages/SignIn';
 import Plans from './pages/Plans';
@@ -26,7 +27,7 @@ import AdminItems from './pages/admin/AdminItems';
 import AdminFeedbackPage from './pages/admin/AdminFeedbackPage';
 import AdminLiveChatPage from './pages/admin/AdminLiveChatPage';
 import UserDetailPage from './pages/admin/UserDetailPage';
-import TeamManagementPage from './pages/admin/TeamManagementPage';  // 🆕 NEW
+import TeamManagementPage from './pages/admin/TeamManagementPage';
 import ApiAccessPage from './pages/enterprise/ApiAccessPage';
 import WhiteLabelPage from './pages/enterprise/WhiteLabelPage';
 import IntegrationsPage from './pages/enterprise/IntegrationsPage';
@@ -100,8 +101,11 @@ function App() {
         <Route path="/admin-panel/items" element={<ProtectedRoute><AdminItems /></ProtectedRoute>} />
         <Route path="/admin-panel/feedback" element={<ProtectedRoute><AdminFeedbackPage /></ProtectedRoute>} />
         <Route path="/admin-panel/live-chat" element={<ProtectedRoute><AdminLiveChatPage /></ProtectedRoute>} />
-        <Route path="/admin-panel/team" element={<ProtectedRoute><TeamManagementPage /></ProtectedRoute>} />  {/* 🆕 NEW */}
+        <Route path="/admin-panel/team" element={<ProtectedRoute><TeamManagementPage /></ProtectedRoute>} />
       </Routes>
+      
+      {/* ✨ NEW: Global AI Chat Widget (appears on all pages except dashboard which has its own) */}
+      <GlobalAiChatWidget showBlinkingPrompt={false} />
     </BrowserRouter>
   );
 }
