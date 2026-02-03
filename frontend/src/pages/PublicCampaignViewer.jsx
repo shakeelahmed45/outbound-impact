@@ -268,18 +268,119 @@ const PublicCampaignViewer = () => {
   const [shareItem, setShareItem] = useState(null);
   const [showShareModal, setShowShareModal] = useState(false);
   
-  // ✅ NEW: Check if this is a preview from Campaigns page
+  // ✅ Check if this is a preview from Campaigns page
   const searchParams = new URLSearchParams(window.location.search);
   const isPreviewMode = searchParams.get('preview') === 'true';
 
-  // ✅ NEW: PASSWORD PROTECTION STATE
+  // ✅ PASSWORD PROTECTION STATE
   const [requiresPassword, setRequiresPassword] = useState(false);
   const [password, setPassword] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [rememberPassword, setRememberPassword] = useState(false);
 
-  // ✅ NEW: PASSWORD STORAGE HELPERS
+  // 🎨 NEW: DRAG-AND-DROP STATE
+  const [isCustomizeMode, setIsCustomizeMode] = useState(false);
+  const [customItemOrder, setCustomItemOrder] = useState([]);
+  const [draggedItem, setDraggedItem] = useState(null);
+
+  // 🎨 NEW: DRAG-AND-DROP HELPER FUNCTIONS
+  const getOrderStorageKey = () => `campaign_order_${slug}`;
+
+  // Load custom order on mount
+  useEffect(() => {
+    if (campaign?.items) {
+      const stored = localStorage.getItem(getOrderStorageKey());
+      if (stored) {
+        try {
+          const orderIds = JSON.parse(stored);
+          setCustomItemOrder(orderIds);
+          console.log('✅ Loaded custom order:', orderIds.length, 'items');
+        } catch (e) {
+          console.error('Failed to load custom order:', e);
+        }
+      }
+    }
+  }, [campaign, slug]);
+
+  // Get ordered items
+  const getOrderedItems = () => {
+    if (!campaign?.items) return [];
+    
+    if (customItemOrder.length > 0) {
+      const itemsMap = new Map(campaign.items.map(item => [item.id, item]));
+      const orderedItems = customItemOrder
+        .map(id => itemsMap.get(id))
+        .filter(Boolean);
+      
+      // Add new items not in custom order
+      campaign.items.forEach(item => {
+        if (!customItemOrder.includes(item.id)) {
+          orderedItems.push(item);
+        }
+      });
+      
+      return orderedItems;
+    }
+    
+    return campaign.items;
+  };
+
+  // Save order to localStorage
+  const saveOrder = (items) => {
+    const orderIds = items.map(item => item.id);
+    localStorage.setItem(getOrderStorageKey(), JSON.stringify(orderIds));
+    setCustomItemOrder(orderIds);
+    console.log('💾 Saved custom order:', orderIds.length, 'items');
+  };
+
+  // Reset order to default
+  const resetOrder = () => {
+    if (confirm('Reset items to default order?')) {
+      localStorage.removeItem(getOrderStorageKey());
+      setCustomItemOrder([]);
+      setIsCustomizeMode(false);
+      console.log('🔄 Reset to default order');
+    }
+  };
+
+  // Drag handlers
+  const handleDragStart = (e, item) => {
+    setDraggedItem(item);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', e.currentTarget);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e, targetItem) => {
+    e.preventDefault();
+    
+    if (!draggedItem || draggedItem.id === targetItem.id) {
+      setDraggedItem(null);
+      return;
+    }
+    
+    const items = getOrderedItems();
+    const draggedIdx = items.findIndex(i => i.id === draggedItem.id);
+    const targetIdx = items.findIndex(i => i.id === targetItem.id);
+    
+    const newItems = [...items];
+    newItems.splice(draggedIdx, 1);
+    newItems.splice(targetIdx, 0, draggedItem);
+    
+    saveOrder(newItems);
+    setDraggedItem(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
+  };
+
+  // ✅ PASSWORD STORAGE HELPERS
   const getStoredPassword = (campaignSlug) => {
     // Check BOTH localStorage and sessionStorage
     let stored = localStorage.getItem(`campaign_password_${campaignSlug}`);
@@ -327,7 +428,7 @@ const PublicCampaignViewer = () => {
     sessionStorage.removeItem(`campaign_password_${campaignSlug}`);
   };
 
-  // ✅ NEW: VERIFY PASSWORD
+  // ✅ VERIFY PASSWORD
   const verifyPassword = async (passwordToVerify, isSilent = false) => {
     try {
       if (!isSilent) {
@@ -375,7 +476,7 @@ const PublicCampaignViewer = () => {
     }
   };
 
-  // ✅ NEW: HANDLE PASSWORD SUBMIT
+  // ✅ HANDLE PASSWORD SUBMIT
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
     
@@ -393,7 +494,7 @@ const PublicCampaignViewer = () => {
         setLoading(true);
         setError(null);
         
-        // ✅ NEW: Check if password is stored
+        // Check if password is stored
         console.log('🔍 Checking for stored password...');
         const storedPassword = getStoredPassword(slug);
         
@@ -417,7 +518,7 @@ const PublicCampaignViewer = () => {
         if (response.data.status === 'success') {
           const campaignData = response.data.campaign;
           
-          // ✅ NEW: Check if campaign requires password
+          // Check if campaign requires password
           if (campaignData.requiresPassword || campaignData.passwordProtected) {
             console.log('🔒 Campaign requires password');
             setRequiresPassword(true);
@@ -438,7 +539,7 @@ const PublicCampaignViewer = () => {
     fetchCampaign();
   }, [slug]);
 
-  // ✅ NEW: Restore scroll position after campaign loads
+  // ✅ Restore scroll position after campaign loads
   useEffect(() => {
     if (campaign && !loading) {
       // Small delay to ensure content is rendered
@@ -456,12 +557,12 @@ const PublicCampaignViewer = () => {
     }
   }, [campaign, loading, slug]);
   
-  // ✅ NEW: Handle back navigation for preview mode
+  // ✅ Handle back navigation for preview mode
   const handleBackToCampaigns = () => {
     navigate('/dashboard/campaigns');
   };
 
-  // ✅ NEW: Handle share button click
+  // ✅ Handle share button click
   const handleShareClick = (e, item) => {
     e.stopPropagation(); // Prevent card click
     setShareItem(item);
@@ -913,7 +1014,7 @@ const PublicCampaignViewer = () => {
     navigate(`/l/${item.slug}?from=${slug}${previewParam}`);
   };
 
-  // ✅ NEW: PASSWORD PROMPT UI (before loading check)
+  // ✅ PASSWORD PROMPT UI (before loading check)
   if (requiresPassword) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center p-4">
@@ -1065,7 +1166,7 @@ const PublicCampaignViewer = () => {
           </button>
         )}
         
-        {/* ✅ NEW DESIGN: Beautiful gradient campaign header with official colors */}
+        {/* ✅ Campaign header */}
         <div className="relative rounded-3xl shadow-2xl overflow-hidden mb-8">
           {/* Gradient Background */}
           <div className="absolute inset-0 bg-gradient-to-r from-primary to-secondary"></div>
@@ -1075,7 +1176,7 @@ const PublicCampaignViewer = () => {
           
           {/* Content Container */}
           <div className="relative z-10 p-6 sm:p-8">
-            {/* Logo Section with white background card - DOUBLED SIZE */}
+            {/* Logo Section with white background card */}
             {campaign.logoUrl && (
               <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 mb-6 shadow-lg inline-block">
                 <img 
@@ -1132,51 +1233,110 @@ const PublicCampaignViewer = () => {
         </div>
 
         {campaign.items.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {campaign.items.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white rounded-2xl shadow-lg overflow-hidden transform transition hover:scale-105 hover:shadow-2xl relative"
-              >
-                {/* ✅ UPDATED: Share Button Only Shows if sharingEnabled is true */}
-                {item.sharingEnabled && (
+          <>
+            {/* 🎨 NEW: Customize Controls */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 bg-white rounded-2xl shadow-lg p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={() => setIsCustomizeMode(!isCustomizeMode)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                    isCustomizeMode
+                      ? 'bg-gradient-to-r from-primary to-secondary text-white shadow-lg'
+                      : 'bg-white text-primary border-2 border-primary hover:bg-purple-50'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  {isCustomizeMode ? 'Done Customizing' : 'Customize Order'}
+                </button>
+
+                {customItemOrder.length > 0 && (
                   <button
-                    onClick={(e) => handleShareClick(e, item)}
-                    className="absolute top-3 right-3 z-50 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white hover:scale-110 transition-all pointer-events-auto"
-                    title="Share this content"
+                    onClick={resetOrder}
+                    className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border-2 border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-all"
                   >
-                    <Share2 size={20} className="text-primary" />
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Reset Order
                   </button>
                 )}
+              </div>
 
-                <div 
-                  onClick={() => openItem(item)}
-                  className="cursor-pointer"
+              {isCustomizeMode && (
+                <div className="text-sm text-gray-600 bg-blue-50 px-4 py-2 rounded-lg border border-blue-200 flex items-center gap-2">
+                  <span className="text-lg">💡</span>
+                  <span className="font-medium">Drag items to reorder</span>
+                </div>
+              )}
+            </div>
+
+            {/* 🎨 NEW: Items Grid with Drag-and-Drop */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {getOrderedItems().map((item) => (
+                <div
+                  key={item.id}
+                  draggable={isCustomizeMode}
+                  onDragStart={(e) => isCustomizeMode && handleDragStart(e, item)}
+                  onDragOver={(e) => isCustomizeMode && handleDragOver(e)}
+                  onDrop={(e) => isCustomizeMode && handleDrop(e, item)}
+                  onDragEnd={handleDragEnd}
+                  className={`bg-white rounded-2xl shadow-lg overflow-hidden transform transition relative ${
+                    isCustomizeMode
+                      ? 'cursor-move hover:shadow-2xl border-2 border-dashed border-transparent hover:border-primary'
+                      : 'hover:scale-105 hover:shadow-2xl'
+                  } ${draggedItem?.id === item.id ? 'opacity-50' : ''}`}
                 >
-                  <div className="aspect-square w-full overflow-hidden bg-gray-100">
-                    {getThumbnail(item)}
-                  </div>
+                  {/* 🎨 NEW: Drag Handle */}
+                  {isCustomizeMode && (
+                    <div className="absolute top-3 left-3 z-50 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-lg pointer-events-none">
+                      <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                      </svg>
+                    </div>
+                  )}
 
-                  <div className="p-4">
-                    <h3 className="text-lg font-bold text-primary mb-2 truncate">
-                      {item.title}
-                    </h3>
-                    {item.description && (
-                      <p className="text-sm text-secondary line-clamp-2 mb-3">
-                        {item.description}
-                      </p>
-                    )}
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span className="px-2 py-1 bg-purple-100 text-primary rounded-full">
-                        {item.type}
-                      </span>
-                      <span>{new Date(item.createdAt).toLocaleDateString()}</span>
+                  {/* Share Button */}
+                  {item.sharingEnabled && !isCustomizeMode && (
+                    <button
+                      onClick={(e) => handleShareClick(e, item)}
+                      className="absolute top-3 right-3 z-50 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white hover:scale-110 transition-all"
+                      title="Share this content"
+                    >
+                      <Share2 size={20} className="text-primary" />
+                    </button>
+                  )}
+
+                  <div
+                    onClick={() => !isCustomizeMode && openItem(item)}
+                    className={isCustomizeMode ? 'pointer-events-none' : 'cursor-pointer'}
+                  >
+                    <div className="aspect-square w-full overflow-hidden bg-gray-100">
+                      {getThumbnail(item)}
+                    </div>
+
+                    <div className="p-4">
+                      <h3 className="text-lg font-bold text-primary mb-2 truncate">
+                        {item.title}
+                      </h3>
+                      {item.description && (
+                        <p className="text-sm text-secondary line-clamp-2 mb-3">
+                          {item.description}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <span className="px-2 py-1 bg-purple-100 text-primary rounded-full">
+                          {item.type}
+                        </span>
+                        <span>{new Date(item.createdAt).toLocaleDateString()}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         ) : (
           <div className="bg-white rounded-3xl shadow-2xl p-12 text-center">
             <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -1188,7 +1348,7 @@ const PublicCampaignViewer = () => {
         )}
       </div>
 
-      {/* ✅ NEW: Share Modal for Items */}
+      {/* ✅ Share Modal for Items */}
       <ItemShareModal
         isOpen={showShareModal}
         onClose={closeShareModal}
