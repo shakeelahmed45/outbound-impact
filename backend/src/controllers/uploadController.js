@@ -2,6 +2,59 @@ const prisma = require('../lib/prisma');
 const { uploadToBunny, generateFileName, generateSlug } = require('../services/bunnyService');
 const QRCode = require('qrcode');
 
+// 🎬 NEW: Helper function to extract YouTube video ID
+const getYouTubeVideoId = (url) => {
+  // YouTube URL patterns:
+  // https://www.youtube.com/watch?v=VIDEO_ID
+  // https://youtu.be/VIDEO_ID
+  // https://www.youtube.com/embed/VIDEO_ID
+  // https://m.youtube.com/watch?v=VIDEO_ID
+  
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+    /youtube\.com\/.*[?&]v=([^&\n?#]+)/
+  ];
+  
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  
+  return null;
+};
+
+// 🎬 NEW: Generate YouTube thumbnail URL
+const getYouTubeThumbnail = (videoId) => {
+  if (!videoId) return null;
+  
+  // Use maxresdefault for highest quality
+  // YouTube automatically falls back to lower quality if max not available
+  return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+};
+
+// 🎬 NEW: Extract Vimeo video ID
+const getVimeoVideoId = (url) => {
+  // Vimeo URL patterns:
+  // https://vimeo.com/VIDEO_ID
+  // https://player.vimeo.com/video/VIDEO_ID
+  
+  const patterns = [
+    /vimeo\.com\/(\d+)/,
+    /player\.vimeo\.com\/video\/(\d+)/
+  ];
+  
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  
+  return null;
+};
+
 const uploadFile = async (req, res) => {
   try {
     const userId = req.effectiveUserId;
@@ -108,16 +161,28 @@ const uploadFile = async (req, res) => {
       },
     });
 
+    const base64QRData = qrCodeDataUrl.split(',')[1];
+    const qrBuffer = Buffer.from(base64QRData, 'base64');
+    const qrFileName = `qr-${slug}.png`;
+    
+    const qrUploadResult = await uploadToBunny(qrBuffer, qrFileName, 'image/png');
+    const qrCodeUrl = qrUploadResult.success ? qrUploadResult.url : qrCodeDataUrl;
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { storageUsed: BigInt(newStorageUsed) }
+    });
+
     // ✅ NEW: Include sharingEnabled (default true if not provided)
     const item = await prisma.item.create({
       data: {
         userId,
+        slug,
         title,
         description: description || null,
         type,
-        slug,
         mediaUrl,
-        qrCodeUrl: qrCodeDataUrl,
+        qrCodeUrl,
         thumbnailUrl,
         fileSize: BigInt(fileSize),
         buttonText: buttonText || null,
@@ -127,12 +192,7 @@ const uploadFile = async (req, res) => {
       }
     });
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: { storageUsed: BigInt(Number(user.storageUsed) + Number(fileSize)) }
-    });
-
-    res.json({
+    res.status(201).json({
       status: 'success',
       message: 'File uploaded successfully',
       item: {
@@ -140,12 +200,9 @@ const uploadFile = async (req, res) => {
         title: item.title,
         slug: item.slug,
         type: item.type,
-        thumbnailUrl: item.thumbnailUrl,
+        mediaUrl: item.mediaUrl,
         qrCodeUrl: item.qrCodeUrl,
         publicUrl: publicUrl,
-        buttonText: item.buttonText,
-        buttonUrl: item.buttonUrl,
-        attachments: item.attachments,
         sharingEnabled: item.sharingEnabled, // ✅ NEW
       }
     });
@@ -250,7 +307,7 @@ const createTextPost = async (req, res) => {
       data: { storageUsed: BigInt(Number(user.storageUsed) + content.length) }
     });
 
-    res.json({
+    res.status(201).json({
       status: 'success',
       message: 'Text post created successfully',
       item: {
@@ -258,12 +315,9 @@ const createTextPost = async (req, res) => {
         title: item.title,
         slug: item.slug,
         type: item.type,
-        thumbnailUrl: item.thumbnailUrl,
+        mediaUrl: item.mediaUrl,
         qrCodeUrl: item.qrCodeUrl,
         publicUrl: publicUrl,
-        buttonText: item.buttonText,
-        buttonUrl: item.buttonUrl,
-        attachments: item.attachments,
         sharingEnabled: item.sharingEnabled, // ✅ NEW
       }
     });
@@ -324,7 +378,28 @@ const createEmbedPost = async (req, res) => {
     const qrUploadResult = await uploadToBunny(qrBuffer, qrFileName, 'image/png');
     const qrCodeUrl = qrUploadResult.success ? qrUploadResult.url : qrCodeDataUrl;
 
-    // ✅ NEW: Include sharingEnabled (default true if not provided)
+    // 🎬 NEW: Extract thumbnail URL for YouTube/Vimeo
+    let thumbnailUrl = null;
+
+    if (embedType === 'YouTube') {
+      const videoId = getYouTubeVideoId(embedUrl);
+      if (videoId) {
+        thumbnailUrl = getYouTubeThumbnail(videoId);
+        console.log('✅ YouTube thumbnail generated:', thumbnailUrl);
+      } else {
+        console.log('⚠️ Could not extract YouTube video ID from:', embedUrl);
+      }
+    } else if (embedType === 'Vimeo') {
+      const videoId = getVimeoVideoId(embedUrl);
+      if (videoId) {
+        // Vimeo thumbnails require API call with authentication
+        // For now, we'll use null and show colored background
+        thumbnailUrl = null;
+        console.log('ℹ️ Vimeo video ID:', videoId, '(thumbnail requires API)');
+      }
+    }
+
+    // ✅ UPDATED: Include thumbnailUrl with YouTube support
     const item = await prisma.item.create({
       data: {
         userId,
@@ -335,11 +410,11 @@ const createEmbedPost = async (req, res) => {
         mediaUrl: embedUrl,
         fileSize: 0,
         qrCodeUrl,
-        thumbnailUrl: null,
+        thumbnailUrl,  // 🎬 NOW HAS YOUTUBE THUMBNAIL!
         buttonText: embedType || 'External Content',
         buttonUrl: null,
         attachments: null,
-        sharingEnabled: sharingEnabled !== undefined ? sharingEnabled : true, // ✅ NEW: Default true
+        sharingEnabled: sharingEnabled !== undefined ? sharingEnabled : true,
       }
     });
 
@@ -353,8 +428,9 @@ const createEmbedPost = async (req, res) => {
         type: item.type,
         mediaUrl: item.mediaUrl,
         qrCodeUrl: item.qrCodeUrl,
+        thumbnailUrl: item.thumbnailUrl, // 🎬 NEW: Include in response
         publicUrl: publicUrl,
-        sharingEnabled: item.sharingEnabled, // ✅ NEW
+        sharingEnabled: item.sharingEnabled,
       }
     });
 

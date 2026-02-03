@@ -279,12 +279,12 @@ const PublicCampaignViewer = () => {
   const [passwordError, setPasswordError] = useState('');
   const [rememberPassword, setRememberPassword] = useState(false);
 
-  // 🎨 NEW: DRAG-AND-DROP STATE
+  // 🎨 DRAG-AND-DROP STATE
   const [isCustomizeMode, setIsCustomizeMode] = useState(false);
   const [customItemOrder, setCustomItemOrder] = useState([]);
   const [draggedItem, setDraggedItem] = useState(null);
 
-  // 🎨 NEW: DRAG-AND-DROP HELPER FUNCTIONS
+  // 🎨 DRAG-AND-DROP HELPER FUNCTIONS
   const getOrderStorageKey = () => `campaign_order_${slug}`;
 
   // Load custom order on mount
@@ -774,15 +774,40 @@ const PublicCampaignViewer = () => {
                             platformType.includes('Google Drive') || 
                             platformType.includes('Google Slides');
     
-    // ✅ VIDEO EMBEDS (YouTube, Vimeo) - RED GRADIENT COLORS
+    // 🎬 VIDEO EMBEDS (YouTube, Vimeo) - WITH ACTUAL THUMBNAILS
     if (isVideoEmbed) {
       return (
         <div className="relative w-full h-full">
-          {/* ✅ CHANGED: Red/crimson gradient background */}
-          <div className="w-full h-full bg-gradient-to-br from-red-600 via-rose-600 to-pink-700"></div>
+          {/* 🎬 FIXED: Show actual YouTube thumbnail if available */}
+          {item.thumbnailUrl ? (
+            <>
+              {/* YouTube Thumbnail */}
+              <img
+                src={item.thumbnailUrl}
+                alt={item.title}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  // Fallback to red gradient if thumbnail fails to load
+                  e.target.style.display = 'none';
+                  e.target.nextElementSibling.style.display = 'block';
+                }}
+              />
+              {/* Fallback red gradient (hidden by default) */}
+              <div 
+                className="absolute inset-0 w-full h-full bg-gradient-to-br from-red-600 via-rose-600 to-pink-700"
+                style={{ display: 'none' }}
+              ></div>
+            </>
+          ) : (
+            /* Red gradient fallback for non-YouTube embeds or old embeds */
+            <div className="w-full h-full bg-gradient-to-br from-red-600 via-rose-600 to-pink-700"></div>
+          )}
+          
+          {/* Dark overlay for better play button visibility */}
+          <div className="absolute inset-0 bg-black bg-opacity-30"></div>
           
           {/* Overlay with play icon */}
-          <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center justify-center">
             <div className="relative">
               {/* Animated pulsing rings */}
               <div className="absolute inset-0 flex items-center justify-center">
@@ -801,7 +826,7 @@ const PublicCampaignViewer = () => {
           
           {/* Platform badge */}
           <div className="absolute top-4 left-4">
-            <div className="px-3 py-1.5 bg-white/20 backdrop-blur-sm rounded-full border border-white/30">
+            <div className="px-3 py-1.5 bg-black/60 backdrop-blur-sm rounded-full border border-white/30">
               <p className="text-white text-xs font-bold tracking-wide">
                 🎬 {platformType.toUpperCase()}
               </p>
@@ -809,7 +834,7 @@ const PublicCampaignViewer = () => {
           </div>
           
           {/* Bottom info */}
-          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-red-900/80 to-transparent">
+          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
             <div className="flex items-center gap-2">
               <Eye className="w-4 h-4 text-white" />
               <span className="text-white text-xs sm:text-sm font-bold">Click to watch video</span>
@@ -1234,7 +1259,7 @@ const PublicCampaignViewer = () => {
 
         {campaign.items.length > 0 ? (
           <>
-            {/* 🎨 NEW: Customize Controls */}
+            {/* 🎨 Customize Controls */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 bg-white rounded-2xl shadow-lg p-4">
               <div className="flex flex-wrap items-center gap-3">
                 <button
@@ -1272,7 +1297,7 @@ const PublicCampaignViewer = () => {
               )}
             </div>
 
-            {/* 🎨 NEW: Items Grid with Drag-and-Drop */}
+            {/* 🎨 Items Grid with Drag-and-Drop */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {getOrderedItems().map((item) => (
                 <div
@@ -1288,7 +1313,7 @@ const PublicCampaignViewer = () => {
                       : 'hover:scale-105 hover:shadow-2xl'
                   } ${draggedItem?.id === item.id ? 'opacity-50' : ''}`}
                 >
-                  {/* 🎨 NEW: Drag Handle */}
+                  {/* 🎨 Drag Handle */}
                   {isCustomizeMode && (
                     <div className="absolute top-3 left-3 z-50 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-lg pointer-events-none">
                       <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
