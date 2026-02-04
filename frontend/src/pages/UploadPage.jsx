@@ -1,7 +1,9 @@
 // ═══════════════════════════════════════════════════════════════
-// UploadPage.jsx - PART 1 of 4 (ERROR-FREE VERSION)
-// COPY THIS ENTIRE FILE CONTENT INTO A NEW UploadPage.jsx
-// Then continue with Part 2, Part 3, and Part 4
+// UploadPage.jsx - COMPLETE FIXED VERSION
+// ✅ Upload never gets stuck
+// ✅ File sizes display correctly (KB/MB/GB)
+// ✅ Better error handling and console logging
+// COPY THIS ENTIRE FILE TO: frontend/src/pages/UploadPage.jsx
 // ═══════════════════════════════════════════════════════════════
 
 import { useState, useEffect, useRef } from 'react';
@@ -68,9 +70,19 @@ const UploadPage = () => {
   const abortControllerRef = useRef(null);
   const progressIntervalRef = useRef(null);
 
-  // ✅ NEW: Real upload progress tracking
   const [uploadedBytes, setUploadedBytes] = useState(0);
   const [totalBytes, setTotalBytes] = useState(0);
+
+  // ✅ NEW: Format file size helper function
+  const formatFileSize = (bytes) => {
+    if (!bytes || bytes === 0) return '0 B';
+    
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
 
   useEffect(() => {
     document.title = 'Upload | Outbound Impact';
@@ -199,20 +211,18 @@ const UploadPage = () => {
       reader.onload = (e) => setPreview(e.target.result);
       reader.readAsDataURL(file);
     } else if (file.type.startsWith('video/')) {
-      // ✅ NEW: Validate video duration (2 minute limit)
       const video = document.createElement('video');
       video.preload = 'metadata';
       
       video.onloadedmetadata = () => {
         window.URL.revokeObjectURL(video.src);
-        const duration = video.duration; // in seconds
+        const duration = video.duration;
         
-        if (duration > 120) { // 120 seconds = 2 minutes
+        if (duration > 120) {
           showToast('Video must be 2 minutes or less. Your video is ' + Math.round(duration / 60) + ' minutes long.', 'error');
           return;
         }
         
-        // Video is valid, proceed with selection
         setUploadType('VIDEO');
         setSelectedFile(file);
         const reader = new FileReader();
@@ -235,15 +245,6 @@ const UploadPage = () => {
       setPreview(null);
     }
   };
-
-// ═══════════════════════════════════════════════════════════════
-// END OF PART 1
-// Continue with Part 2...
-// ═══════════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════════
-// UploadPage.jsx - PART 2 of 4 (ERROR-FREE VERSION)
-// PASTE THIS IMMEDIATELY AFTER PART 1 (no gap, no extra lines)
-// ═══════════════════════════════════════════════════════════════
 
   const handleFileUpload = async (e) => {
     e.preventDefault();
@@ -280,79 +281,100 @@ const UploadPage = () => {
     abortControllerRef.current = new AbortController();
 
     try {
+      console.log('📦 Starting upload:', selectedFile.name);
+      console.log('📊 File size:', formatFileSize(selectedFile.size));
+      
       const reader = new FileReader();
+      
       reader.onload = async (e) => {
-        const fileData = e.target.result;
+        try {
+          const fileData = e.target.result;
 
-        // ✅ NEW: Real upload progress with axios onUploadProgress
-        const response = await api.post('/upload/file', {
-          title,
-          description,
-          type: uploadType,
-          fileData,
-          fileName: selectedFile.name,
-          fileSize: selectedFile.size,
-          buttonText: buttonText || null,
-          buttonUrl: buttonUrl || null,
-          attachments: attachments.length > 0 ? attachments : null,
-          sharingEnabled,
-        }, {
-          signal: abortControllerRef.current?.signal,
-          onUploadProgress: (progressEvent) => {
-            const { loaded, total } = progressEvent;
-            setUploadedBytes(loaded);
-            setTotalBytes(total || selectedFile.size);
-            
-            // Calculate percentage
-            const percentCompleted = Math.round((loaded * 100) / (total || selectedFile.size));
-            setUploadProgress(percentCompleted);
-          }
-        });
-
-        if (response.data.status === 'success') {
-          const itemId = response.data.item.id;
-
-          await api.post('/campaigns/assign', {
-            itemId,
-            campaignId: selectedCampaignId,
+          console.log('✅ File converted to base64, uploading...');
+          
+          const response = await api.post('/upload/file', {
+            title,
+            description,
+            type: uploadType,
+            fileData,
+            fileName: selectedFile.name,
+            fileSize: selectedFile.size,
+            buttonText: buttonText || null,
+            buttonUrl: buttonUrl || null,
+            attachments: attachments.length > 0 ? attachments : null,
+            sharingEnabled,
           }, {
-            signal: abortControllerRef.current?.signal
+            signal: abortControllerRef.current?.signal,
+            onUploadProgress: (progressEvent) => {
+              const { loaded, total } = progressEvent;
+              setUploadedBytes(loaded);
+              setTotalBytes(total || selectedFile.size);
+              
+              const percentCompleted = Math.round((loaded * 100) / (total || selectedFile.size));
+              setUploadProgress(percentCompleted);
+              
+              console.log(`📤 Upload progress: ${percentCompleted}% (${formatFileSize(loaded)} / ${formatFileSize(total || selectedFile.size)})`);
+            }
           });
 
-          showToast('File uploaded and added to stream!', 'success');
-          
-          setTimeout(() => {
-            setTitle('');
-            setDescription('');
-            setSelectedFile(null);
-            setPreview(null);
-            setUploadType(null);
-            setUploadProgress(0);
-            setUploadedBytes(0);
-            setTotalBytes(0);
-            setButtonText('');
-            setButtonUrl('');
-            setAttachments([]);
-            setSharingEnabled(true);
-            navigate('/dashboard/campaigns');
-          }, 1000);
+          if (response.data.status === 'success') {
+            console.log('✅ Upload complete!');
+            
+            const itemId = response.data.item.id;
+
+            await api.post('/campaigns/assign', {
+              itemId,
+              campaignId: selectedCampaignId,
+            }, {
+              signal: abortControllerRef.current?.signal
+            });
+
+            showToast('File uploaded and added to stream!', 'success');
+            
+            setTimeout(() => {
+              setTitle('');
+              setDescription('');
+              setSelectedFile(null);
+              setPreview(null);
+              setUploadType(null);
+              setUploadProgress(0);
+              setUploadedBytes(0);
+              setTotalBytes(0);
+              setButtonText('');
+              setButtonUrl('');
+              setAttachments([]);
+              setSharingEnabled(true);
+              setUploading(false);
+              navigate('/dashboard/campaigns');
+            }, 1000);
+          }
+        } catch (uploadError) {
+          throw uploadError;
         }
       };
       
+      reader.onerror = () => {
+        console.error('❌ File read error');
+        showToast('Failed to read file. Please try again.', 'error');
+        setUploading(false);
+      };
+      
       reader.readAsDataURL(selectedFile);
+      
     } catch (error) {
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-        console.log('Upload was canceled by user');
+        console.log('⚠️ Upload was canceled by user');
         return;
       }
       
-      console.error('Upload error:', error);
+      console.error('❌ Upload error:', error);
       showToast(error.response?.data?.message || 'Failed to upload file', 'error');
       setUploadProgress(0);
       setUploadedBytes(0);
       setTotalBytes(0);
       setUploading(false);
     } finally {
+      setUploading(false);
       abortControllerRef.current = null;
     }
   };
@@ -672,15 +694,6 @@ const UploadPage = () => {
     const newAttachments = attachments.filter((_, i) => i !== index);
     setAttachments(newAttachments);
   };
-
-// ═══════════════════════════════════════════════════════════════
-// END OF PART 2
-// Continue with Part 3...
-// ═══════════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════════
-// UploadPage.jsx - PART 3 of 4 (ERROR-FREE VERSION)
-// PASTE THIS IMMEDIATELY AFTER PART 2 (no gap, no extra lines)
-// ═══════════════════════════════════════════════════════════════
 
   const ShareToggleSection = () => (
     <div className="border-t border-gray-200 pt-6">
@@ -1084,7 +1097,7 @@ const UploadPage = () => {
                                 {file.name}
                               </p>
                               <p className="text-xs text-gray-500">
-                                {(file.size / 1024).toFixed(1)} KB
+                                {formatFileSize(file.size)}
                               </p>
                             </div>
                           </div>
@@ -1125,7 +1138,7 @@ const UploadPage = () => {
                     />
                   </div>
                   <p className="text-xs text-gray-600 mt-2">
-                    Uploaded: {(uploadedBytes / 1024 / 1024).toFixed(2)} MB / {(totalBytes / 1024 / 1024).toFixed(2)} MB
+                    Uploaded: {formatFileSize(uploadedBytes)} / {formatFileSize(totalBytes)}
                   </p>
                 </div>
               )}
@@ -1413,7 +1426,7 @@ const UploadPage = () => {
                                 {file.name}
                               </p>
                               <p className="text-xs text-gray-500">
-                                {(file.size / 1024).toFixed(1)} KB
+                                {formatFileSize(file.size)}
                               </p>
                             </div>
                           </div>
@@ -1443,7 +1456,7 @@ const UploadPage = () => {
 
               <div className="text-sm text-gray-600 bg-gray-50 p-4 rounded-lg">
                 <p><strong>File:</strong> {selectedFile.name}</p>
-                <p><strong>Size:</strong> {(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                <p><strong>Size:</strong> {formatFileSize(selectedFile.size)}</p>
               </div>
 
               {uploading && uploadProgress > 0 && (
@@ -1459,7 +1472,7 @@ const UploadPage = () => {
                     />
                   </div>
                   <p className="text-xs text-gray-600 mt-2">
-                    Uploaded: {(uploadedBytes / 1024 / 1024).toFixed(2)} MB / {(totalBytes / 1024 / 1024).toFixed(2)} MB
+                    Uploaded: {formatFileSize(uploadedBytes)} / {formatFileSize(totalBytes)}
                   </p>
                 </div>
               )}
