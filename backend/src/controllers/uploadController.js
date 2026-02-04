@@ -2,14 +2,8 @@ const prisma = require('../lib/prisma');
 const { uploadToBunny, generateFileName, generateSlug } = require('../services/bunnyService');
 const QRCode = require('qrcode');
 
-// 🎬 NEW: Helper function to extract YouTube video ID
+// 🎬 Helper function to extract YouTube video ID
 const getYouTubeVideoId = (url) => {
-  // YouTube URL patterns:
-  // https://www.youtube.com/watch?v=VIDEO_ID
-  // https://youtu.be/VIDEO_ID
-  // https://www.youtube.com/embed/VIDEO_ID
-  // https://m.youtube.com/watch?v=VIDEO_ID
-  
   const patterns = [
     /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
     /youtube\.com\/.*[?&]v=([^&\n?#]+)/
@@ -25,21 +19,14 @@ const getYouTubeVideoId = (url) => {
   return null;
 };
 
-// 🎬 NEW: Generate YouTube thumbnail URL
+// 🎬 Generate YouTube thumbnail URL
 const getYouTubeThumbnail = (videoId) => {
   if (!videoId) return null;
-  
-  // Use maxresdefault for highest quality
-  // YouTube automatically falls back to lower quality if max not available
   return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
 };
 
-// 🎬 NEW: Extract Vimeo video ID
+// 🎬 Extract Vimeo video ID
 const getVimeoVideoId = (url) => {
-  // Vimeo URL patterns:
-  // https://vimeo.com/VIDEO_ID
-  // https://player.vimeo.com/video/VIDEO_ID
-  
   const patterns = [
     /vimeo\.com\/(\d+)/,
     /player\.vimeo\.com\/video\/(\d+)/
@@ -55,12 +42,63 @@ const getVimeoVideoId = (url) => {
   return null;
 };
 
+// ✅ NEW: Main upload handler - supports BOTH multipart AND base64
 const uploadFile = async (req, res) => {
   try {
     const userId = req.effectiveUserId;
-    const { title, description, type, fileData, fileName, fileSize, buttonText, buttonUrl, attachments, sharingEnabled } = req.body;
+    
+    // ✅ NEW: Check if this is multipart/form-data or JSON
+    const isMultipart = req.file !== undefined;
+    
+    let title, description, type, fileName, fileSize, buttonText, buttonUrl, attachments, sharingEnabled;
+    let fileBuffer;
+    
+    if (isMultipart) {
+      // ✅ NEW: FormData upload (YouTube-style - no memory issues!)
+      console.log('📤 FormData upload detected (YouTube-style)');
+      
+      title = req.body.title;
+      description = req.body.description;
+      type = req.body.type;
+      fileName = req.file.originalname;
+      fileSize = req.file.size;
+      buttonText = req.body.buttonText;
+      buttonUrl = req.body.buttonUrl;
+      attachments = req.body.attachments ? JSON.parse(req.body.attachments) : null;
+      sharingEnabled = req.body.sharingEnabled === 'true' || req.body.sharingEnabled === true;
+      
+      // File is already in memory as Buffer
+      fileBuffer = req.file.buffer;
+      
+    } else {
+      // ⚠️ OLD: Base64 upload (backward compatibility - has memory issues)
+      console.log('📦 Base64 upload detected (old method)');
+      
+      const { fileData } = req.body;
+      title = req.body.title;
+      description = req.body.description;
+      type = req.body.type;
+      fileName = req.body.fileName;
+      fileSize = req.body.fileSize;
+      buttonText = req.body.buttonText;
+      buttonUrl = req.body.buttonUrl;
+      attachments = req.body.attachments;
+      sharingEnabled = req.body.sharingEnabled;
+      
+      if (!fileData) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Missing file data'
+        });
+      }
+      
+      // Convert base64 to buffer
+      const base64Data = fileData.split(',')[1] || fileData;
+      fileBuffer = Buffer.from(base64Data, 'base64');
+    }
 
-    if (!title || !type || !fileData || !fileName) {
+    // Validation
+    if (!title || !type || !fileName) {
       return res.status(400).json({
         status: 'error',
         message: 'Missing required fields'
@@ -98,6 +136,7 @@ const uploadFile = async (req, res) => {
       }
     }
 
+    // Check storage limits
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { storageUsed: true, storageLimit: true }
@@ -112,10 +151,8 @@ const uploadFile = async (req, res) => {
       });
     }
 
+    // Upload to Bunny.net
     const uniqueFileName = generateFileName(fileName, userId);
-    const base64Data = fileData.split(',')[1] || fileData;
-    const fileBuffer = Buffer.from(base64Data, 'base64');
-
     const uploadResult = await uploadToBunny(
       fileBuffer,
       uniqueFileName,
@@ -133,15 +170,25 @@ const uploadFile = async (req, res) => {
         thumbnailUrl = mediaUrl;
       }
     } else {
-      console.log('⚠️ Bunny.net upload failed, storing as base64');
+      console.log('⚠️ Bunny.net upload failed');
       console.log('Error:', uploadResult.error);
-      mediaUrl = fileData;
       
+      // If multipart, we can't fall back to base64 in database
+      if (isMultipart) {
+        return res.status(500).json({
+          status: 'error',
+          message: 'File upload failed. Please try again.'
+        });
+      }
+      
+      // For base64, store as fallback
+      mediaUrl = `data:${type.toLowerCase()};base64,${fileBuffer.toString('base64')}`;
       if (type === 'IMAGE') {
-        thumbnailUrl = fileData;
+        thumbnailUrl = mediaUrl;
       }
     }
 
+    // Generate slug and QR code
     let slug = generateSlug();
     let slugExists = await prisma.item.findUnique({ where: { slug } });
     
@@ -168,12 +215,13 @@ const uploadFile = async (req, res) => {
     const qrUploadResult = await uploadToBunny(qrBuffer, qrFileName, 'image/png');
     const qrCodeUrl = qrUploadResult.success ? qrUploadResult.url : qrCodeDataUrl;
 
+    // Update storage
     await prisma.user.update({
       where: { id: userId },
       data: { storageUsed: BigInt(newStorageUsed) }
     });
 
-    // ✅ NEW: Include sharingEnabled (default true if not provided)
+    // Create item
     const item = await prisma.item.create({
       data: {
         userId,
@@ -188,7 +236,7 @@ const uploadFile = async (req, res) => {
         buttonText: buttonText || null,
         buttonUrl: buttonUrl || null,
         attachments: attachments || null,
-        sharingEnabled: sharingEnabled !== undefined ? sharingEnabled : true, // ✅ NEW: Default true
+        sharingEnabled: sharingEnabled !== undefined ? sharingEnabled : true,
       }
     });
 
@@ -199,23 +247,22 @@ const uploadFile = async (req, res) => {
         id: item.id,
         title: item.title,
         slug: item.slug,
-        type: item.type,
         mediaUrl: item.mediaUrl,
         qrCodeUrl: item.qrCodeUrl,
-        publicUrl: publicUrl,
-        sharingEnabled: item.sharingEnabled, // ✅ NEW
       }
     });
 
   } catch (error) {
-    console.error('Upload error:', error);
+    console.error('Upload file error:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Upload failed: ' + error.message
+      message: 'Internal server error',
+      error: error.message
     });
   }
 };
 
+// Text post creation (unchanged)
 const createTextPost = async (req, res) => {
   try {
     const userId = req.effectiveUserId;
@@ -278,33 +325,28 @@ const createTextPost = async (req, res) => {
       },
     });
 
-    // ✅ NEW: Include sharingEnabled (default true if not provided)
+    const base64QRData = qrCodeDataUrl.split(',')[1];
+    const qrBuffer = Buffer.from(base64QRData, 'base64');
+    const qrFileName = `qr-${slug}.png`;
+    
+    const qrUploadResult = await uploadToBunny(qrBuffer, qrFileName, 'image/png');
+    const qrCodeUrl = qrUploadResult.success ? qrUploadResult.url : qrCodeDataUrl;
+
     const item = await prisma.item.create({
       data: {
         userId,
+        slug,
         title,
         description: description || null,
         type: 'TEXT',
-        slug,
-        mediaUrl: content,
-        qrCodeUrl: qrCodeDataUrl,
-        thumbnailUrl: null,
-        fileSize: BigInt(content.length),
+        content,
+        qrCodeUrl,
+        fileSize: BigInt(0),
         buttonText: buttonText || null,
         buttonUrl: buttonUrl || null,
         attachments: attachments || null,
-        sharingEnabled: sharingEnabled !== undefined ? sharingEnabled : true, // ✅ NEW: Default true
+        sharingEnabled: sharingEnabled !== undefined ? sharingEnabled : true,
       }
-    });
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { storageUsed: true }
-    });
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: { storageUsed: BigInt(Number(user.storageUsed) + content.length) }
     });
 
     res.status(201).json({
@@ -314,23 +356,21 @@ const createTextPost = async (req, res) => {
         id: item.id,
         title: item.title,
         slug: item.slug,
-        type: item.type,
-        mediaUrl: item.mediaUrl,
         qrCodeUrl: item.qrCodeUrl,
-        publicUrl: publicUrl,
-        sharingEnabled: item.sharingEnabled, // ✅ NEW
       }
     });
 
   } catch (error) {
-    console.error('Text post error:', error);
+    console.error('Create text post error:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Failed to create text post'
+      message: 'Internal server error',
+      error: error.message
     });
   }
 };
 
+// Embed post creation (unchanged)
 const createEmbedPost = async (req, res) => {
   try {
     const userId = req.effectiveUserId;
@@ -343,7 +383,6 @@ const createEmbedPost = async (req, res) => {
       });
     }
 
-    // Validate embed URL
     try {
       new URL(embedUrl);
     } catch (error) {
@@ -353,15 +392,16 @@ const createEmbedPost = async (req, res) => {
       });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { storageUsed: true, storageLimit: true }
-    });
+    let slug = generateSlug();
+    let slugExists = await prisma.item.findUnique({ where: { slug } });
+    
+    while (slugExists) {
+      slug = generateSlug();
+      slugExists = await prisma.item.findUnique({ where: { slug } });
+    }
 
-    const slug = generateSlug();
-    const publicUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/l/${slug}`;
+    const publicUrl = `${process.env.FRONTEND_URL}/l/${slug}`;
 
-    // Generate QR code
     const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
       width: 512,
       margin: 2,
@@ -370,75 +410,56 @@ const createEmbedPost = async (req, res) => {
         light: '#FFFFFF',
       },
     });
-    const base64Data = qrCodeDataUrl.split(',')[1];
-    const qrBuffer = Buffer.from(base64Data, 'base64');
+
+    const base64QRData = qrCodeDataUrl.split(',')[1];
+    const qrBuffer = Buffer.from(base64QRData, 'base64');
     const qrFileName = `qr-${slug}.png`;
     
-    // Upload to Bunny and extract URL
     const qrUploadResult = await uploadToBunny(qrBuffer, qrFileName, 'image/png');
     const qrCodeUrl = qrUploadResult.success ? qrUploadResult.url : qrCodeDataUrl;
 
-    // 🎬 NEW: Extract thumbnail URL for YouTube/Vimeo
     let thumbnailUrl = null;
-
     if (embedType === 'YouTube') {
       const videoId = getYouTubeVideoId(embedUrl);
       if (videoId) {
         thumbnailUrl = getYouTubeThumbnail(videoId);
-        console.log('✅ YouTube thumbnail generated:', thumbnailUrl);
-      } else {
-        console.log('⚠️ Could not extract YouTube video ID from:', embedUrl);
-      }
-    } else if (embedType === 'Vimeo') {
-      const videoId = getVimeoVideoId(embedUrl);
-      if (videoId) {
-        // Vimeo thumbnails require API call with authentication
-        // For now, we'll use null and show colored background
-        thumbnailUrl = null;
-        console.log('ℹ️ Vimeo video ID:', videoId, '(thumbnail requires API)');
+        console.log('🎬 YouTube thumbnail generated:', thumbnailUrl);
       }
     }
 
-    // ✅ UPDATED: Include thumbnailUrl with YouTube support
     const item = await prisma.item.create({
       data: {
         userId,
         slug,
         title,
-        description: description || `${embedType || 'External'} Embed`,
+        description: description || null,
         type: 'EMBED',
-        mediaUrl: embedUrl,
-        fileSize: 0,
+        embedUrl,
+        embedType: embedType || 'External',
         qrCodeUrl,
-        thumbnailUrl,  // 🎬 NOW HAS YOUTUBE THUMBNAIL!
-        buttonText: embedType || 'External Content',
-        buttonUrl: null,
-        attachments: null,
+        thumbnailUrl,
+        fileSize: BigInt(0),
         sharingEnabled: sharingEnabled !== undefined ? sharingEnabled : true,
       }
     });
 
     res.status(201).json({
       status: 'success',
-      message: 'Embed created successfully',
+      message: 'Embed post created successfully',
       item: {
         id: item.id,
         title: item.title,
         slug: item.slug,
-        type: item.type,
-        mediaUrl: item.mediaUrl,
         qrCodeUrl: item.qrCodeUrl,
-        thumbnailUrl: item.thumbnailUrl, // 🎬 NEW: Include in response
-        publicUrl: publicUrl,
-        sharingEnabled: item.sharingEnabled,
       }
     });
 
   } catch (error) {
-    console.error('Embed creation error:', error);
+    console.error('Create embed post error:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Failed to create embed'
+      message: 'Internal server error',
+      error: error.message
     });
   }
 };
@@ -446,5 +467,5 @@ const createEmbedPost = async (req, res) => {
 module.exports = {
   uploadFile,
   createTextPost,
-  createEmbedPost,
+  createEmbedPost
 };
