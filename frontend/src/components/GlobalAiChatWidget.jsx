@@ -11,13 +11,26 @@ const GlobalAiChatWidget = ({ showBlinkingPrompt = false }) => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
-  const [showPrompt, setShowPrompt] = useState(showBlinkingPrompt);
+  
+  // ✅ NEW: Welcome modal state
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   
   const messagesEndRef = useRef(null);
   const pollInterval = useRef(null);
   const messagesContainerRef = useRef(null);
   const previousMessageCountRef = useRef(0);
   const shouldAutoScrollRef = useRef(true);
+
+  // ✅ NEW: Check if first-time user and show welcome modal
+  useEffect(() => {
+    const hasSeenWelcome = localStorage.getItem('hasSeenWelcome');
+    if (!hasSeenWelcome && user) {
+      // Small delay to let the dashboard load first
+      setTimeout(() => {
+        setShowWelcomeModal(true);
+      }, 1000);
+    }
+  }, [user]);
 
   // Initialize conversation when widget opens
   useEffect(() => {
@@ -61,17 +74,6 @@ const GlobalAiChatWidget = ({ showBlinkingPrompt = false }) => {
     
     previousMessageCountRef.current = messages.length;
   }, [messages]);
-
-  // Hide blinking prompt after 30 seconds
-  useEffect(() => {
-    if (showPrompt) {
-      const timer = setTimeout(() => {
-        setShowPrompt(false);
-      }, 30000); // 30 seconds
-
-      return () => clearTimeout(timer);
-    }
-  }, [showPrompt]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -232,7 +234,6 @@ What can I help you with today?`,
   const openWidget = () => {
     setIsOpen(true);
     setIsMinimized(false);
-    setShowPrompt(false);
   };
 
   const closeWidget = () => {
@@ -244,59 +245,150 @@ What can I help you with today?`,
     setIsOpen(false);
   };
 
-  // Blinking Prompt (Dashboard only)
-  if (showPrompt && !isOpen && !isMinimized) {
+  // ✅ NEW: Handle welcome modal done button
+  const handleWelcomeDone = () => {
+    localStorage.setItem('hasSeenWelcome', 'true');
+    setShowWelcomeModal(false);
+    // Open chatbot after closing welcome modal
+    openWidget();
+  };
+
+  // ✅ NEW: Welcome Modal
+  if (showWelcomeModal) {
     return (
-      <div className="fixed bottom-24 right-6 z-[9999] animate-bounce">
-        <div 
-          onClick={openWidget}
-          className="bg-gradient-to-r from-purple-600 to-violet-600 text-white px-6 py-4 rounded-2xl shadow-2xl cursor-pointer hover:scale-105 transition-transform duration-200 flex items-center gap-3"
-        >
-          <Bot size={28} className="animate-pulse" />
-          <div>
-            <p className="font-bold text-lg">Do you need help?</p>
-            <p className="text-sm opacity-90">Ask me anything about Outbound Impact!</p>
+      <>
+        {/* Backdrop */}
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9998] animate-fadeIn" />
+        
+        {/* Welcome Modal */}
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8 animate-slideUp">
+            {/* Decorative gradient header */}
+            <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-purple-600 via-violet-600 to-purple-600 rounded-t-3xl"></div>
+            
+            {/* Content */}
+            <div className="text-center space-y-6 mt-4">
+              {/* Icon with pulsing effect */}
+              <div className="relative inline-flex items-center justify-center">
+                {/* Pulsing rings */}
+                <div className="absolute w-24 h-24 rounded-full bg-purple-200 animate-ping"></div>
+                <div className="absolute w-20 h-20 rounded-full bg-purple-300 animate-ping" style={{ animationDelay: '0.2s' }}></div>
+                
+                {/* Icon */}
+                <div className="relative bg-gradient-to-r from-purple-600 to-violet-600 p-6 rounded-full">
+                  <Bot size={48} className="text-white" />
+                </div>
+              </div>
+              
+              {/* Welcome text */}
+              <div>
+                <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                  Welcome to Outbound Impact! 🎉
+                </h2>
+                <p className="text-lg text-gray-600">
+                  {user?.name ? `Hi ${user.name.split(' ')[0]}!` : 'Hello!'} We're excited to have you here.
+                </p>
+              </div>
+              
+              {/* Features highlight */}
+              <div className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-2xl p-6 space-y-3 text-left">
+                <h3 className="font-bold text-gray-900 text-center mb-4">Get Started Quickly:</h3>
+                <div className="space-y-2">
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">🎨</span>
+                    <div>
+                      <p className="font-semibold text-gray-900">Create Streams</p>
+                      <p className="text-sm text-gray-600">Organize your content with QR codes</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">📤</span>
+                    <div>
+                      <p className="font-semibold text-gray-900">Upload Content</p>
+                      <p className="text-sm text-gray-600">Images, videos, audio, text & embeds</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">📊</span>
+                    <div>
+                      <p className="font-semibold text-gray-900">Track Analytics</p>
+                      <p className="text-sm text-gray-600">See how your content performs</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* AI Assistant info */}
+              <div className="bg-gradient-to-r from-purple-100 to-violet-100 rounded-2xl p-4 border-2 border-purple-200">
+                <div className="flex items-center gap-3 mb-2">
+                  <Bot size={24} className="text-purple-600" />
+                  <h4 className="font-bold text-gray-900">Need Help?</h4>
+                </div>
+                <p className="text-sm text-gray-700">
+                  Our <strong>FREE AI Assistant</strong> is available 24/7 to help you with anything! 
+                  Just click the chat icon anytime.
+                </p>
+              </div>
+              
+              {/* Done button */}
+              <button
+                onClick={handleWelcomeDone}
+                className="w-full bg-gradient-to-r from-purple-600 to-violet-600 text-white py-4 px-6 rounded-xl font-bold text-lg hover:opacity-90 transition-all transform hover:scale-105 shadow-lg"
+              >
+                Got It! Let's Go 🚀
+              </button>
+              
+              <p className="text-xs text-gray-400">
+                Click "Got It" to open your AI Assistant
+              </p>
+            </div>
           </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowPrompt(false);
-            }}
-            className="ml-2 hover:bg-white/20 p-1 rounded-full transition-colors"
-          >
-            <X size={18} />
-          </button>
         </div>
-      </div>
+      </>
     );
   }
+
+  // ✅ REMOVED: Dancing blinking prompt (lines 248-272 deleted)
+  // User didn't like it, so it's completely removed
 
   // Minimized State (Collapsed to right side)
   if (isMinimized && !isOpen) {
     return (
       <button
         onClick={openWidget}
-        className="fixed bottom-24 right-0 z-[9999] bg-gradient-to-r from-purple-600 to-violet-600 text-white p-4 rounded-l-2xl shadow-2xl hover:pr-6 transition-all duration-300 group flex items-center gap-2"
+        className="fixed bottom-24 right-0 z-[9999] bg-gradient-to-r from-purple-600 to-violet-600 text-white px-4 py-4 rounded-l-2xl shadow-2xl hover:pr-6 transition-all duration-300 group flex items-center gap-2"
         title="Open AI Assistant"
       >
-        <ChevronLeft size={24} className="group-hover:-translate-x-1 transition-transform" />
+        {/* ✅ CHANGED: "Hide" text instead of arrow icon */}
+        <span className="font-semibold text-sm group-hover:-translate-x-1 transition-transform">Hide</span>
         <Bot size={24} />
       </button>
     );
   }
 
-  // Floating Chat Button (Closed state)
+  // ✅ UPDATED: Floating Chat Button with PULSE EFFECT (like eye and mic icons)
   if (!isOpen && !isMinimized) {
     return (
       <button
         onClick={openWidget}
-        className="fixed bottom-24 right-6 z-[9999] bg-gradient-to-r from-purple-600 to-violet-600 text-white p-5 rounded-full shadow-2xl hover:scale-110 transition-transform duration-200 group"
+        className="fixed bottom-24 right-6 z-[9999] group"
         title="Open AI Assistant"
       >
-        <Bot size={32} className="group-hover:rotate-12 transition-transform" />
+        {/* Pulsing rings - same as eye and mic icons */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-20 h-20 rounded-full bg-purple-400/30 animate-ping"></div>
+        </div>
+        <div className="absolute inset-0 flex items-center justify-center" style={{ animationDelay: '0.2s' }}>
+          <div className="w-16 h-16 rounded-full bg-purple-500/40 animate-ping"></div>
+        </div>
+        
+        {/* Main button */}
+        <div className="relative bg-gradient-to-r from-purple-600 to-violet-600 text-white p-5 rounded-full shadow-2xl group-hover:scale-110 transition-transform duration-200">
+          <Bot size={32} className="group-hover:rotate-12 transition-transform" />
+        </div>
       </button>
     );
-  };
+  }
 
   // Full Chat Widget (Open state)
   return (
@@ -315,10 +407,11 @@ What can I help you with today?`,
         <div className="flex gap-2">
           <button
             onClick={minimizeWidget}
-            className="hover:bg-white/20 p-2 rounded-lg transition-colors"
+            className="hover:bg-white/20 px-3 py-2 rounded-lg transition-colors flex items-center gap-1"
             title="Minimize"
           >
-            <ChevronRight size={20} />
+            {/* ✅ CHANGED: "Hide" text instead of ChevronRight icon */}
+            <span className="text-sm font-semibold">Hide</span>
           </button>
           <button
             onClick={closeWidget}
