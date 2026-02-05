@@ -316,6 +316,7 @@ const UploadPage = () => {
         headers: {
           'Content-Type': 'multipart/form-data'
         },
+        timeout: 1800000,
         signal: abortControllerRef.current?.signal,
         onUploadProgress: (progressEvent) => {
           const { loaded, total } = progressEvent;

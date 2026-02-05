@@ -150,8 +150,8 @@ app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 // Set timeout for all routes (especially for file uploads)
 app.use((req, res, next) => {
   if (req.path.includes('/upload')) {
-    req.setTimeout(300000); // 5 minutes
-    res.setTimeout(300000);
+    req.setTimeout(1800000); // 5 minutes
+    res.setTimeout(1800000);
   }
   next();
 });
