@@ -657,9 +657,12 @@ const updateCampaignItemOrder = async (req, res) => {
       });
     }
 
+    // Store null instead of empty array to avoid Prisma Json conversion issues
+    const orderData = itemOrder.length > 0 ? itemOrder : null;
+
     await prisma.campaign.update({
       where: { id },
-      data: { itemOrder },
+      data: { itemOrder: orderData },
     });
 
     console.log(`✅ Campaign item order updated: ${campaign.name} (${itemOrder.length} items)`);
