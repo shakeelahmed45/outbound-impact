@@ -12,7 +12,7 @@ const GlobalAiChatWidget = ({ showBlinkingPrompt = false }) => {
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
   
-  // ✅ FIXED: Welcome modal state
+  // ✅ Welcome modal state
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   
   const messagesEndRef = useRef(null);
@@ -240,10 +240,10 @@ What can I help you with today?`,
     setIsOpen(false);
   };
 
-  // ✅ FIXED: Hide button now properly hides BOTH chat and icon
+  // ✅ FIXED: Hide button minimizes to right side
   const minimizeWidget = () => {
     setIsOpen(false);        // Close the chat
-    setIsMinimized(false);   // Don't show minimized button, go back to floating icon
+    setIsMinimized(true);    // Show minimized button on right side
   };
 
   // ✅ FIXED: Got it button now closes modal AND opens chatbot in ONE click
@@ -257,7 +257,7 @@ What can I help you with today?`,
     setIsMinimized(false);
   };
 
-  // ✅ UPDATED: Smaller, responsive welcome modal
+  // ✅ Welcome modal - Smaller & responsive
   if (showWelcomeModal) {
     return (
       <>
@@ -320,7 +320,21 @@ What can I help you with today?`,
     );
   }
 
-  // ✅ Floating Chat Button with PULSE EFFECT (like eye and mic icons)
+  // ✅ UPDATED: Minimized State (on right side) - SMALLER
+  if (isMinimized && !isOpen) {
+    return (
+      <button
+        onClick={openWidget}
+        className="fixed bottom-24 right-0 z-[9999] bg-gradient-to-r from-purple-600 to-violet-600 text-white px-3 py-3 rounded-l-xl shadow-2xl hover:pr-5 transition-all duration-300 group flex items-center gap-2"
+        title="Open AI Assistant"
+      >
+        <span className="font-semibold text-sm group-hover:-translate-x-1 transition-transform">Hide</span>
+        <Bot size={20} /> {/* ✅ SMALLER: 20px instead of 24px */}
+      </button>
+    );
+  }
+
+  // ✅ UPDATED: Floating Chat Button - SMALLER with pulse effect
   if (!isOpen && !isMinimized) {
     return (
       <button
@@ -328,17 +342,17 @@ What can I help you with today?`,
         className="fixed bottom-24 right-6 z-[9999] group"
         title="Open AI Assistant"
       >
-        {/* Pulsing rings - same as eye and mic icons */}
+        {/* ✅ SMALLER Pulsing rings */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-20 h-20 rounded-full bg-purple-400/30 animate-ping"></div>
+          <div className="w-16 h-16 rounded-full bg-purple-400/30 animate-ping"></div>
         </div>
         <div className="absolute inset-0 flex items-center justify-center" style={{ animationDelay: '0.2s' }}>
-          <div className="w-16 h-16 rounded-full bg-purple-500/40 animate-ping"></div>
+          <div className="w-14 h-14 rounded-full bg-purple-500/40 animate-ping"></div>
         </div>
         
-        {/* Main button */}
-        <div className="relative bg-gradient-to-r from-purple-600 to-violet-600 text-white p-5 rounded-full shadow-2xl group-hover:scale-110 transition-transform duration-200">
-          <Bot size={32} className="group-hover:rotate-12 transition-transform" />
+        {/* ✅ SMALLER Main button */}
+        <div className="relative bg-gradient-to-r from-purple-600 to-violet-600 text-white p-4 rounded-full shadow-2xl group-hover:scale-110 transition-transform duration-200">
+          <Bot size={24} className="group-hover:rotate-12 transition-transform" /> {/* ✅ SMALLER: 24px instead of 32px */}
         </div>
       </button>
     );
