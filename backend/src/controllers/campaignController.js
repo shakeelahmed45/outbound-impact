@@ -4,6 +4,34 @@ const QRCode = require('qrcode');
 const axios = require('axios');
 const { nanoid } = require('nanoid');
 
+// Helper function to sort items by custom order
+const applyCustomOrder = (items, itemOrder) => {
+  if (!itemOrder || itemOrder.length === 0) {
+    // No custom order, return items as-is (they're already sorted by createdAt desc)
+    return items;
+  }
+
+  // Create a map of item positions based on itemOrder
+  const orderMap = new Map();
+  itemOrder.forEach((id, index) => {
+    orderMap.set(id, index);
+  });
+
+  // Sort items: items in itemOrder come first (in that order), then remaining items by createdAt
+  return items.sort((a, b) => {
+    const aIndex = orderMap.has(a.id) ? orderMap.get(a.id) : Infinity;
+    const bIndex = orderMap.has(b.id) ? orderMap.get(b.id) : Infinity;
+
+    if (aIndex === Infinity && bIndex === Infinity) {
+      // Both items not in order, sort by createdAt desc
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    }
+
+    return aIndex - bIndex;
+  });
+};
+
+
 // Generate unique slug
 const generateUniqueSlug = async () => {
   let slug;
@@ -377,6 +405,7 @@ const getPublicCampaign = async (req, res) => {
         createdAt: true,
         passwordProtected: true,
         passwordHash: true,
+        itemOrder: true, // ✅ Fetch custom order
         items: {
           select: {
             id: true,
@@ -444,12 +473,16 @@ const getPublicCampaign = async (req, res) => {
       console.error('⚠️ Could not fetch user name:', userError.message);
     }
 
-    // Remove passwordHash before sending
-    const { passwordHash, ...campaignWithoutHash } = campaign;
+    // ✅ Apply custom item order
+    const orderedItems = applyCustomOrder(campaign.items, campaign.itemOrder);
+    console.log('🎨 Applied custom order:', campaign.itemOrder?.length > 0 ? 'Yes' : 'No (using default)');
+
+    // Remove passwordHash and itemOrder before sending
+    const { passwordHash, itemOrder, ...campaignWithoutHash } = campaign;
 
     const campaignData = {
       ...campaignWithoutHash,
-      items: campaign.items.map(item => ({
+      items: orderedItems.map(item => ({
         ...item,
         fileSize: item.fileSize ? item.fileSize.toString() : '0',
       })),
@@ -495,9 +528,20 @@ const verifyCampaignPassword = async (req, res) => {
 
     const campaign = await prisma.campaign.findUnique({
       where: { slug },
-      include: {
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        description: true,
+        category: true,
+        logoUrl: true,
+        qrCodeUrl: true,
+        userId: true,
+        createdAt: true,
+        passwordProtected: true,
+        passwordHash: true,
+        itemOrder: true, // ✅ Fetch custom order
         items: {
-          orderBy: { createdAt: 'desc' },
           select: {
             id: true,
             slug: true,
@@ -515,6 +559,7 @@ const verifyCampaignPassword = async (req, res) => {
             fileSize: true,
             createdAt: true,
           },
+          orderBy: { createdAt: 'desc' },
         },
       },
     });
@@ -563,12 +608,16 @@ const verifyCampaignPassword = async (req, res) => {
       console.error('⚠️ Could not fetch user name:', userError.message);
     }
 
+    // ✅ Apply custom item order
+    const orderedItems = applyCustomOrder(campaign.items, campaign.itemOrder);
+    console.log('🎨 Applied custom order:', campaign.itemOrder?.length > 0 ? 'Yes' : 'No (using default)');
+
     // Remove sensitive data
-    const { passwordHash, userId, ...campaignWithoutHash } = campaign;
+    const { passwordHash, userId, itemOrder, ...campaignWithoutHash } = campaign;
 
     const campaignData = {
       ...campaignWithoutHash,
-      items: campaign.items.map(item => ({
+      items: orderedItems.map(item => ({
         ...item,
         fileSize: item.fileSize ? item.fileSize.toString() : '0',
       })),
@@ -591,6 +640,49 @@ const verifyCampaignPassword = async (req, res) => {
   }
 };
 
+// ✅ Update campaign item order
+const updateCampaignOrder = async (req, res) => {
+  try {
+    const userId = req.effectiveUserId;
+    const { slug } = req.params;
+    const { itemOrder } = req.body;
+
+    console.log(`🎨 Updating item order for campaign: ${slug}`);
+    console.log(`📦 New order:`, itemOrder);
+
+    // Find campaign by slug and verify ownership
+    const campaign = await prisma.campaign.findFirst({
+      where: { slug, userId },
+    });
+
+    if (!campaign) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Campaign not found or you do not have permission to edit it',
+      });
+    }
+
+    // Update the itemOrder
+    await prisma.campaign.update({
+      where: { id: campaign.id },
+      data: { itemOrder: itemOrder || [] },
+    });
+
+    console.log(`✅ Item order updated successfully for campaign: ${campaign.name}`);
+
+    res.json({
+      status: 'success',
+      message: 'Item order updated successfully',
+    });
+  } catch (error) {
+    console.error('❌ Update campaign order error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to update item order',
+    });
+  }
+};
+
 module.exports = {
   getUserCampaigns,
   createCampaign,
@@ -599,4 +691,5 @@ module.exports = {
   assignItemToCampaign,
   getPublicCampaign,
   verifyCampaignPassword,
+  updateCampaignOrder,
 };

@@ -286,8 +286,8 @@ const PublicCampaignViewer = () => {
 
   // 🎨 DRAG-AND-DROP STATE
   const [isCustomizeMode, setIsCustomizeMode] = useState(false);
-  const [customItemOrder, setCustomItemOrder] = useState([]);
   const [draggedItem, setDraggedItem] = useState(null);
+  const [savingOrder, setSavingOrder] = useState(false);
 
   // ✅ Check if user can customize content order
   const canCustomizeContent = () => {
@@ -305,67 +305,90 @@ const PublicCampaignViewer = () => {
   const isCustomizeAllowed = canCustomizeContent();
 
   // 🎨 DRAG-AND-DROP HELPER FUNCTIONS
-  const getOrderStorageKey = () => `campaign_order_${slug}`;
-
-  // Load custom order on mount - only for account holder
-  useEffect(() => {
-    if (campaign?.items && isCustomizeAllowed) {
-      const stored = localStorage.getItem(getOrderStorageKey());
-      if (stored) {
-        try {
-          const orderIds = JSON.parse(stored);
-          setCustomItemOrder(orderIds);
-          console.log('✅ Loaded custom order:', orderIds.length, 'items');
-        } catch (e) {
-          console.error('Failed to load custom order:', e);
-        }
-      }
-    }
-  }, [campaign, slug, isCustomizeAllowed]);
-
-  // Get ordered items
+  
+  // Get ordered items - now just returns campaign.items (backend handles sorting)
   const getOrderedItems = () => {
-    if (!campaign?.items) return [];
-    
-    // Only apply custom order if user is the account holder
-    if (customItemOrder.length > 0 && isCustomizeAllowed) {
-      const itemsMap = new Map(campaign.items.map(item => [item.id, item]));
-      const orderedItems = customItemOrder
-        .map(id => itemsMap.get(id))
-        .filter(Boolean);
-      
-      // Add new items not in custom order
-      campaign.items.forEach(item => {
-        if (!customItemOrder.includes(item.id)) {
-          orderedItems.push(item);
-        }
-      });
-      
-      return orderedItems;
-    }
-    
-    return campaign.items;
+    return campaign?.items || [];
   };
 
-  // Save order to localStorage - only for account holder
-  const saveOrder = (items) => {
+  // Save order to backend - only for account holder
+  const saveOrder = async (items) => {
     if (!isCustomizeAllowed) return;
     
-    const orderIds = items.map(item => item.id);
-    localStorage.setItem(getOrderStorageKey(), JSON.stringify(orderIds));
-    setCustomItemOrder(orderIds);
-    console.log('💾 Saved custom order:', orderIds.length, 'items');
+    try {
+      setSavingOrder(true);
+      const orderIds = items.map(item => item.id);
+      
+      console.log('💾 Saving custom order to backend:', orderIds.length, 'items');
+      
+      const token = localStorage.getItem('token');
+      const response = await axios.put(
+        `${import.meta.env.VITE_API_URL}/campaigns/${slug}/order`,
+        { itemOrder: orderIds },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      
+      if (response.data.status === 'success') {
+        console.log('✅ Order saved successfully to backend');
+        
+        // Update local campaign state with new order
+        setCampaign(prev => ({
+          ...prev,
+          items: items,
+        }));
+      }
+    } catch (error) {
+      console.error('❌ Failed to save order:', error);
+      alert('Failed to save order. Please try again.');
+    } finally {
+      setSavingOrder(false);
+    }
   };
 
   // Reset order to default - only for account holder
-  const resetOrder = () => {
+  const resetOrder = async () => {
     if (!isCustomizeAllowed) return;
     
-    if (confirm('Reset items to default order?')) {
-      localStorage.removeItem(getOrderStorageKey());
-      setCustomItemOrder([]);
-      setIsCustomizeMode(false);
-      console.log('🔄 Reset to default order');
+    if (confirm('Reset items to default order (sorted by creation date)?')) {
+      try {
+        setSavingOrder(true);
+        console.log('🔄 Resetting to default order');
+        
+        const token = localStorage.getItem('token');
+        const response = await axios.put(
+          `${import.meta.env.VITE_API_URL}/campaigns/${slug}/order`,
+          { itemOrder: [] }, // Empty array = use default order
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        
+        if (response.data.status === 'success') {
+          console.log('✅ Order reset successfully');
+          
+          // Reload campaign to get default order from backend
+          const campaignResponse = await axios.get(
+            `${import.meta.env.VITE_API_URL}/campaigns/public/${slug}`
+          );
+          
+          if (campaignResponse.data.status === 'success') {
+            setCampaign(campaignResponse.data.campaign);
+          }
+          
+          setIsCustomizeMode(false);
+        }
+      } catch (error) {
+        console.error('❌ Failed to reset order:', error);
+        alert('Failed to reset order. Please try again.');
+      } finally {
+        setSavingOrder(false);
+      }
     }
   };
 
@@ -1296,22 +1319,26 @@ const PublicCampaignViewer = () => {
                 <div className="flex flex-wrap items-center gap-3">
                   <button
                     onClick={() => setIsCustomizeMode(!isCustomizeMode)}
+                    disabled={savingOrder}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
                       isCustomizeMode
                         ? 'bg-gradient-to-r from-primary to-secondary text-white shadow-lg'
                         : 'bg-white text-primary border-2 border-primary hover:bg-purple-50'
-                    }`}
+                    } ${savingOrder ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
-                    {isCustomizeMode ? 'Done Customizing' : 'Customize Order'}
+                    {savingOrder ? 'Saving...' : (isCustomizeMode ? 'Done Customizing' : 'Customize Order')}
                   </button>
 
-                  {customItemOrder.length > 0 && (
+                  {campaign?.items?.length > 0 && (
                     <button
                       onClick={resetOrder}
-                      className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border-2 border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-all"
+                      disabled={savingOrder}
+                      className={`flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border-2 border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-all ${
+                        savingOrder ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1321,10 +1348,17 @@ const PublicCampaignViewer = () => {
                   )}
                 </div>
 
-                {isCustomizeMode && (
+                {isCustomizeMode && !savingOrder && (
                   <div className="text-sm text-gray-600 bg-blue-50 px-4 py-2 rounded-lg border border-blue-200 flex items-center gap-2">
                     <span className="text-lg">💡</span>
                     <span className="font-medium">Drag items to reorder</span>
+                  </div>
+                )}
+                
+                {savingOrder && (
+                  <div className="text-sm text-gray-600 bg-green-50 px-4 py-2 rounded-lg border border-green-200 flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="font-medium">Saving order...</span>
                   </div>
                 )}
               </div>
