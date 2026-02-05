@@ -12,7 +12,7 @@ const GlobalAiChatWidget = ({ showBlinkingPrompt = false }) => {
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
   
-  // ✅ NEW: Welcome modal state
+  // ✅ FIXED: Welcome modal state
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   
   const messagesEndRef = useRef(null);
@@ -21,7 +21,7 @@ const GlobalAiChatWidget = ({ showBlinkingPrompt = false }) => {
   const previousMessageCountRef = useRef(0);
   const shouldAutoScrollRef = useRef(true);
 
-  // ✅ NEW: Check if first-time user and show welcome modal
+  // ✅ Check if first-time user and show welcome modal
   useEffect(() => {
     const hasSeenWelcome = localStorage.getItem('hasSeenWelcome');
     if (!hasSeenWelcome && user) {
@@ -162,7 +162,7 @@ What can I help you with today?`,
     // Add user message optimistically
     const userMsg = {
       id: `temp-${Date.now()}`,
-      message: messageContent,  // ✅ FIXED: Use 'message' not 'content'
+      message: messageContent,
       senderType: 'USER',
       isAiGenerated: false,
       isUser: true,
@@ -193,7 +193,7 @@ What can I help you with today?`,
           
           const aiMsg = {
             id: response.data.aiResponse.id || `ai-${Date.now()}`,
-            message: response.data.aiResponse.response,  // ✅ FIXED: Use 'message' not 'content'
+            message: response.data.aiResponse.response,
             senderType: 'ADMIN',
             isAiGenerated: true,
             isUser: false,
@@ -240,107 +240,79 @@ What can I help you with today?`,
     setIsOpen(false);
   };
 
+  // ✅ FIXED: Hide button now properly hides BOTH chat and icon
   const minimizeWidget = () => {
-    setIsMinimized(true);
-    setIsOpen(false);
+    setIsOpen(false);        // Close the chat
+    setIsMinimized(false);   // Don't show minimized button, go back to floating icon
   };
 
-  // ✅ NEW: Handle welcome modal done button
+  // ✅ FIXED: Got it button now closes modal AND opens chatbot in ONE click
   const handleWelcomeDone = () => {
-    localStorage.setItem('hasSeenWelcome', 'true');
+    // Close modal and mark as seen
     setShowWelcomeModal(false);
-    // Open chatbot after closing welcome modal
-    openWidget();
+    localStorage.setItem('hasSeenWelcome', 'true');
+    
+    // Open chatbot immediately
+    setIsOpen(true);
+    setIsMinimized(false);
   };
 
-  // ✅ NEW: Welcome Modal
+  // ✅ UPDATED: Smaller, responsive welcome modal
   if (showWelcomeModal) {
     return (
       <>
         {/* Backdrop */}
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9998] animate-fadeIn" />
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9998] animate-fadeIn" onClick={handleWelcomeDone} />
         
-        {/* Welcome Modal */}
+        {/* Welcome Modal - SMALLER & RESPONSIVE */}
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8 animate-slideUp">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-slideUp">
             {/* Decorative gradient header */}
-            <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-purple-600 via-violet-600 to-purple-600 rounded-t-3xl"></div>
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-purple-600 via-violet-600 to-purple-600 rounded-t-2xl"></div>
             
             {/* Content */}
-            <div className="text-center space-y-6 mt-4">
+            <div className="text-center space-y-4 mt-2">
               {/* Icon with pulsing effect */}
               <div className="relative inline-flex items-center justify-center">
                 {/* Pulsing rings */}
-                <div className="absolute w-24 h-24 rounded-full bg-purple-200 animate-ping"></div>
-                <div className="absolute w-20 h-20 rounded-full bg-purple-300 animate-ping" style={{ animationDelay: '0.2s' }}></div>
+                <div className="absolute w-16 h-16 rounded-full bg-purple-200 animate-ping"></div>
+                <div className="absolute w-14 h-14 rounded-full bg-purple-300 animate-ping" style={{ animationDelay: '0.2s' }}></div>
                 
                 {/* Icon */}
-                <div className="relative bg-gradient-to-r from-purple-600 to-violet-600 p-6 rounded-full">
-                  <Bot size={48} className="text-white" />
+                <div className="relative bg-gradient-to-r from-purple-600 to-violet-600 p-4 rounded-full">
+                  <Bot size={32} className="text-white" />
                 </div>
               </div>
               
               {/* Welcome text */}
               <div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-2">
-                  Welcome to Outbound Impact! 🎉
+                <h2 className="text-2xl font-bold text-gray-900 mb-1">
+                  Welcome! 🎉
                 </h2>
-                <p className="text-lg text-gray-600">
-                  {user?.name ? `Hi ${user.name.split(' ')[0]}!` : 'Hello!'} We're excited to have you here.
+                <p className="text-sm text-gray-600">
+                  {user?.name ? `Hi ${user.name.split(' ')[0]}!` : 'Hello!'} We're excited to have you.
                 </p>
-              </div>
-              
-              {/* Features highlight */}
-              <div className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-2xl p-6 space-y-3 text-left">
-                <h3 className="font-bold text-gray-900 text-center mb-4">Get Started Quickly:</h3>
-                <div className="space-y-2">
-                  <div className="flex items-start gap-3">
-                    <span className="text-2xl">🎨</span>
-                    <div>
-                      <p className="font-semibold text-gray-900">Create Streams</p>
-                      <p className="text-sm text-gray-600">Organize your content with QR codes</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <span className="text-2xl">📤</span>
-                    <div>
-                      <p className="font-semibold text-gray-900">Upload Content</p>
-                      <p className="text-sm text-gray-600">Images, videos, audio, text & embeds</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <span className="text-2xl">📊</span>
-                    <div>
-                      <p className="font-semibold text-gray-900">Track Analytics</p>
-                      <p className="text-sm text-gray-600">See how your content performs</p>
-                    </div>
-                  </div>
-                </div>
               </div>
               
               {/* AI Assistant info */}
-              <div className="bg-gradient-to-r from-purple-100 to-violet-100 rounded-2xl p-4 border-2 border-purple-200">
-                <div className="flex items-center gap-3 mb-2">
-                  <Bot size={24} className="text-purple-600" />
-                  <h4 className="font-bold text-gray-900">Need Help?</h4>
+              <div className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl p-4 border border-purple-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <Bot size={20} className="text-purple-600" />
+                  <h4 className="font-bold text-gray-900 text-sm">Need Help?</h4>
                 </div>
-                <p className="text-sm text-gray-700">
-                  Our <strong>FREE AI Assistant</strong> is available 24/7 to help you with anything! 
-                  Just click the chat icon anytime.
+                <p className="text-xs text-gray-700">
+                  Our <strong>FREE AI Assistant</strong> is here 24/7 to help you! 
+                  Click below to get started.
                 </p>
               </div>
               
-              {/* Done button */}
+              {/* Got it button */}
               <button
                 onClick={handleWelcomeDone}
-                className="w-full bg-gradient-to-r from-purple-600 to-violet-600 text-white py-4 px-6 rounded-xl font-bold text-lg hover:opacity-90 transition-all transform hover:scale-105 shadow-lg"
+                className="w-full bg-gradient-to-r from-purple-600 to-violet-600 text-white py-3 px-6 rounded-xl font-bold text-base hover:opacity-90 transition-all transform hover:scale-105 shadow-lg"
               >
                 Got It! Let's Go 🚀
               </button>
-              
-              <p className="text-xs text-gray-400">
-                Click "Got It" to open your AI Assistant
-              </p>
             </div>
           </div>
         </div>
@@ -348,25 +320,7 @@ What can I help you with today?`,
     );
   }
 
-  // ✅ REMOVED: Dancing blinking prompt (lines 248-272 deleted)
-  // User didn't like it, so it's completely removed
-
-  // Minimized State (Collapsed to right side)
-  if (isMinimized && !isOpen) {
-    return (
-      <button
-        onClick={openWidget}
-        className="fixed bottom-24 right-0 z-[9999] bg-gradient-to-r from-purple-600 to-violet-600 text-white px-4 py-4 rounded-l-2xl shadow-2xl hover:pr-6 transition-all duration-300 group flex items-center gap-2"
-        title="Open AI Assistant"
-      >
-        {/* ✅ CHANGED: "Hide" text instead of arrow icon */}
-        <span className="font-semibold text-sm group-hover:-translate-x-1 transition-transform">Hide</span>
-        <Bot size={24} />
-      </button>
-    );
-  }
-
-  // ✅ UPDATED: Floating Chat Button with PULSE EFFECT (like eye and mic icons)
+  // ✅ Floating Chat Button with PULSE EFFECT (like eye and mic icons)
   if (!isOpen && !isMinimized) {
     return (
       <button
@@ -408,9 +362,8 @@ What can I help you with today?`,
           <button
             onClick={minimizeWidget}
             className="hover:bg-white/20 px-3 py-2 rounded-lg transition-colors flex items-center gap-1"
-            title="Minimize"
+            title="Hide Chat"
           >
-            {/* ✅ CHANGED: "Hide" text instead of ChevronRight icon */}
             <span className="text-sm font-semibold">Hide</span>
           </button>
           <button
@@ -429,7 +382,6 @@ What can I help you with today?`,
         className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50"
       >
         {messages.map((message) => {
-          // ✅ FIXED: Support both 'message' and 'content' fields
           const messageText = message.message || message.content || '';
           const isUser = message.isUser || message.senderType === 'USER';
           const isAi = message.isAi || message.isAiGenerated;
