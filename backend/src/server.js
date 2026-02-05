@@ -79,6 +79,20 @@ setInterval(async () => {
   }
 }, 3 * 60 * 60 * 1000); // Every 3 hours
 
+// Fix: Clean up invalid itemOrder values (empty arrays) that Prisma can't read as Json
+(async () => {
+  try {
+    const result = await prisma.$executeRawUnsafe(
+      `UPDATE "Campaign" SET "itemOrder" = NULL WHERE "itemOrder"::text = '[]'`
+    );
+    if (result > 0) {
+      console.log(`✅ Fixed ${result} campaigns with invalid itemOrder`);
+    }
+  } catch (e) {
+    // Column may not exist yet, ignore
+  }
+})();
+
 // 3. Graceful Shutdown
 // Proper cleanup on termination
 const gracefulShutdown = async (signal) => {
