@@ -377,7 +377,6 @@ const getPublicCampaign = async (req, res) => {
         createdAt: true,
         passwordProtected: true,
         passwordHash: true,
-        itemOrder: true,
         items: {
           select: {
             id: true,
@@ -448,20 +447,28 @@ const getPublicCampaign = async (req, res) => {
     // Remove passwordHash before sending
     const { passwordHash, ...campaignWithoutHash } = campaign;
 
-    // Apply custom item order if it exists
+    // Fetch itemOrder via raw query to avoid Prisma Json conversion error
     let orderedItems = campaign.items;
-    if (Array.isArray(campaign.itemOrder) && campaign.itemOrder.length > 0) {
-      const itemsMap = new Map(campaign.items.map(item => [item.id, item]));
-      const sorted = campaign.itemOrder
-        .map(id => itemsMap.get(id))
-        .filter(Boolean);
-      // Append any items not in the custom order (e.g. newly added)
-      campaign.items.forEach(item => {
-        if (!campaign.itemOrder.includes(item.id)) {
-          sorted.push(item);
-        }
-      });
-      orderedItems = sorted;
+    try {
+      const rawResult = await prisma.$queryRawUnsafe(
+        `SELECT "itemOrder" FROM "Campaign" WHERE "id" = $1`,
+        campaign.id
+      );
+      const itemOrder = rawResult?.[0]?.itemOrder;
+      if (Array.isArray(itemOrder) && itemOrder.length > 0) {
+        const itemsMap = new Map(campaign.items.map(item => [item.id, item]));
+        const sorted = itemOrder
+          .map(id => itemsMap.get(id))
+          .filter(Boolean);
+        campaign.items.forEach(item => {
+          if (!itemOrder.includes(item.id)) {
+            sorted.push(item);
+          }
+        });
+        orderedItems = sorted;
+      }
+    } catch (orderError) {
+      console.error('⚠️ Could not fetch item order, using default:', orderError.message);
     }
 
     const campaignData = {
@@ -512,7 +519,18 @@ const verifyCampaignPassword = async (req, res) => {
 
     const campaign = await prisma.campaign.findUnique({
       where: { slug },
-      include: {
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        description: true,
+        category: true,
+        logoUrl: true,
+        qrCodeUrl: true,
+        userId: true,
+        createdAt: true,
+        passwordProtected: true,
+        passwordHash: true,
         items: {
           orderBy: { createdAt: 'desc' },
           select: {
@@ -535,8 +553,6 @@ const verifyCampaignPassword = async (req, res) => {
         },
       },
     });
-
-    // Note: campaign.itemOrder is available via include
 
     if (!campaign) {
       console.log(`❌ Campaign not found: ${slug}`);
@@ -585,19 +601,28 @@ const verifyCampaignPassword = async (req, res) => {
     // Remove sensitive data
     const { passwordHash, userId, ...campaignWithoutHash } = campaign;
 
-    // Apply custom item order if it exists
+    // Fetch itemOrder via raw query to avoid Prisma Json conversion error
     let orderedItems = campaign.items;
-    if (Array.isArray(campaign.itemOrder) && campaign.itemOrder.length > 0) {
-      const itemsMap = new Map(campaign.items.map(item => [item.id, item]));
-      const sorted = campaign.itemOrder
-        .map(id => itemsMap.get(id))
-        .filter(Boolean);
-      campaign.items.forEach(item => {
-        if (!campaign.itemOrder.includes(item.id)) {
-          sorted.push(item);
-        }
-      });
-      orderedItems = sorted;
+    try {
+      const rawResult = await prisma.$queryRawUnsafe(
+        `SELECT "itemOrder" FROM "Campaign" WHERE "id" = $1`,
+        campaign.id
+      );
+      const itemOrder = rawResult?.[0]?.itemOrder;
+      if (Array.isArray(itemOrder) && itemOrder.length > 0) {
+        const itemsMap = new Map(campaign.items.map(item => [item.id, item]));
+        const sorted = itemOrder
+          .map(id => itemsMap.get(id))
+          .filter(Boolean);
+        campaign.items.forEach(item => {
+          if (!itemOrder.includes(item.id)) {
+            sorted.push(item);
+          }
+        });
+        orderedItems = sorted;
+      }
+    } catch (orderError) {
+      console.error('⚠️ Could not fetch item order, using default:', orderError.message);
     }
 
     const campaignData = {
