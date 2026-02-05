@@ -447,14 +447,26 @@ const getPublicCampaign = async (req, res) => {
     // Remove passwordHash before sending
     const { passwordHash, ...campaignWithoutHash } = campaign;
 
-    // Fetch itemOrder via raw query to avoid Prisma Json conversion error
+    // Fetch itemOrder safely - use try/catch to handle invalid stored values
     let orderedItems = campaign.items;
     try {
       const rawResult = await prisma.$queryRawUnsafe(
-        `SELECT "itemOrder" FROM "Campaign" WHERE "id" = $1`,
+        `SELECT "itemOrder"::text as "itemOrderText" FROM "Campaign" WHERE "id" = $1`,
         campaign.id
       );
-      const itemOrder = rawResult?.[0]?.itemOrder;
+      const rawText = rawResult?.[0]?.itemOrderText;
+      let itemOrder = null;
+
+      if (rawText && rawText !== 'null' && rawText !== '[]') {
+        try {
+          itemOrder = JSON.parse(rawText);
+        } catch (e) {
+          itemOrder = null;
+        }
+      }
+
+      console.log('📋 itemOrder loaded:', itemOrder ? `${itemOrder.length} items` : 'none');
+
       if (Array.isArray(itemOrder) && itemOrder.length > 0) {
         const itemsMap = new Map(campaign.items.map(item => [item.id, item]));
         const sorted = itemOrder
@@ -466,6 +478,7 @@ const getPublicCampaign = async (req, res) => {
           }
         });
         orderedItems = sorted;
+        console.log('✅ Applied custom order:', sorted.map(i => i.title).join(', '));
       }
     } catch (orderError) {
       console.error('⚠️ Could not fetch item order, using default:', orderError.message);
@@ -601,14 +614,24 @@ const verifyCampaignPassword = async (req, res) => {
     // Remove sensitive data
     const { passwordHash, userId, ...campaignWithoutHash } = campaign;
 
-    // Fetch itemOrder via raw query to avoid Prisma Json conversion error
+    // Fetch itemOrder safely - use try/catch to handle invalid stored values
     let orderedItems = campaign.items;
     try {
       const rawResult = await prisma.$queryRawUnsafe(
-        `SELECT "itemOrder" FROM "Campaign" WHERE "id" = $1`,
+        `SELECT "itemOrder"::text as "itemOrderText" FROM "Campaign" WHERE "id" = $1`,
         campaign.id
       );
-      const itemOrder = rawResult?.[0]?.itemOrder;
+      const rawText = rawResult?.[0]?.itemOrderText;
+      let itemOrder = null;
+
+      if (rawText && rawText !== 'null' && rawText !== '[]') {
+        try {
+          itemOrder = JSON.parse(rawText);
+        } catch (e) {
+          itemOrder = null;
+        }
+      }
+
       if (Array.isArray(itemOrder) && itemOrder.length > 0) {
         const itemsMap = new Map(campaign.items.map(item => [item.id, item]));
         const sorted = itemOrder
@@ -664,7 +687,10 @@ const updateCampaignItemOrder = async (req, res) => {
     const { id } = req.params;
     const { itemOrder } = req.body;
 
+    console.log(`📦 Reorder request: campaignId=${id}, userId=${userId}, items=${Array.isArray(itemOrder) ? itemOrder.length : 'not-array'}`);
+
     if (!Array.isArray(itemOrder)) {
+      console.log('❌ itemOrder is not an array:', typeof itemOrder);
       return res.status(400).json({
         status: 'error',
         message: 'itemOrder must be an array of item IDs',
@@ -676,6 +702,7 @@ const updateCampaignItemOrder = async (req, res) => {
     });
 
     if (!campaign) {
+      console.log(`❌ Campaign not found for id=${id}, userId=${userId}`);
       return res.status(404).json({
         status: 'error',
         message: 'Campaign not found',
@@ -690,7 +717,13 @@ const updateCampaignItemOrder = async (req, res) => {
       data: { itemOrder: orderData },
     });
 
-    console.log(`✅ Campaign item order updated: ${campaign.name} (${itemOrder.length} items)`);
+    // Verify the save by reading it back
+    const verifyResult = await prisma.$queryRawUnsafe(
+      `SELECT "itemOrder"::text as "itemOrderText" FROM "Campaign" WHERE "id" = $1`,
+      id
+    );
+    console.log(`✅ Campaign item order saved: ${campaign.name} (${itemOrder.length} items)`);
+    console.log(`📋 Verified stored value: ${verifyResult?.[0]?.itemOrderText?.substring(0, 100)}...`);
 
     res.json({
       status: 'success',
