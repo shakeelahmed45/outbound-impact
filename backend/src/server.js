@@ -79,6 +79,36 @@ setInterval(async () => {
   }
 }, 3 * 60 * 60 * 1000); // Every 3 hours
 
+// Fix: Clean up invalid itemOrder values that Prisma corrupted (stored as objects instead of arrays)
+(async () => {
+  try {
+    // Fix empty arrays
+    await prisma.$executeRawUnsafe(
+      `UPDATE "Campaign" SET "itemOrder" = NULL WHERE "itemOrder"::text = '[]'`
+    );
+    // Fix object-format arrays: {"0":"id1","1":"id2"} → convert to proper array
+    const corrupted = await prisma.$queryRawUnsafe(
+      `SELECT "id", "itemOrder"::text as "itemOrderText" FROM "Campaign" WHERE "itemOrder" IS NOT NULL AND "itemOrder"::text LIKE '{%'`
+    );
+    for (const row of corrupted) {
+      try {
+        const obj = JSON.parse(row.itemOrderText);
+        const arr = Object.keys(obj).sort((a, b) => Number(a) - Number(b)).map(k => obj[k]);
+        await prisma.$executeRawUnsafe(
+          `UPDATE "Campaign" SET "itemOrder" = $1::jsonb WHERE "id" = $2`,
+          JSON.stringify(arr),
+          row.id
+        );
+        console.log(`✅ Fixed corrupted itemOrder for campaign ${row.id}`);
+      } catch (e) {
+        // Skip rows that can't be fixed
+      }
+    }
+  } catch (e) {
+    // Column may not exist yet, ignore
+  }
+})();
+
 // 3. Graceful Shutdown
 // Proper cleanup on termination
 const gracefulShutdown = async (signal) => {

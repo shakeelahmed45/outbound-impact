@@ -419,7 +419,7 @@ const getPublicCampaign = async (req, res) => {
             fileSize: true,
             buttonText: true,
             buttonUrl: true,
-            sharingEnabled: true, // ✅ CRITICAL FIX: Added sharingEnabled field!
+            sharingEnabled: true,
             createdAt: true,
           },
           orderBy: { createdAt: 'desc' },
@@ -479,6 +479,51 @@ const getPublicCampaign = async (req, res) => {
 
     // Remove passwordHash and itemOrder before sending
     const { passwordHash, itemOrder, ...campaignWithoutHash } = campaign;
+
+    // Fetch itemOrder safely - use try/catch to handle invalid stored values
+    let orderedItems = campaign.items;
+    try {
+      const rawResult = await prisma.$queryRawUnsafe(
+        `SELECT "itemOrder"::text as "itemOrderText" FROM "Campaign" WHERE "id" = $1`,
+        campaign.id
+      );
+      const rawText = rawResult?.[0]?.itemOrderText;
+      let itemOrder = null;
+
+      if (rawText && rawText !== 'null' && rawText !== '[]') {
+        try {
+          const parsed = JSON.parse(rawText);
+          // Handle both array format and corrupted object format from Prisma
+          if (Array.isArray(parsed)) {
+            itemOrder = parsed;
+          } else if (parsed && typeof parsed === 'object') {
+            // Prisma stored array as {"0":"id1","1":"id2"} - convert back to array
+            itemOrder = Object.keys(parsed).sort((a, b) => Number(a) - Number(b)).map(k => parsed[k]);
+            console.log('⚠️ Converted object-format itemOrder to array');
+          }
+        } catch (e) {
+          itemOrder = null;
+        }
+      }
+
+      console.log('📋 itemOrder loaded:', Array.isArray(itemOrder) ? `${itemOrder.length} items` : 'none');
+
+      if (Array.isArray(itemOrder) && itemOrder.length > 0) {
+        const itemsMap = new Map(campaign.items.map(item => [item.id, item]));
+        const sorted = itemOrder
+          .map(id => itemsMap.get(id))
+          .filter(Boolean);
+        campaign.items.forEach(item => {
+          if (!itemOrder.includes(item.id)) {
+            sorted.push(item);
+          }
+        });
+        orderedItems = sorted;
+        console.log('✅ Applied custom order:', sorted.map(i => i.title).join(', '));
+      }
+    } catch (orderError) {
+      console.error('⚠️ Could not fetch item order, using default:', orderError.message);
+    }
 
     const campaignData = {
       ...campaignWithoutHash,
@@ -540,7 +585,6 @@ const verifyCampaignPassword = async (req, res) => {
         createdAt: true,
         passwordProtected: true,
         passwordHash: true,
-        itemOrder: true, // ✅ Fetch custom order
         items: {
           select: {
             id: true,
@@ -555,7 +599,7 @@ const verifyCampaignPassword = async (req, res) => {
             buttonText: true,
             buttonUrl: true,
             attachments: true,
-            sharingEnabled: true, // ✅ CRITICAL FIX: Added sharingEnabled field!
+            sharingEnabled: true,
             fileSize: true,
             createdAt: true,
           },
@@ -615,6 +659,45 @@ const verifyCampaignPassword = async (req, res) => {
     // Remove sensitive data
     const { passwordHash, userId, itemOrder, ...campaignWithoutHash } = campaign;
 
+    // Fetch itemOrder safely - use try/catch to handle invalid stored values
+    let orderedItems = campaign.items;
+    try {
+      const rawResult = await prisma.$queryRawUnsafe(
+        `SELECT "itemOrder"::text as "itemOrderText" FROM "Campaign" WHERE "id" = $1`,
+        campaign.id
+      );
+      const rawText = rawResult?.[0]?.itemOrderText;
+      let itemOrder = null;
+
+      if (rawText && rawText !== 'null' && rawText !== '[]') {
+        try {
+          const parsed = JSON.parse(rawText);
+          if (Array.isArray(parsed)) {
+            itemOrder = parsed;
+          } else if (parsed && typeof parsed === 'object') {
+            itemOrder = Object.keys(parsed).sort((a, b) => Number(a) - Number(b)).map(k => parsed[k]);
+          }
+        } catch (e) {
+          itemOrder = null;
+        }
+      }
+
+      if (Array.isArray(itemOrder) && itemOrder.length > 0) {
+        const itemsMap = new Map(campaign.items.map(item => [item.id, item]));
+        const sorted = itemOrder
+          .map(id => itemsMap.get(id))
+          .filter(Boolean);
+        campaign.items.forEach(item => {
+          if (!itemOrder.includes(item.id)) {
+            sorted.push(item);
+          }
+        });
+        orderedItems = sorted;
+      }
+    } catch (orderError) {
+      console.error('⚠️ Could not fetch item order, using default:', orderError.message);
+    }
+
     const campaignData = {
       ...campaignWithoutHash,
       items: orderedItems.map(item => ({
@@ -640,42 +723,70 @@ const verifyCampaignPassword = async (req, res) => {
   }
 };
 
-// ✅ Update campaign item order
-const updateCampaignOrder = async (req, res) => {
+// ✅ Update campaign item order (drag-and-drop reorder)
+const updateCampaignItemOrder = async (req, res) => {
   try {
-    const userId = req.effectiveUserId;
-    const { slug } = req.params;
-    const { itemOrder } = req.body;
-
-    console.log(`🎨 Updating item order for campaign: ${slug}`);
-    console.log(`📦 New order:`, itemOrder);
-
-    // Find campaign by slug and verify ownership
-    const campaign = await prisma.campaign.findFirst({
-      where: { slug, userId },
-    });
-
-    if (!campaign) {
-      return res.status(404).json({
+    if (req.teamRole === 'VIEWER') {
+      return res.status(403).json({
         status: 'error',
-        message: 'Campaign not found or you do not have permission to edit it',
+        message: 'VIEWER role does not have permission to reorder campaign items',
       });
     }
 
-    // Update the itemOrder
-    await prisma.campaign.update({
-      where: { id: campaign.id },
-      data: { itemOrder: itemOrder || [] },
+    const userId = req.effectiveUserId;
+    const { id } = req.params;
+    const { itemOrder } = req.body;
+
+    console.log(`📦 Reorder request: campaignId=${id}, userId=${userId}, items=${Array.isArray(itemOrder) ? itemOrder.length : 'not-array'}`);
+
+    if (!Array.isArray(itemOrder)) {
+      console.log('❌ itemOrder is not an array:', typeof itemOrder);
+      return res.status(400).json({
+        status: 'error',
+        message: 'itemOrder must be an array of item IDs',
+      });
+    }
+
+    const campaign = await prisma.campaign.findFirst({
+      where: { id, userId },
     });
 
-    console.log(`✅ Item order updated successfully for campaign: ${campaign.name}`);
+    if (!campaign) {
+      console.log(`❌ Campaign not found for id=${id}, userId=${userId}`);
+      return res.status(404).json({
+        status: 'error',
+        message: 'Campaign not found',
+      });
+    }
+
+    // Use raw SQL to store as proper JSONB array (Prisma Json type can corrupt arrays to objects)
+    if (itemOrder.length > 0) {
+      await prisma.$executeRawUnsafe(
+        `UPDATE "Campaign" SET "itemOrder" = $1::jsonb WHERE "id" = $2`,
+        JSON.stringify(itemOrder),
+        id
+      );
+    } else {
+      await prisma.$executeRawUnsafe(
+        `UPDATE "Campaign" SET "itemOrder" = NULL WHERE "id" = $1`,
+        id
+      );
+    }
+
+    // Verify the save by reading it back
+    const verifyResult = await prisma.$queryRawUnsafe(
+      `SELECT "itemOrder"::text as "itemOrderText" FROM "Campaign" WHERE "id" = $1`,
+      id
+    );
+    console.log(`✅ Campaign item order saved: ${campaign.name} (${itemOrder.length} items)`);
+    console.log(`📋 Verified stored value: ${verifyResult?.[0]?.itemOrderText?.substring(0, 200)}`);
 
     res.json({
       status: 'success',
       message: 'Item order updated successfully',
     });
   } catch (error) {
-    console.error('❌ Update campaign order error:', error);
+    console.error('Update item order error:', error);
     res.status(500).json({
       status: 'error',
       message: 'Failed to update item order',
@@ -691,5 +802,5 @@ module.exports = {
   assignItemToCampaign,
   getPublicCampaign,
   verifyCampaignPassword,
-  updateCampaignOrder,
+  updateCampaignItemOrder,
 };
