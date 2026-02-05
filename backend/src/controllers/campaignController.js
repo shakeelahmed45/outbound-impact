@@ -459,13 +459,21 @@ const getPublicCampaign = async (req, res) => {
 
       if (rawText && rawText !== 'null' && rawText !== '[]') {
         try {
-          itemOrder = JSON.parse(rawText);
+          const parsed = JSON.parse(rawText);
+          // Handle both array format and corrupted object format from Prisma
+          if (Array.isArray(parsed)) {
+            itemOrder = parsed;
+          } else if (parsed && typeof parsed === 'object') {
+            // Prisma stored array as {"0":"id1","1":"id2"} - convert back to array
+            itemOrder = Object.keys(parsed).sort((a, b) => Number(a) - Number(b)).map(k => parsed[k]);
+            console.log('⚠️ Converted object-format itemOrder to array');
+          }
         } catch (e) {
           itemOrder = null;
         }
       }
 
-      console.log('📋 itemOrder loaded:', itemOrder ? `${itemOrder.length} items` : 'none');
+      console.log('📋 itemOrder loaded:', Array.isArray(itemOrder) ? `${itemOrder.length} items` : 'none');
 
       if (Array.isArray(itemOrder) && itemOrder.length > 0) {
         const itemsMap = new Map(campaign.items.map(item => [item.id, item]));
@@ -626,7 +634,12 @@ const verifyCampaignPassword = async (req, res) => {
 
       if (rawText && rawText !== 'null' && rawText !== '[]') {
         try {
-          itemOrder = JSON.parse(rawText);
+          const parsed = JSON.parse(rawText);
+          if (Array.isArray(parsed)) {
+            itemOrder = parsed;
+          } else if (parsed && typeof parsed === 'object') {
+            itemOrder = Object.keys(parsed).sort((a, b) => Number(a) - Number(b)).map(k => parsed[k]);
+          }
         } catch (e) {
           itemOrder = null;
         }
@@ -709,13 +722,19 @@ const updateCampaignItemOrder = async (req, res) => {
       });
     }
 
-    // Store null instead of empty array to avoid Prisma Json conversion issues
-    const orderData = itemOrder.length > 0 ? itemOrder : null;
-
-    await prisma.campaign.update({
-      where: { id },
-      data: { itemOrder: orderData },
-    });
+    // Use raw SQL to store as proper JSONB array (Prisma Json type can corrupt arrays to objects)
+    if (itemOrder.length > 0) {
+      await prisma.$executeRawUnsafe(
+        `UPDATE "Campaign" SET "itemOrder" = $1::jsonb WHERE "id" = $2`,
+        JSON.stringify(itemOrder),
+        id
+      );
+    } else {
+      await prisma.$executeRawUnsafe(
+        `UPDATE "Campaign" SET "itemOrder" = NULL WHERE "id" = $1`,
+        id
+      );
+    }
 
     // Verify the save by reading it back
     const verifyResult = await prisma.$queryRawUnsafe(
@@ -723,7 +742,7 @@ const updateCampaignItemOrder = async (req, res) => {
       id
     );
     console.log(`✅ Campaign item order saved: ${campaign.name} (${itemOrder.length} items)`);
-    console.log(`📋 Verified stored value: ${verifyResult?.[0]?.itemOrderText?.substring(0, 100)}...`);
+    console.log(`📋 Verified stored value: ${verifyResult?.[0]?.itemOrderText?.substring(0, 200)}`);
 
     res.json({
       status: 'success',
