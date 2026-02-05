@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, Folder, Play, FileText, Music, Image as ImageIcon, Eye, Mic, ArrowLeft, Share2, Copy, Check, X, Lock, Loader2, Key, Shield, ExternalLink, Link } from 'lucide-react';
 import axios from 'axios';
+import useAuthStore, { getEffectiveUserId } from '../store/authStore';
 import {
   copyToClipboard,
   shareToTwitter,
@@ -268,6 +269,10 @@ const PublicCampaignViewer = () => {
   const [shareItem, setShareItem] = useState(null);
   const [showShareModal, setShowShareModal] = useState(false);
   
+  // ✅ Get current user from auth store
+  const { user } = useAuthStore();
+  const effectiveUserId = getEffectiveUserId();
+  
   // ✅ Check if this is a preview from Campaigns page
   const searchParams = new URLSearchParams(window.location.search);
   const isPreviewMode = searchParams.get('preview') === 'true';
@@ -284,12 +289,27 @@ const PublicCampaignViewer = () => {
   const [customItemOrder, setCustomItemOrder] = useState([]);
   const [draggedItem, setDraggedItem] = useState(null);
 
+  // ✅ Check if user can customize content order
+  const canCustomizeContent = () => {
+    // If not logged in, cannot customize
+    if (!user) return false;
+    
+    // If in preview mode (from campaigns page), can customize
+    if (isPreviewMode) return true;
+    
+    // Check if current user is the account holder
+    const isAccountHolder = effectiveUserId === campaign?.userId;
+    return isAccountHolder;
+  };
+
+  const isCustomizeAllowed = canCustomizeContent();
+
   // 🎨 DRAG-AND-DROP HELPER FUNCTIONS
   const getOrderStorageKey = () => `campaign_order_${slug}`;
 
-  // Load custom order on mount
+  // Load custom order on mount - only for account holder
   useEffect(() => {
-    if (campaign?.items) {
+    if (campaign?.items && isCustomizeAllowed) {
       const stored = localStorage.getItem(getOrderStorageKey());
       if (stored) {
         try {
@@ -301,13 +321,14 @@ const PublicCampaignViewer = () => {
         }
       }
     }
-  }, [campaign, slug]);
+  }, [campaign, slug, isCustomizeAllowed]);
 
   // Get ordered items
   const getOrderedItems = () => {
     if (!campaign?.items) return [];
     
-    if (customItemOrder.length > 0) {
+    // Only apply custom order if user is the account holder
+    if (customItemOrder.length > 0 && isCustomizeAllowed) {
       const itemsMap = new Map(campaign.items.map(item => [item.id, item]));
       const orderedItems = customItemOrder
         .map(id => itemsMap.get(id))
@@ -326,16 +347,20 @@ const PublicCampaignViewer = () => {
     return campaign.items;
   };
 
-  // Save order to localStorage
+  // Save order to localStorage - only for account holder
   const saveOrder = (items) => {
+    if (!isCustomizeAllowed) return;
+    
     const orderIds = items.map(item => item.id);
     localStorage.setItem(getOrderStorageKey(), JSON.stringify(orderIds));
     setCustomItemOrder(orderIds);
     console.log('💾 Saved custom order:', orderIds.length, 'items');
   };
 
-  // Reset order to default
+  // Reset order to default - only for account holder
   const resetOrder = () => {
+    if (!isCustomizeAllowed) return;
+    
     if (confirm('Reset items to default order?')) {
       localStorage.removeItem(getOrderStorageKey());
       setCustomItemOrder([]);
@@ -344,19 +369,25 @@ const PublicCampaignViewer = () => {
     }
   };
 
-  // Drag handlers
+  // Drag handlers - only active for account holder
   const handleDragStart = (e, item) => {
+    if (!isCustomizeAllowed) return;
+    
     setDraggedItem(item);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/html', e.currentTarget);
   };
 
   const handleDragOver = (e) => {
+    if (!isCustomizeAllowed) return;
+    
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   };
 
   const handleDrop = (e, targetItem) => {
+    if (!isCustomizeAllowed) return;
+    
     e.preventDefault();
     
     if (!draggedItem || draggedItem.id === targetItem.id) {
@@ -1259,62 +1290,64 @@ const PublicCampaignViewer = () => {
 
         {campaign.items.length > 0 ? (
           <>
-            {/* 🎨 Customize Controls */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 bg-white rounded-2xl shadow-lg p-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  onClick={() => setIsCustomizeMode(!isCustomizeMode)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
-                    isCustomizeMode
-                      ? 'bg-gradient-to-r from-primary to-secondary text-white shadow-lg'
-                      : 'bg-white text-primary border-2 border-primary hover:bg-purple-50'
-                  }`}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                  {isCustomizeMode ? 'Done Customizing' : 'Customize Order'}
-                </button>
-
-                {customItemOrder.length > 0 && (
+            {/* 🎨 Customize Controls - Only show for account holder */}
+            {isCustomizeAllowed && (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 bg-white rounded-2xl shadow-lg p-4">
+                <div className="flex flex-wrap items-center gap-3">
                   <button
-                    onClick={resetOrder}
-                    className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border-2 border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-all"
+                    onClick={() => setIsCustomizeMode(!isCustomizeMode)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                      isCustomizeMode
+                        ? 'bg-gradient-to-r from-primary to-secondary text-white shadow-lg'
+                        : 'bg-white text-primary border-2 border-primary hover:bg-purple-50'
+                    }`}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
-                    Reset Order
+                    {isCustomizeMode ? 'Done Customizing' : 'Customize Order'}
                   </button>
+
+                  {customItemOrder.length > 0 && (
+                    <button
+                      onClick={resetOrder}
+                      className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border-2 border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-all"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Reset Order
+                    </button>
+                  )}
+                </div>
+
+                {isCustomizeMode && (
+                  <div className="text-sm text-gray-600 bg-blue-50 px-4 py-2 rounded-lg border border-blue-200 flex items-center gap-2">
+                    <span className="text-lg">💡</span>
+                    <span className="font-medium">Drag items to reorder</span>
+                  </div>
                 )}
               </div>
-
-              {isCustomizeMode && (
-                <div className="text-sm text-gray-600 bg-blue-50 px-4 py-2 rounded-lg border border-blue-200 flex items-center gap-2">
-                  <span className="text-lg">💡</span>
-                  <span className="font-medium">Drag items to reorder</span>
-                </div>
-              )}
-            </div>
+            )}
 
             {/* 🎨 Items Grid with Drag-and-Drop */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {getOrderedItems().map((item) => (
                 <div
                   key={item.id}
-                  draggable={isCustomizeMode}
-                  onDragStart={(e) => isCustomizeMode && handleDragStart(e, item)}
-                  onDragOver={(e) => isCustomizeMode && handleDragOver(e)}
-                  onDrop={(e) => isCustomizeMode && handleDrop(e, item)}
+                  draggable={isCustomizeMode && isCustomizeAllowed}
+                  onDragStart={(e) => isCustomizeMode && isCustomizeAllowed && handleDragStart(e, item)}
+                  onDragOver={(e) => isCustomizeMode && isCustomizeAllowed && handleDragOver(e)}
+                  onDrop={(e) => isCustomizeMode && isCustomizeAllowed && handleDrop(e, item)}
                   onDragEnd={handleDragEnd}
                   className={`bg-white rounded-2xl shadow-lg overflow-hidden transform transition relative ${
-                    isCustomizeMode
+                    isCustomizeMode && isCustomizeAllowed
                       ? 'cursor-move hover:shadow-2xl border-2 border-dashed border-transparent hover:border-primary'
                       : 'hover:scale-105 hover:shadow-2xl'
                   } ${draggedItem?.id === item.id ? 'opacity-50' : ''}`}
                 >
-                  {/* 🎨 Drag Handle */}
-                  {isCustomizeMode && (
+                  {/* 🎨 Drag Handle - Only show for account holder in customize mode */}
+                  {isCustomizeMode && isCustomizeAllowed && (
                     <div className="absolute top-3 left-3 z-50 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-lg pointer-events-none">
                       <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
@@ -1335,7 +1368,7 @@ const PublicCampaignViewer = () => {
 
                   <div
                     onClick={() => !isCustomizeMode && openItem(item)}
-                    className={isCustomizeMode ? 'pointer-events-none' : 'cursor-pointer'}
+                    className={isCustomizeMode && isCustomizeAllowed ? 'pointer-events-none' : 'cursor-pointer'}
                   >
                     <div className="aspect-square w-full overflow-hidden bg-gray-100">
                       {getThumbnail(item)}
