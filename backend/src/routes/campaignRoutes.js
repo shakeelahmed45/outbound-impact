@@ -33,4 +33,7 @@ router.delete('/:id', authMiddleware, resolveEffectiveUserId, campaignController
 // Assign/unassign item to campaign
 router.post('/assign', authMiddleware, resolveEffectiveUserId, campaignController.assignItemToCampaign);
 
+// Update campaign item order (drag-and-drop reorder)
+router.put('/:id/reorder', authMiddleware, resolveEffectiveUserId, campaignController.updateCampaignItemOrder);
+
 module.exports = router;
