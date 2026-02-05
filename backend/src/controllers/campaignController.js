@@ -377,6 +377,7 @@ const getPublicCampaign = async (req, res) => {
         createdAt: true,
         passwordProtected: true,
         passwordHash: true,
+        itemOrder: true,
         items: {
           select: {
             id: true,
@@ -390,7 +391,7 @@ const getPublicCampaign = async (req, res) => {
             fileSize: true,
             buttonText: true,
             buttonUrl: true,
-            sharingEnabled: true, // ✅ CRITICAL FIX: Added sharingEnabled field!
+            sharingEnabled: true,
             createdAt: true,
           },
           orderBy: { createdAt: 'desc' },
@@ -447,9 +448,25 @@ const getPublicCampaign = async (req, res) => {
     // Remove passwordHash before sending
     const { passwordHash, ...campaignWithoutHash } = campaign;
 
+    // Apply custom item order if it exists
+    let orderedItems = campaign.items;
+    if (Array.isArray(campaign.itemOrder) && campaign.itemOrder.length > 0) {
+      const itemsMap = new Map(campaign.items.map(item => [item.id, item]));
+      const sorted = campaign.itemOrder
+        .map(id => itemsMap.get(id))
+        .filter(Boolean);
+      // Append any items not in the custom order (e.g. newly added)
+      campaign.items.forEach(item => {
+        if (!campaign.itemOrder.includes(item.id)) {
+          sorted.push(item);
+        }
+      });
+      orderedItems = sorted;
+    }
+
     const campaignData = {
       ...campaignWithoutHash,
-      items: campaign.items.map(item => ({
+      items: orderedItems.map(item => ({
         ...item,
         fileSize: item.fileSize ? item.fileSize.toString() : '0',
       })),
@@ -511,13 +528,15 @@ const verifyCampaignPassword = async (req, res) => {
             buttonText: true,
             buttonUrl: true,
             attachments: true,
-            sharingEnabled: true, // ✅ CRITICAL FIX: Added sharingEnabled field!
+            sharingEnabled: true,
             fileSize: true,
             createdAt: true,
           },
         },
       },
     });
+
+    // Note: campaign.itemOrder is available via include
 
     if (!campaign) {
       console.log(`❌ Campaign not found: ${slug}`);
@@ -566,9 +585,24 @@ const verifyCampaignPassword = async (req, res) => {
     // Remove sensitive data
     const { passwordHash, userId, ...campaignWithoutHash } = campaign;
 
+    // Apply custom item order if it exists
+    let orderedItems = campaign.items;
+    if (Array.isArray(campaign.itemOrder) && campaign.itemOrder.length > 0) {
+      const itemsMap = new Map(campaign.items.map(item => [item.id, item]));
+      const sorted = campaign.itemOrder
+        .map(id => itemsMap.get(id))
+        .filter(Boolean);
+      campaign.items.forEach(item => {
+        if (!campaign.itemOrder.includes(item.id)) {
+          sorted.push(item);
+        }
+      });
+      orderedItems = sorted;
+    }
+
     const campaignData = {
       ...campaignWithoutHash,
-      items: campaign.items.map(item => ({
+      items: orderedItems.map(item => ({
         ...item,
         fileSize: item.fileSize ? item.fileSize.toString() : '0',
       })),
@@ -591,6 +625,58 @@ const verifyCampaignPassword = async (req, res) => {
   }
 };
 
+// ✅ Update campaign item order (drag-and-drop reorder)
+const updateCampaignItemOrder = async (req, res) => {
+  try {
+    if (req.teamRole === 'VIEWER') {
+      return res.status(403).json({
+        status: 'error',
+        message: 'VIEWER role does not have permission to reorder campaign items',
+      });
+    }
+
+    const userId = req.effectiveUserId;
+    const { id } = req.params;
+    const { itemOrder } = req.body;
+
+    if (!Array.isArray(itemOrder)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'itemOrder must be an array of item IDs',
+      });
+    }
+
+    const campaign = await prisma.campaign.findFirst({
+      where: { id, userId },
+    });
+
+    if (!campaign) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Campaign not found',
+      });
+    }
+
+    await prisma.campaign.update({
+      where: { id },
+      data: { itemOrder },
+    });
+
+    console.log(`✅ Campaign item order updated: ${campaign.name} (${itemOrder.length} items)`);
+
+    res.json({
+      status: 'success',
+      message: 'Item order updated successfully',
+    });
+  } catch (error) {
+    console.error('Update item order error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to update item order',
+    });
+  }
+};
+
 module.exports = {
   getUserCampaigns,
   createCampaign,
@@ -599,4 +685,5 @@ module.exports = {
   assignItemToCampaign,
   getPublicCampaign,
   verifyCampaignPassword,
+  updateCampaignItemOrder,
 };

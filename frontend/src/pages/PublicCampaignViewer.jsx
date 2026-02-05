@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, Folder, Play, FileText, Music, Image as ImageIcon, Eye, Mic, ArrowLeft, Share2, Copy, Check, X, Lock, Loader2, Key, Shield, ExternalLink, Link } from 'lucide-react';
 import axios from 'axios';
+import api from '../services/api';
 import useAuthStore, { getEffectiveUserId } from '../store/authStore';
 import {
   copyToClipboard,
@@ -347,25 +348,45 @@ const PublicCampaignViewer = () => {
     return campaign.items;
   };
 
-  // Save order to localStorage - only for account holder
-  const saveOrder = (items) => {
+  // Save order to localStorage AND persist to backend
+  const saveOrder = async (items) => {
     if (!isCustomizeAllowed) return;
-    
+
     const orderIds = items.map(item => item.id);
     localStorage.setItem(getOrderStorageKey(), JSON.stringify(orderIds));
     setCustomItemOrder(orderIds);
     console.log('💾 Saved custom order:', orderIds.length, 'items');
+
+    // Persist to backend so shared viewers see the same order
+    if (campaign?.id) {
+      try {
+        await api.put(`/campaigns/${campaign.id}/reorder`, { itemOrder: orderIds });
+        console.log('✅ Order persisted to server');
+      } catch (err) {
+        console.error('Failed to persist order to server:', err);
+      }
+    }
   };
 
   // Reset order to default - only for account holder
-  const resetOrder = () => {
+  const resetOrder = async () => {
     if (!isCustomizeAllowed) return;
-    
+
     if (confirm('Reset items to default order?')) {
       localStorage.removeItem(getOrderStorageKey());
       setCustomItemOrder([]);
       setIsCustomizeMode(false);
       console.log('🔄 Reset to default order');
+
+      // Clear server-side order too
+      if (campaign?.id) {
+        try {
+          await api.put(`/campaigns/${campaign.id}/reorder`, { itemOrder: [] });
+          console.log('✅ Server order cleared');
+        } catch (err) {
+          console.error('Failed to clear server order:', err);
+        }
+      }
     }
   };
 
