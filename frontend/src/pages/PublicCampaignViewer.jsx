@@ -321,7 +321,16 @@ const PublicCampaignViewer = () => {
       
       console.log('💾 Saving custom order to backend:', orderIds.length, 'items');
       
-      const token = localStorage.getItem('token');
+      // ✅ Get token from Zustand store instead of localStorage
+      const authState = useAuthStore.getState();
+      const token = authState.token;
+      
+      if (!token) {
+        console.error('❌ No token found in auth store');
+        alert('Authentication error. Please sign in again.');
+        return;
+      }
+      
       const response = await axios.put(
         `${import.meta.env.VITE_API_URL}/campaigns/${slug}/order`,
         { itemOrder: orderIds },
@@ -358,7 +367,16 @@ const PublicCampaignViewer = () => {
         setSavingOrder(true);
         console.log('🔄 Resetting to default order');
         
-        const token = localStorage.getItem('token');
+        // ✅ Get token from Zustand store instead of localStorage
+        const authState = useAuthStore.getState();
+        const token = authState.token;
+        
+        if (!token) {
+          console.error('❌ No token found in auth store');
+          alert('Authentication error. Please sign in again.');
+          return;
+        }
+        
         const response = await axios.put(
           `${import.meta.env.VITE_API_URL}/campaigns/${slug}/order`,
           { itemOrder: [] }, // Empty array = use default order
