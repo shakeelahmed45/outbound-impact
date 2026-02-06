@@ -213,7 +213,7 @@ const AdminDashboard = () => {
             color="#8b5cf6"
           />
           <StatCard
-            title="Total Campaigns"
+            title="Total Streamns"
             value={stats?.totalCampaigns}
             previousValue={stats?.previousPeriod?.totalCampaigns}
             icon={Folder}
