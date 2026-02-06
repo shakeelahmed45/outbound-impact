@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { X, Send, MessageSquare, ChevronRight, ChevronLeft, Bot, Loader2, ThumbsUp, ThumbsDown, Minimize2 } from 'lucide-react';
 import api from '../services/api';
 import useAuthStore from '../store/authStore';
 
 const GlobalAiChatWidget = ({ showBlinkingPrompt = false }) => {
   const { user } = useAuthStore();
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [conversationId, setConversationId] = useState(null);
@@ -21,8 +23,24 @@ const GlobalAiChatWidget = ({ showBlinkingPrompt = false }) => {
   const previousMessageCountRef = useRef(0);
   const shouldAutoScrollRef = useRef(true);
 
-  // ✅ Check if first-time user and show welcome modal
+  // ✅ Check if we should show the widget on this page
+  const shouldShowWidget = () => {
+    // Don't show if no user
+    if (!user) return false;
+    
+    // Don't show for admin users
+    if (user.role === 'ADMIN' || user.role === 'CUSTOMER_SUPPORT') return false;
+    
+    // Only show on dashboard pages (not on public pages, admin panel, etc.)
+    const isDashboardPage = location.pathname.startsWith('/dashboard');
+    
+    return isDashboardPage;
+  };
+
+  // ✅ Check if first-time user and show welcome modal (only on dashboards)
   useEffect(() => {
+    if (!shouldShowWidget()) return;
+    
     const hasSeenWelcome = localStorage.getItem('hasSeenWelcome');
     if (!hasSeenWelcome && user) {
       // Small delay to let the dashboard load first
@@ -30,7 +48,7 @@ const GlobalAiChatWidget = ({ showBlinkingPrompt = false }) => {
         setShowWelcomeModal(true);
       }, 1000);
     }
-  }, [user]);
+  }, [user, location.pathname]);
 
   // Initialize conversation when widget opens
   useEffect(() => {
@@ -256,6 +274,11 @@ What can I help you with today?`,
     setIsOpen(true);
     setIsMinimized(false);
   };
+
+  // ✅ Don't render widget if we shouldn't show it
+  if (!shouldShowWidget()) {
+    return null;
+  }
 
   // ✅ Welcome modal - Smaller & responsive
   if (showWelcomeModal) {
