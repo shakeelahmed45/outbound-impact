@@ -5,20 +5,22 @@ const authMiddleware = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/auth');
 
 // ═══════════════════════════════════════════════════════════
-// PUBLIC ROUTES (No auth required)
+// PUBLIC ROUTES — Admin invitation acceptance
+// These use /api/team-invitation/ path (mounted separately in server.js)
+// Regular team invitations use teamRoutes' /invitation/:token handlers
 // ═══════════════════════════════════════════════════════════
 
-// ✅ Get invitation details by token (for the accept page)
-router.get('/invitation/:token', teamInvitationController.getInvitationByToken);
+// ✅ Get admin invitation details by token
+router.get('/admin-invitation/:token', teamInvitationController.getInvitationByToken);
 
-// ✅ Accept invitation - token in body (legacy)
+// ✅ Accept admin invitation - token in body (legacy)
 router.post('/accept-invitation', teamInvitationController.acceptInvitation);
 
-// ✅ NEW: Accept invitation - token in URL params (matches frontend)
-router.post('/invitation/:token/accept', teamInvitationController.acceptInvitationWithParams);
+// ✅ Accept admin invitation - token in URL params
+router.post('/admin-invitation/:token/accept', teamInvitationController.acceptInvitationWithParams);
 
-// ✅ NEW: Decline invitation - token in URL params
-router.post('/invitation/:token/decline', teamInvitationController.declineInvitation);
+// ✅ Decline admin invitation - token in URL params
+router.post('/admin-invitation/:token/decline', teamInvitationController.declineInvitation);
 
 // ═══════════════════════════════════════════════════════════
 // PROTECTED ROUTES (Require ADMIN only)
