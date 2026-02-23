@@ -24,9 +24,19 @@ const securityRoutes = require('./routes/securityRoutes');
 const whiteLabelRoutes = require('./routes/whiteLabelRoutes');
 const integrationsRoutes = require('./routes/integrationsRoutes');
 const platformRoutes = require('./routes/platformIntegrationRoutes');
+const workflowRoutes = require('./routes/workflowRoutes');
+const organizationRoutes = require('./routes/organizationRoutes');
+const auditRoutes = require('./routes/auditRoutes');
+const complianceRoutes = require('./routes/complianceRoutes');
+const messageRoutes = require('./routes/messageRoutes');
+const auditMiddleware = require('./middleware/auditMiddleware');
+
 
 // 💳 Subscription management routes
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
+
+// 🔔 Notification routes
+const notificationRoutes = require('./routes/notificationRoutes');
 
 // 🔄 Refund routes (NEW)
 // const refundRoutes = require('./routes/refundRoutes'); //
@@ -184,12 +194,18 @@ app.get('/api/health', (req, res) => {
 // 🛣️ API ROUTES
 // ═══════════════════════════════════════════════
 
+// 📋 Audit middleware — auto-logs all successful write operations
+app.use(auditMiddleware);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/items', itemsRoutes);
 app.use('/api/campaigns', campaignRoutes);
+app.use('/api/workflows', workflowRoutes);
+app.use('/api/organizations', organizationRoutes);
+
 
 // ✅ FIXED: teamInvitationRoutes MUST come BEFORE teamRoutes
 // Both have /invitation/:token route - admin uses AdminInvitation table, regular uses TeamMember table
@@ -205,12 +221,20 @@ app.use('/api/chat', chatRoutes);
 // ✨ Enterprise feature routes
 app.use('/api/api-keys', apiKeyRoutes);
 app.use('/api/security', securityRoutes);
+app.use('/api/audit', auditRoutes);
+app.use('/api/compliance', complianceRoutes);
+app.use('/api/messages', messageRoutes);
 app.use('/api/white-label', whiteLabelRoutes);
 app.use('/api/integrations', integrationsRoutes);
 app.use('/api/platforms', platformRoutes);
 
 // 💳 Subscription management routes
 app.use('/api/subscription', subscriptionRoutes);
+
+// 🔔 Notification routes
+app.use('/api/notifications', notificationRoutes);
+const cohortRoutes = require('./routes/cohortRoutes');
+app.use('/api/cohorts', cohortRoutes);
 
 // 🔄 Refund routes (NEW)
 // app.use('/api/refund', refundRoutes); //

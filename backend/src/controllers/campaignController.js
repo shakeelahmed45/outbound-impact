@@ -1,8 +1,10 @@
 const prisma = require('../lib/prisma');
+const { buildOrgFilter, getAutoAssignOrgId } = require("../helpers/orgScope");
 const bcrypt = require('bcryptjs');
 const QRCode = require('qrcode');
 const axios = require('axios');
 const { nanoid } = require('nanoid');
+const { notifyStreamPublished, notifyQrScan } = require('../services/notificationService');
 
 // Helper function to sort items by custom order
 const applyCustomOrder = (items, itemOrder) => {
@@ -53,8 +55,9 @@ const generateCampaignQRCode = async (slug) => {
   try {
     const baseUrl = process.env.FRONTEND_URL || 'https://outboundimpact.net';
     const campaignUrl = `${baseUrl}/c/${slug}`;
+    const qrUrl = `${campaignUrl}?s=qr`;
 
-    const qrCodeBuffer = await QRCode.toBuffer(campaignUrl, {
+    const qrCodeBuffer = await QRCode.toBuffer(qrUrl, {
       width: 500,
       margin: 2,
       color: {
@@ -68,8 +71,12 @@ const generateCampaignQRCode = async (slug) => {
     const bunnyStoragePassword = process.env.BUNNY_STORAGE_PASSWORD;
     const bunnyPullZone = process.env.BUNNY_PULL_ZONE;
 
+    // âœ… Use unique filename to bust CDN cache
+    const timestamp = Date.now();
+    const fileName = `campaign-qr-${slug}-${timestamp}.png`;
+
     const response = await axios.put(
-      `https://${bunnyHostname}/${bunnyStorageZone}/qr-codes/campaign-qr-${slug}.png`,
+      `https://${bunnyHostname}/${bunnyStorageZone}/qr-codes/${fileName}`,
       qrCodeBuffer,
       {
         headers: {
@@ -79,7 +86,7 @@ const generateCampaignQRCode = async (slug) => {
       }
     );
 
-    const qrCodeUrl = `https://${bunnyPullZone}/qr-codes/campaign-qr-${slug}.png`;
+    const qrCodeUrl = `https://${bunnyPullZone}/qr-codes/${fileName}`;
     return qrCodeUrl;
   } catch (error) {
     console.error('QR code generation error:', error);
@@ -87,13 +94,13 @@ const generateCampaignQRCode = async (slug) => {
   }
 };
 
-// ✅ Get all campaigns for authenticated user
+// âœ… Get all campaigns for authenticated user
 const getUserCampaigns = async (req, res) => {
   try {
     const userId = req.effectiveUserId;
 
     const campaigns = await prisma.campaign.findMany({
-      where: { userId },
+      where: { userId, ...buildOrgFilter(req) },
       select: {
         id: true,
         slug: true,
@@ -102,7 +109,10 @@ const getUserCampaigns = async (req, res) => {
         category: true,
         logoUrl: true,
         qrCodeUrl: true,
-        passwordProtected: true, // ✅ NEW: Include password protection status
+        passwordProtected: true, // âœ… NEW: Include password protection status
+        views: true, // âœ… Campaign page view count
+        viewsQr: true, // âœ… QR scan count
+        viewsNfc: true, // âœ… NFC tap count
         createdAt: true,
         updatedAt: true,
         _count: {
@@ -130,7 +140,7 @@ const getUserCampaigns = async (req, res) => {
   }
 };
 
-// ✅ Create new campaign with optional password protection
+// âœ… Create new campaign with optional password protection
 const createCampaign = async (req, res) => {
   try {
     if (req.teamRole === 'VIEWER') {
@@ -143,6 +153,18 @@ const createCampaign = async (req, res) => {
     const userId = req.effectiveUserId;
     const { name, description, category, logoUrl, passwordProtected, password } = req.body;
 
+    // ✅ STRICT: Individual plan → 2 streams max
+    const owner = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    if (owner?.role === 'INDIVIDUAL') {
+      const streamCount = await prisma.campaign.count({ where: { userId } });
+      if (streamCount >= 2) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'Stream limit reached (2/2). Please upgrade your plan to create more streams.'
+        });
+      }
+    }
+
     if (!name) {
       return res.status(400).json({
         status: 'error',
@@ -150,7 +172,7 @@ const createCampaign = async (req, res) => {
       });
     }
 
-    // ✅ NEW: Validate password if protection is enabled
+    // âœ… NEW: Validate password if protection is enabled
     if (passwordProtected && !password) {
       return res.status(400).json({
         status: 'error',
@@ -168,7 +190,7 @@ const createCampaign = async (req, res) => {
     const slug = await generateUniqueSlug();
     const qrCodeUrl = await generateCampaignQRCode(slug);
 
-    // ✅ NEW: Hash password if provided
+    // âœ… NEW: Hash password if provided
     let passwordHash = null;
     if (passwordProtected && password) {
       passwordHash = await bcrypt.hash(password, 10);
@@ -183,12 +205,16 @@ const createCampaign = async (req, res) => {
         category: category || null,
         logoUrl: logoUrl || null,
         qrCodeUrl,
-        passwordProtected: passwordProtected || false, // ✅ NEW
-        passwordHash, // ✅ NEW
+        passwordProtected: passwordProtected || false, // âœ… NEW
+        organizationId: req.body.organizationId || getAutoAssignOrgId(req),
+        passwordHash, // âœ… NEW
       },
     });
 
-    console.log(`✅ Campaign created: ${campaign.name}${logoUrl ? ' (with logo)' : ''}${passwordProtected ? ' [PROTECTED]' : ''}`);
+    console.log(`âœ… Campaign created: ${campaign.name}${logoUrl ? ' (with logo)' : ''}${passwordProtected ? ' [PROTECTED]' : ''}`);
+
+    // 🔔 Notify: stream published
+    await notifyStreamPublished(userId, name);
 
     res.status(201).json({
       status: 'success',
@@ -204,7 +230,7 @@ const createCampaign = async (req, res) => {
   }
 };
 
-// ✅ Update campaign with password protection support
+// âœ… Update campaign with password protection support
 const updateCampaign = async (req, res) => {
   try {
     if (req.teamRole === 'VIEWER') {
@@ -229,7 +255,7 @@ const updateCampaign = async (req, res) => {
       });
     }
 
-    // ✅ NEW: Handle password updates
+    // âœ… NEW: Handle password updates
     let passwordHash = campaign.passwordHash;
     
     if (passwordProtected) {
@@ -262,12 +288,12 @@ const updateCampaign = async (req, res) => {
         description: description !== undefined ? description : campaign.description,
         category: category !== undefined ? category : campaign.category,
         logoUrl: logoUrl !== undefined ? logoUrl : campaign.logoUrl,
-        passwordProtected: passwordProtected || false, // ✅ NEW
-        passwordHash, // ✅ NEW
+        passwordProtected: passwordProtected || false, // âœ… NEW
+        passwordHash, // âœ… NEW
       },
     });
 
-    console.log(`✅ Campaign updated: ${updatedCampaign.name}${logoUrl ? ' (logo updated)' : ''}${passwordProtected ? ' [PROTECTED]' : ''}`);
+    console.log(`âœ… Campaign updated: ${updatedCampaign.name}${logoUrl ? ' (logo updated)' : ''}${passwordProtected ? ' [PROTECTED]' : ''}`);
 
     res.json({
       status: 'success',
@@ -283,13 +309,13 @@ const updateCampaign = async (req, res) => {
   }
 };
 
-// ✅ Delete campaign
+// âœ… Delete campaign
 const deleteCampaign = async (req, res) => {
   try {
-    if (req.teamRole === 'VIEWER') {
+    if (req.teamRole === 'VIEWER' || req.teamRole === 'EDITOR') {
       return res.status(403).json({
         status: 'error',
-        message: 'VIEWER role does not have permission to delete campaigns',
+        message: 'Only ADMIN role can delete campaigns',
       });
     }
 
@@ -329,7 +355,7 @@ const deleteCampaign = async (req, res) => {
   }
 };
 
-// ✅ Assign/remove item to/from campaign
+// âœ… Assign/remove item to/from campaign
 const assignItemToCampaign = async (req, res) => {
   try {
     if (req.teamRole === 'VIEWER') {
@@ -384,12 +410,12 @@ const assignItemToCampaign = async (req, res) => {
   }
 };
 
-// ✅ FIXED: Get public campaign (with password protection check)
+// âœ… FIXED: Get public campaign (with password protection check)
 const getPublicCampaign = async (req, res) => {
   try {
     const { slug } = req.params;
 
-    console.log('📋 Fetching campaign with slug:', slug);
+    console.log('ðŸ“‹ Fetching campaign with slug:', slug);
 
     const campaign = await prisma.campaign.findUnique({
       where: { slug },
@@ -405,7 +431,7 @@ const getPublicCampaign = async (req, res) => {
         createdAt: true,
         passwordProtected: true,
         passwordHash: true,
-        itemOrder: true, // ✅ Fetch custom order
+        itemOrder: true, // âœ… Fetch custom order
         items: {
           select: {
             id: true,
@@ -419,7 +445,7 @@ const getPublicCampaign = async (req, res) => {
             fileSize: true,
             buttonText: true,
             buttonUrl: true,
-            sharingEnabled: true, // ✅ CRITICAL FIX: Added sharingEnabled field!
+            sharingEnabled: true, // âœ… CRITICAL FIX: Added sharingEnabled field!
             createdAt: true,
           },
           orderBy: { createdAt: 'desc' },
@@ -428,16 +454,16 @@ const getPublicCampaign = async (req, res) => {
     });
 
     if (!campaign) {
-      console.log('❌ Campaign not found:', slug);
+      console.log('âŒ Campaign not found:', slug);
       return res.status(404).json({
         status: 'error',
         message: 'Campaign not found',
       });
     }
 
-    // ✅ Check if campaign is password protected
+    // âœ… Check if campaign is password protected
     if (campaign.passwordProtected) {
-      console.log(`🔒 Campaign is password protected: ${campaign.name}`);
+      console.log(`ðŸ”’ Campaign is password protected: ${campaign.name}`);
       
       // Return limited info indicating password is required
       return res.json({
@@ -454,10 +480,10 @@ const getPublicCampaign = async (req, res) => {
       });
     }
 
-    console.log('✅ Campaign found:', campaign.name);
-    console.log('📦 Items count:', campaign.items.length);
+    console.log('âœ… Campaign found:', campaign.name);
+    console.log('ðŸ“¦ Items count:', campaign.items.length);
     if (campaign.logoUrl) {
-      console.log('🎨 Logo URL:', campaign.logoUrl);
+      console.log('ðŸŽ¨ Logo URL:', campaign.logoUrl);
     }
 
     let userName = 'Unknown';
@@ -470,12 +496,12 @@ const getPublicCampaign = async (req, res) => {
         userName = user.name;
       }
     } catch (userError) {
-      console.error('⚠️ Could not fetch user name:', userError.message);
+      console.error('âš ï¸ Could not fetch user name:', userError.message);
     }
 
-    // ✅ Apply custom item order
+    // âœ… Apply custom item order
     const orderedItems = applyCustomOrder(campaign.items, campaign.itemOrder);
-    console.log('🎨 Applied custom order:', campaign.itemOrder?.length > 0 ? 'Yes' : 'No (using default)');
+    console.log('ðŸŽ¨ Applied custom order:', campaign.itemOrder?.length > 0 ? 'Yes' : 'No (using default)');
 
     // Remove passwordHash and itemOrder before sending
     const { passwordHash, itemOrder, ...campaignWithoutHash } = campaign;
@@ -491,14 +517,14 @@ const getPublicCampaign = async (req, res) => {
       },
     };
 
-    console.log('✅ Sending campaign data');
+    console.log('âœ… Sending campaign data');
 
     res.json({
       status: 'success',
       campaign: campaignData,
     });
   } catch (error) {
-    console.error('❌ Get public campaign error:', error);
+    console.error('âŒ Get public campaign error:', error);
     console.error('Error details:', {
       message: error.message,
       stack: error.stack,
@@ -511,13 +537,13 @@ const getPublicCampaign = async (req, res) => {
   }
 };
 
-// ✅ FIXED: Verify campaign password and return full campaign data
+// âœ… FIXED: Verify campaign password and return full campaign data
 const verifyCampaignPassword = async (req, res) => {
   try {
     const { slug } = req.params;
     const { password } = req.body;
 
-    console.log(`🔐 Password verification attempt for campaign: ${slug}`);
+    console.log(`ðŸ” Password verification attempt for campaign: ${slug}`);
 
     if (!password) {
       return res.status(400).json({
@@ -540,7 +566,7 @@ const verifyCampaignPassword = async (req, res) => {
         createdAt: true,
         passwordProtected: true,
         passwordHash: true,
-        itemOrder: true, // ✅ Fetch custom order
+        itemOrder: true, // âœ… Fetch custom order
         items: {
           select: {
             id: true,
@@ -555,7 +581,7 @@ const verifyCampaignPassword = async (req, res) => {
             buttonText: true,
             buttonUrl: true,
             attachments: true,
-            sharingEnabled: true, // ✅ CRITICAL FIX: Added sharingEnabled field!
+            sharingEnabled: true, // âœ… CRITICAL FIX: Added sharingEnabled field!
             fileSize: true,
             createdAt: true,
           },
@@ -565,7 +591,7 @@ const verifyCampaignPassword = async (req, res) => {
     });
 
     if (!campaign) {
-      console.log(`❌ Campaign not found: ${slug}`);
+      console.log(`âŒ Campaign not found: ${slug}`);
       return res.status(404).json({
         status: 'error',
         message: 'Campaign not found',
@@ -573,26 +599,26 @@ const verifyCampaignPassword = async (req, res) => {
     }
 
     if (!campaign.passwordProtected || !campaign.passwordHash) {
-      console.log(`⚠️ Campaign is not password protected: ${campaign.name}`);
+      console.log(`âš ï¸ Campaign is not password protected: ${campaign.name}`);
       return res.status(400).json({
         status: 'error',
         message: 'This campaign is not password protected',
       });
     }
 
-    // ✅ Verify password
+    // âœ… Verify password
     const isValidPassword = await bcrypt.compare(password, campaign.passwordHash);
 
     if (!isValidPassword) {
-      console.log(`❌ Invalid password for campaign: ${campaign.name}`);
+      console.log(`âŒ Invalid password for campaign: ${campaign.name}`);
       return res.status(401).json({
         status: 'error',
         message: 'Incorrect password',
       });
     }
 
-    // ✅ Password is correct - return full campaign data
-    console.log(`✅ Password verified for campaign: ${campaign.name}`);
+    // âœ… Password is correct - return full campaign data
+    console.log(`âœ… Password verified for campaign: ${campaign.name}`);
 
     // Get user name
     let userName = 'Unknown';
@@ -605,12 +631,12 @@ const verifyCampaignPassword = async (req, res) => {
         userName = user.name;
       }
     } catch (userError) {
-      console.error('⚠️ Could not fetch user name:', userError.message);
+      console.error('âš ï¸ Could not fetch user name:', userError.message);
     }
 
-    // ✅ Apply custom item order
+    // âœ… Apply custom item order
     const orderedItems = applyCustomOrder(campaign.items, campaign.itemOrder);
-    console.log('🎨 Applied custom order:', campaign.itemOrder?.length > 0 ? 'Yes' : 'No (using default)');
+    console.log('ðŸŽ¨ Applied custom order:', campaign.itemOrder?.length > 0 ? 'Yes' : 'No (using default)');
 
     // Remove sensitive data
     const { passwordHash, userId, itemOrder, ...campaignWithoutHash } = campaign;
@@ -632,7 +658,7 @@ const verifyCampaignPassword = async (req, res) => {
       message: 'Access granted',
     });
   } catch (error) {
-    console.error('❌ Verify campaign password error:', error);
+    console.error('âŒ Verify campaign password error:', error);
     res.status(500).json({
       status: 'error',
       message: 'Failed to verify password',
@@ -640,15 +666,15 @@ const verifyCampaignPassword = async (req, res) => {
   }
 };
 
-// ✅ Update campaign item order
+// âœ… Update campaign item order
 const updateCampaignOrder = async (req, res) => {
   try {
     const userId = req.effectiveUserId;
     const { slug } = req.params;
     const { itemOrder } = req.body;
 
-    console.log(`🎨 Updating item order for campaign: ${slug}`);
-    console.log(`📦 New order:`, itemOrder);
+    console.log(`ðŸŽ¨ Updating item order for campaign: ${slug}`);
+    console.log(`ðŸ“¦ New order:`, itemOrder);
 
     // Find campaign by slug and verify ownership
     const campaign = await prisma.campaign.findFirst({
@@ -668,18 +694,102 @@ const updateCampaignOrder = async (req, res) => {
       data: { itemOrder: itemOrder || [] },
     });
 
-    console.log(`✅ Item order updated successfully for campaign: ${campaign.name}`);
+    console.log(`âœ… Item order updated successfully for campaign: ${campaign.name}`);
 
     res.json({
       status: 'success',
       message: 'Item order updated successfully',
     });
   } catch (error) {
-    console.error('❌ Update campaign order error:', error);
+    console.error('âŒ Update campaign order error:', error);
     res.status(500).json({
       status: 'error',
       message: 'Failed to update item order',
     });
+  }
+};
+
+// âœ… Regenerate QR codes for a campaign (with ?s=qr tracking)
+const regenerateCampaignQR = async (req, res) => {
+  try {
+    const userId = req.effectiveUserId;
+    const { id } = req.params;
+
+    const campaign = await prisma.campaign.findFirst({
+      where: { id, userId },
+      select: { id: true, slug: true, name: true },
+    });
+
+    if (!campaign) {
+      return res.status(404).json({ status: 'error', message: 'Campaign not found' });
+    }
+
+    // Regenerate QR code with ?s=qr source tracking
+    const qrCodeUrl = await generateCampaignQRCode(campaign.slug);
+
+    await prisma.campaign.update({
+      where: { id },
+      data: { qrCodeUrl },
+    });
+
+    res.json({
+      status: 'success',
+      message: 'QR code regenerated with tracking',
+      qrCodeUrl,
+    });
+  } catch (error) {
+    console.error('Regenerate QR error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to regenerate QR code' });
+  }
+};
+
+// âœ… Track a campaign page view with source (qr/nfc/direct)
+const trackCampaignView = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { source } = req.body;
+    const viewSource = (source || 'direct').toLowerCase();
+
+    const campaign = await prisma.campaign.findUnique({
+      where: { slug },
+      select: { id: true, name: true, userId: true, viewsQr: true },
+    });
+
+    if (!campaign) {
+      return res.status(404).json({ status: 'error', message: 'Campaign not found' });
+    }
+
+    // Increment total views + source-specific counter
+    const incrementData = { views: { increment: 1 } };
+    if (viewSource === 'qr') {
+      incrementData.viewsQr = { increment: 1 };
+    } else if (viewSource === 'nfc') {
+      incrementData.viewsNfc = { increment: 1 };
+    }
+
+    try {
+      await prisma.campaign.update({
+        where: { id: campaign.id },
+        data: incrementData,
+      });
+    } catch (updateErr) {
+      // Fallback if viewsQr/viewsNfc columns don't exist yet
+      await prisma.campaign.update({
+        where: { id: campaign.id },
+        data: { views: { increment: 1 } },
+      });
+    }
+
+
+    // 🔔 Notify: QR scan milestone
+    if (viewSource === 'qr') {
+      const newCount = (campaign.viewsQr || 0) + 1;
+      await notifyQrScan(campaign.userId, campaign.name, newCount);
+    }
+    res.json({ status: 'success', message: 'View tracked' });
+  } catch (error) {
+    console.error('Track campaign view error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to track view' });
   }
 };
 
@@ -692,4 +802,6 @@ module.exports = {
   getPublicCampaign,
   verifyCampaignPassword,
   updateCampaignOrder,
+  regenerateCampaignQR,
+  trackCampaignView,
 };

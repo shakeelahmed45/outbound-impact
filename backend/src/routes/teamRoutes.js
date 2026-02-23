@@ -9,7 +9,13 @@ router.get('/', authMiddleware, teamController.getTeamMembers);
 // Invite a new team member
 router.post('/invite', authMiddleware, teamController.inviteTeamMember);
 
-// ✅ NEW: Update team member role (must be BEFORE the general PUT /:id route)
+// ✅ NEW: Request role change (used by team members)
+router.post('/request-role-change', authMiddleware, teamController.requestRoleChange);
+
+// ✅ NEW: Dismiss role change request (used by org owner)
+router.post('/:id/dismiss-request', authMiddleware, teamController.dismissRoleRequest);
+
+// ✅ Update team member role (must be BEFORE the general PUT /:id route)
 router.put('/:id/role', authMiddleware, teamController.updateTeamMemberRole);
 
 // Update team member (general update)

@@ -22,26 +22,27 @@ router.post('/invitation/:token/decline', teamInvitationController.declineInvita
 
 // ═══════════════════════════════════════════════════════════
 // PROTECTED ROUTES (Require ADMIN only)
+// ✅ FIX: Apply auth + requireAdmin per-route instead of
+//         blanket router.use() which was blocking GET /api/team
+//         from reaching teamRoutes for regular users
 // ═══════════════════════════════════════════════════════════
-router.use(authMiddleware);
-router.use(requireAdmin); // Only ADMIN role
 
 // Invite new team member
-router.post('/invite', teamInvitationController.inviteTeamMember);
+router.post('/invite', authMiddleware, requireAdmin, teamInvitationController.inviteTeamMember);
 
 // Get all invitations
-router.get('/invitations', teamInvitationController.getAllInvitations);
+router.get('/invitations', authMiddleware, requireAdmin, teamInvitationController.getAllInvitations);
 
 // Resend invitation
-router.post('/invitations/:invitationId/resend', teamInvitationController.resendInvitation);
+router.post('/invitations/:invitationId/resend', authMiddleware, requireAdmin, teamInvitationController.resendInvitation);
 
 // Delete invitation
-router.delete('/invitations/:invitationId', teamInvitationController.deleteInvitation);
+router.delete('/invitations/:invitationId', authMiddleware, requireAdmin, teamInvitationController.deleteInvitation);
 
 // Get all team members
-router.get('/members', teamInvitationController.getAllTeamMembers);
+router.get('/members', authMiddleware, requireAdmin, teamInvitationController.getAllTeamMembers);
 
 // Remove team member
-router.delete('/members/:userId', teamInvitationController.removeTeamMember);
+router.delete('/members/:userId', authMiddleware, requireAdmin, teamInvitationController.removeTeamMember);
 
 module.exports = router;

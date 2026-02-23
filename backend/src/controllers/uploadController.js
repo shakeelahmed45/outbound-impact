@@ -1,6 +1,38 @@
 const prisma = require('../lib/prisma');
+const { getAutoAssignOrgId } = require("../helpers/orgScope");
 const { uploadToBunny, generateFileName, generateSlug } = require('../services/bunnyService');
 const QRCode = require('qrcode');
+const { notifyUpload, notifyStorageWarning } = require('../services/notificationService');
+
+// ═══════════════════════════════════════════════════════════
+// PLAN LIMITS — Strict enforcement
+// ═══════════════════════════════════════════════════════════
+const PLAN_UPLOAD_LIMITS = {
+  INDIVIDUAL: 5,
+  ORG_SMALL: null,    // unlimited
+  ORG_MEDIUM: null,   // unlimited
+  ORG_ENTERPRISE: null // unlimited
+};
+
+const checkUploadLimit = async (userId) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true }
+  });
+  const limit = PLAN_UPLOAD_LIMITS[user?.role];
+  if (limit === null || limit === undefined) return { allowed: true };
+
+  const currentCount = await prisma.item.count({ where: { userId } });
+  if (currentCount >= limit) {
+    return {
+      allowed: false,
+      message: `Upload limit reached (${currentCount}/${limit}). Please upgrade your plan.`,
+      current: currentCount,
+      limit
+    };
+  }
+  return { allowed: true, current: currentCount, limit };
+};
 
 // 🎬 Helper function to extract YouTube video ID
 const getYouTubeVideoId = (url) => {
@@ -45,9 +77,18 @@ const getVimeoVideoId = (url) => {
 // ✅ NEW: Main upload handler - supports BOTH multipart AND base64
 const uploadFile = async (req, res) => {
   try {
+    // ✅ VIEWER cannot upload
+    if (req.teamRole === "VIEWER") {
+      return res.status(403).json({ status: "error", message: "VIEWER role does not have permission to upload content" });
+    }
+
     const userId = req.effectiveUserId;
     
-    // ✅ NEW: Check if this is multipart/form-data or JSON
+    // ✅ STRICT: Check upload item limit per plan
+    const limitCheck = await checkUploadLimit(userId);
+    if (!limitCheck.allowed) {
+      return res.status(403).json({ status: 'error', message: limitCheck.message });
+    }
     const isMultipart = req.file !== undefined;
     
     let title, description, type, fileName, fileSize, buttonText, buttonUrl, attachments, sharingEnabled;
@@ -199,7 +240,8 @@ const uploadFile = async (req, res) => {
 
     const publicUrl = `${process.env.FRONTEND_URL}/l/${slug}`;
 
-    const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
+    const qrUrl = `${publicUrl}?s=qr`;
+    const qrCodeDataUrl = await QRCode.toDataURL(qrUrl, {
       width: 512,
       margin: 2,
       color: {
@@ -237,8 +279,17 @@ const uploadFile = async (req, res) => {
         buttonUrl: buttonUrl || null,
         attachments: attachments || null,
         sharingEnabled: sharingEnabled !== undefined ? sharingEnabled : true,
+        organizationId: req.body.organizationId || getAutoAssignOrgId(req),
       }
     });
+
+    // 🔔 Notify: upload success
+    await notifyUpload(userId, title, type);
+
+    // 🔔 Notify: storage warning if > 80%
+    const storageLimit = Number(user.storageLimit || 2147483648);
+    const storagePercent = storageLimit > 0 ? Math.round((newStorageUsed / storageLimit) * 100) : 0;
+    await notifyStorageWarning(userId, storagePercent);
 
     res.status(201).json({
       status: 'success',
@@ -265,8 +316,19 @@ const uploadFile = async (req, res) => {
 // Text post creation (unchanged)
 const createTextPost = async (req, res) => {
   try {
+    // ✅ VIEWER cannot create text posts
+    if (req.teamRole === "VIEWER") {
+      return res.status(403).json({ status: "error", message: "VIEWER role does not have permission to create content" });
+    }
+
     const userId = req.effectiveUserId;
     const { title, description, content, buttonText, buttonUrl, attachments, sharingEnabled } = req.body;
+
+    // ✅ STRICT: Check upload item limit per plan
+    const limitCheck = await checkUploadLimit(userId);
+    if (!limitCheck.allowed) {
+      return res.status(403).json({ status: 'error', message: limitCheck.message });
+    }
 
     if (!title || !content) {
       return res.status(400).json({
@@ -316,7 +378,8 @@ const createTextPost = async (req, res) => {
 
     const publicUrl = `${process.env.FRONTEND_URL}/l/${slug}`;
 
-    const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
+    const qrUrl = `${publicUrl}?s=qr`;
+    const qrCodeDataUrl = await QRCode.toDataURL(qrUrl, {
       width: 512,
       margin: 2,
       color: {
@@ -346,8 +409,12 @@ const createTextPost = async (req, res) => {
         buttonUrl: buttonUrl || null,
         attachments: attachments || null,
         sharingEnabled: sharingEnabled !== undefined ? sharingEnabled : true,
+        organizationId: req.body.organizationId || getAutoAssignOrgId(req),
       }
     });
+
+    // 🔔 Notify: text post created
+    await notifyUpload(userId, title, 'text');
 
     res.status(201).json({
       status: 'success',
@@ -373,8 +440,19 @@ const createTextPost = async (req, res) => {
 // Embed post creation (unchanged)
 const createEmbedPost = async (req, res) => {
   try {
+    // ✅ VIEWER cannot create embed posts
+    if (req.teamRole === "VIEWER") {
+      return res.status(403).json({ status: "error", message: "VIEWER role does not have permission to create content" });
+    }
+
     const userId = req.effectiveUserId;
     const { title, description, embedUrl, embedType, sharingEnabled } = req.body;
+
+    // ✅ STRICT: Check upload item limit per plan
+    const limitCheck = await checkUploadLimit(userId);
+    if (!limitCheck.allowed) {
+      return res.status(403).json({ status: 'error', message: limitCheck.message });
+    }
 
     if (!title || !embedUrl) {
       return res.status(400).json({
@@ -402,7 +480,8 @@ const createEmbedPost = async (req, res) => {
 
     const publicUrl = `${process.env.FRONTEND_URL}/l/${slug}`;
 
-    const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
+    const qrUrl = `${publicUrl}?s=qr`;
+    const qrCodeDataUrl = await QRCode.toDataURL(qrUrl, {
       width: 512,
       margin: 2,
       color: {
@@ -440,8 +519,12 @@ const createEmbedPost = async (req, res) => {
         thumbnailUrl,
         fileSize: BigInt(0),
         sharingEnabled: sharingEnabled !== undefined ? sharingEnabled : true,
+        organizationId: req.body.organizationId || getAutoAssignOrgId(req),
       }
     });
+
+    // 🔔 Notify: embed post created
+    await notifyUpload(userId, title, 'embed');
 
     res.status(201).json({
       status: 'success',

@@ -8,8 +8,9 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { useState, useEffect, useRef } from 'react';
-import { Upload, Image, Video, Music, FileText, X, Loader2, Plus, Folder, Link, ExternalLink, Paperclip, Share2, Lock } from 'lucide-react';
+import { Upload, Image, Video, Music, FileText, X, Loader2, Plus, Folder, Link, ExternalLink, Paperclip, Share2, Lock, Pencil, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import MediaEditor from '../components/MediaEditor';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import api from '../services/api';
 import { useToast } from '../hooks/useToast';
@@ -41,6 +42,8 @@ const UploadPage = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [showEditor, setShowEditor] = useState(false);
+  const [trimMetadata, setTrimMetadata] = useState(null);
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -70,6 +73,7 @@ const UploadPage = () => {
 
   const abortControllerRef = useRef(null);
   const progressIntervalRef = useRef(null);
+  const replaceFileRef = useRef(null);
 
   const [uploadedBytes, setUploadedBytes] = useState(0);
   const [totalBytes, setTotalBytes] = useState(0);
@@ -247,6 +251,37 @@ const UploadPage = () => {
     }
   };
 
+  // ═══ Media Editor handlers ═══
+  const handleEditorSave = (editedFile, editedPreview, metadata) => {
+    if (editedFile) {
+      setSelectedFile(editedFile);
+    }
+    if (editedPreview && typeof editedPreview === 'string') {
+      setPreview(editedPreview);
+    }
+    if (metadata) {
+      setTrimMetadata(metadata);
+    }
+    setShowEditor(false);
+    showToast('Edits applied!', 'success');
+  };
+
+  const handleEditorCancel = () => {
+    setShowEditor(false);
+  };
+
+  const handleReplaceFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset editor state
+    setShowEditor(false);
+    setTrimMetadata(null);
+    // Process the new file through the same selection logic
+    handleFileSelect(file);
+    // Reset the input so the same file can be re-selected
+    if (replaceFileRef.current) replaceFileRef.current.value = '';
+  };
+
   // ✅ NEW: YouTube-style FormData upload (NO MORE CRASHES!)
   const handleFileUpload = async (e) => {
     e.preventDefault();
@@ -350,6 +385,8 @@ const UploadPage = () => {
           setDescription('');
           setSelectedFile(null);
           setPreview(null);
+          setShowEditor(false);
+          setTrimMetadata(null);
           setUploadType(null);
           setUploadProgress(0);
           setUploadedBytes(0);
@@ -1245,6 +1282,8 @@ const UploadPage = () => {
                   setUploadType(null);
                   setSelectedFile(null);
                   setPreview(null);
+                  setShowEditor(false);
+                  setTrimMetadata(null);
                   setTitle('');
                   setDescription('');
                   setButtonText('');
@@ -1261,14 +1300,66 @@ const UploadPage = () => {
             <div className="space-y-6">
               <CampaignSelector />
 
-              {preview && (uploadType === 'IMAGE' || uploadType === 'VIDEO') && (
+              {/* ═══ Media Editor Modal ═══ */}
+              {showEditor && selectedFile && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowEditor(false); }}>
+                  <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+                    <MediaEditor
+                      file={selectedFile}
+                      preview={preview}
+                      onSave={handleEditorSave}
+                      onCancel={handleEditorCancel}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ═══ File Preview + Edit Button ═══ */}
+              {selectedFile && (uploadType === 'IMAGE' || uploadType === 'VIDEO' || uploadType === 'AUDIO') && (
                 <div className="mb-6">
-                  {uploadType === 'IMAGE' && (
+                  {preview && uploadType === 'IMAGE' && (
                     <img src={preview} alt="Preview" className="w-full max-h-64 object-contain rounded-lg" />
                   )}
-                  {uploadType === 'VIDEO' && (
+                  {preview && uploadType === 'VIDEO' && (
                     <video src={preview} controls className="w-full max-h-64 rounded-lg" />
                   )}
+                  {uploadType === 'AUDIO' && (
+                    <div className="flex items-center gap-3 bg-slate-100 rounded-lg p-4">
+                      <Music size={24} className="text-purple-600" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">{selectedFile.name}</p>
+                        <p className="text-xs text-slate-500">{(selectedFile.size / (1024 * 1024)).toFixed(1)} MB</p>
+                      </div>
+                    </div>
+                  )}
+                  {trimMetadata && (
+                    <div className="mt-2 text-xs text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5 inline-flex items-center gap-1">
+                      ✅ Trimmed: {Math.floor(trimMetadata.duration / 60)}:{Math.floor(trimMetadata.duration % 60).toString().padStart(2, '0')}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowEditor(true)}
+                    className="mt-3 w-full px-4 py-2.5 bg-gradient-to-r from-purple-50 to-violet-50 border-2 border-purple-200 text-purple-700 rounded-xl font-semibold hover:border-purple-400 hover:from-purple-100 hover:to-violet-100 transition-all flex items-center justify-center gap-2 text-sm"
+                  >
+                    <Pencil size={16} />
+                    {uploadType === 'IMAGE' ? 'Edit Image — Crop, Rotate, Adjust' : uploadType === 'VIDEO' ? 'Edit Video — Trim Start & End' : 'Edit Audio — Trim & Adjust Volume'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => replaceFileRef.current?.click()}
+                    className="mt-2 w-full px-4 py-2.5 bg-white border-2 border-gray-200 text-gray-600 rounded-xl font-semibold hover:border-gray-400 hover:bg-gray-50 transition-all flex items-center justify-center gap-2 text-sm"
+                  >
+                    <RefreshCw size={16} />
+                    Replace File
+                  </button>
+                  <input
+                    ref={replaceFileRef}
+                    type="file"
+                    accept={uploadType === 'IMAGE' ? 'image/*' : uploadType === 'VIDEO' ? 'video/*' : uploadType === 'AUDIO' ? 'audio/*' : '*/*'}
+                    onChange={handleReplaceFile}
+                    className="hidden"
+                  />
                 </div>
               )}
 
@@ -1459,6 +1550,24 @@ const UploadPage = () => {
               <div className="text-sm text-gray-600 bg-gray-50 p-4 rounded-lg">
                 <p><strong>File:</strong> {selectedFile.name}</p>
                 <p><strong>Size:</strong> {formatFileSize(selectedFile.size)}</p>
+                {uploadType === 'OTHER' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => replaceFileRef.current?.click()}
+                      className="mt-3 w-full px-4 py-2.5 bg-white border-2 border-gray-200 text-gray-600 rounded-xl font-semibold hover:border-gray-400 hover:bg-gray-50 transition-all flex items-center justify-center gap-2 text-sm"
+                    >
+                      <RefreshCw size={16} />
+                      Replace File
+                    </button>
+                    <input
+                      ref={replaceFileRef}
+                      type="file"
+                      onChange={handleReplaceFile}
+                      className="hidden"
+                    />
+                  </>
+                )}
               </div>
 
               {uploading && uploadProgress > 0 && (

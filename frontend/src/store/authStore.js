@@ -151,6 +151,17 @@ export const canEdit = () => {
   return user?.teamRole === 'ADMIN' || user?.teamRole === 'EDITOR';
 };
 
+// ✅ NEW: canDelete — only ADMIN + account owner can delete content
+export const canDelete = () => {
+  const user = useAuthStore.getState().user;
+  
+  if (!user?.isTeamMember) {
+    return true; // Account owner
+  }
+  
+  return user?.teamRole === 'ADMIN';
+};
+
 export const canManageTeam = () => {
   const user = useAuthStore.getState().user;
   

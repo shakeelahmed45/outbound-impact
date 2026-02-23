@@ -28,7 +28,10 @@ const PublicViewer = () => {
           
           if (!hasTracked.current) {
             hasTracked.current = true;
-            axios.post(import.meta.env.VITE_API_URL + '/analytics/track', { slug }).catch(err => {
+            // Detect view source from URL params
+            const urlParams = new URLSearchParams(window.location.search);
+            const source = urlParams.get('source') || urlParams.get('s') || 'direct';
+            axios.post(import.meta.env.VITE_API_URL + '/analytics/track', { slug, source }).catch(err => {
               console.log('Failed to track view:', err);
             });
           }

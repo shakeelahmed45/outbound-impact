@@ -1441,6 +1441,222 @@ const sendChatReplyToUser = async (userEmail, userName, adminReply) => {
   }
 };
 
+// ═══════════════════════════════════════════════════════════════
+// 🎯 COHORT MEMBER EMAIL NOTIFICATION
+// Paste this function ABOVE the "module.exports = {" line
+// Then add "sendCohortMemberEmail," to module.exports
+// ═══════════════════════════════════════════════════════════════
+
+// 📧 Send email notification when member is added to a cohort
+const sendCohortMemberEmail = async ({ memberEmail, memberName, cohortName, organizationName, cohortLink }) => {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.log('⚠️ Resend not configured - skipping cohort member email');
+      return { success: false, error: 'Resend not configured' };
+    }
+
+    const greeting = memberName ? `Hi ${memberName}!` : 'Hi there!';
+
+    const { data, error } = await resend.emails.send({
+      from: 'Outbound Impact <noreply@outboundimpact.org>',
+      to: [memberEmail],
+      replyTo: 'support@outboundimpact.org',
+      subject: `📱 You've been added to "${cohortName}" — ${organizationName}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 40px 20px;">
+            <tr>
+              <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); overflow: hidden;">
+                  <tr>
+                    <td style="background: linear-gradient(135deg, #800080 0%, #9333EA 100%); padding: 40px 40px 30px; text-align: center;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">You've Been Added! 🎉</h1>
+                      <p style="color: #e9d5ff; margin: 10px 0 0 0; font-size: 16px;">${organizationName}</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 40px;">
+                      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">${greeting} 👋</p>
+                      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
+                        You've been added to the <strong>"${cohortName}"</strong> group by <strong>${organizationName}</strong>. You now have access to exclusive content shared with this group.
+                      </p>
+                      <table cellpadding="0" cellspacing="0" style="margin: 30px 0; width: 100%;">
+                        <tr>
+                          <td style="background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); padding: 20px; border-radius: 12px; border: 1px solid #e9d5ff;">
+                            <table cellpadding="0" cellspacing="0">
+                              <tr>
+                                <td style="padding-right: 15px; vertical-align: top;">
+                                  <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #800080, #9333EA); border-radius: 12px; text-align: center; line-height: 48px; font-size: 22px; color: white;">👥</div>
+                                </td>
+                                <td>
+                                  <p style="margin: 0; font-weight: bold; color: #800080; font-size: 16px;">${cohortName}</p>
+                                  <p style="margin: 4px 0 0; color: #6b7280; font-size: 14px;">by ${organizationName}</p>
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+                      </table>
+                      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 25px;">Tap the button below to view the content shared with your group:</p>
+                      <table width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td align="center" style="padding: 20px 0;">
+                            <a href="${cohortLink}" style="background: linear-gradient(135deg, #800080 0%, #9333EA 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 12px rgba(128, 0, 128, 0.3);">
+                              View Content →
+                            </a>
+                          </td>
+                        </tr>
+                      </table>
+                      <p style="color: #999999; font-size: 13px; line-height: 1.6; margin: 30px 0 0; padding-top: 20px; border-top: 1px solid #eeeeee;">
+                        Or copy and paste this link:<br>
+                        <a href="${cohortLink}" style="color: #800080; word-break: break-all;">${cohortLink}</a>
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="background-color: #f9f9f9; padding: 30px 40px; text-align: center; border-top: 1px solid #eeeeee;">
+                      <p style="margin: 0; font-size: 14px; color: #6b7280;"><strong style="color: #800080;">Outbound Impact</strong> — Share Content. Track Analytics. Grow Your Reach.</p>
+                      <p style="margin: 10px 0 0 0; font-size: 12px; color: #cccccc;">© ${new Date().getFullYear()} Outbound Impact. All rights reserved.</p>
+                      <p style="margin: 10px 0 0 0; font-size: 11px; color: #cccccc;">You received this because you were added to a group on Outbound Impact.</p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Failed to send cohort member email:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('✅ Cohort member email sent to:', memberEmail, '(ID:', data.id, ')');
+    return { success: true, messageId: data.id };
+  } catch (error) {
+    console.error('❌ Failed to send cohort member email:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+// ✅ Send upgrade receipt email when user changes plan
+const sendUpgradeReceiptEmail = async ({ email, name, oldPlan, newPlan, amountCharged, creditApplied, nextBillingDate }) => {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.log('⚠️ Resend not configured - skipping upgrade receipt');
+      return { success: false, error: 'Resend not configured' };
+    }
+
+    const formattedDate = nextBillingDate 
+      ? new Date(nextBillingDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+      : 'N/A';
+
+    const creditSection = creditApplied > 0
+      ? `
+        <div style="background: #ecfdf5; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #10b981;">
+          <p style="margin: 0; color: #065f46; font-size: 15px;">
+            <strong>✅ 7-Day Upgrade Credit Applied!</strong><br>
+            Your previous ${oldPlan} plan payment of <strong>$${creditApplied.toFixed(2)}</strong> was credited toward your new plan.
+          </p>
+        </div>`
+      : '';
+
+    const { data, error } = await resend.emails.send({
+      from: 'Outbound Impact <noreply@outboundimpact.org>',
+      to: [email],
+      replyTo: 'support@outboundimpact.org',
+      subject: `✅ Plan Upgraded: ${oldPlan} → ${newPlan}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #800080 0%, #9333EA 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #ffffff; padding: 40px 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; }
+            .receipt-box { background: #f8f9fa; padding: 25px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #800080; }
+            .amount { font-size: 36px; font-weight: bold; color: #800080; margin: 15px 0; }
+            .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; padding: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1 style="margin: 0; font-size: 32px; color: white;">🎉 Plan Upgraded!</h1>
+              <p style="margin: 10px 0 0 0; font-size: 16px; color: white;">${oldPlan} → ${newPlan}</p>
+            </div>
+            
+            <div class="content">
+              <p style="font-size: 16px; margin: 0 0 20px;">Hi ${name},</p>
+              
+              <p style="font-size: 16px; margin: 0 0 25px;">Your plan has been successfully upgraded! Here are your receipt details:</p>
+              
+              <div class="receipt-box">
+                <h3 style="color: #800080; margin: 0 0 20px;">📋 Upgrade Receipt</h3>
+                <p style="margin: 10px 0;"><strong>Previous Plan:</strong> ${oldPlan}</p>
+                <p style="margin: 10px 0;"><strong>New Plan:</strong> ${newPlan}</p>
+                ${creditApplied > 0 ? `<p style="margin: 10px 0;"><strong>Credit Applied:</strong> <span style="color: #10b981;">-$${creditApplied.toFixed(2)}</span></p>` : ''}
+                <p style="margin: 10px 0;"><strong>Amount Charged:</strong></p>
+                <div class="amount">$${amountCharged.toFixed(2)} USD</div>
+                <p style="margin: 10px 0;"><strong>Status:</strong> <span style="color: #10b981; font-weight: bold;">✅ Paid</span></p>
+                <p style="margin: 10px 0;"><strong>Next Billing Date:</strong> ${formattedDate}</p>
+              </div>
+              
+              ${creditSection}
+              
+              <p style="font-size: 16px; margin: 25px 0;">Your new plan features are now active. Enjoy the upgrade!</p>
+              
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="https://outboundimpact.net/dashboard" style="display: inline-block; padding: 14px 30px; background: linear-gradient(135deg, #800080 0%, #9333EA 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                  Go to Dashboard →
+                </a>
+              </div>
+              
+              <p style="font-size: 14px; color: #666; margin: 25px 0 0; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+                If you have any questions, contact us at <a href="mailto:support@outboundimpact.org" style="color: #800080;">support@outboundimpact.org</a>
+              </p>
+              
+              <p style="font-size: 16px; margin: 25px 0 0;">
+                Best regards,<br>
+                <strong>The Outbound Impact Team</strong>
+              </p>
+            </div>
+            
+            <div class="footer">
+              <p style="margin: 0 0 10px;">Questions? Email us at <a href="mailto:support@outboundimpact.org" style="color: #800080;">support@outboundimpact.org</a></p>
+              <p style="color: #999; font-size: 12px; margin: 0;">© ${new Date().getFullYear()} Outbound Impact. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Failed to send upgrade receipt:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('✅ Upgrade receipt sent to:', email, '(ID:', data.id, ')');
+    return { success: true, messageId: data.id };
+  } catch (error) {
+    console.error('❌ Failed to send upgrade receipt:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendWelcomeEmail,
   sendAdminNotification,
@@ -1455,5 +1671,7 @@ module.exports = {
   sendChatNotificationToAdmin,
   sendChatReplyToUser,
   sendAdminTeamInvitationEmail,
+  sendCohortMemberEmail,
+  sendUpgradeReceiptEmail,
   testConnection
 };

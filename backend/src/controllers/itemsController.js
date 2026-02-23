@@ -1,4 +1,5 @@
 const prisma = require('../lib/prisma');
+const { buildOrgFilter } = require("../helpers/orgScope");
 const { deleteFromBunny, uploadToBunny, generateFileName } = require('../services/bunnyService');
 
 const getUserItems = async (req, res) => {
@@ -7,6 +8,7 @@ const getUserItems = async (req, res) => {
     const { search, type } = req.query;
 
     const where = {
+      ...buildOrgFilter(req),
       userId,
       ...(type && { type }),
       ...(search && {
@@ -36,6 +38,9 @@ const getUserItems = async (req, res) => {
         fileSize: item.fileSize.toString(),
         campaignId: item.campaignId,
         views: item.views || 0,
+        viewsQr: item.viewsQr || 0,
+        viewsNfc: item.viewsNfc || 0,
+        viewsDirect: item.viewsDirect || 0,
         createdAt: item.createdAt,
         publicUrl: `${process.env.FRONTEND_URL}/l/${item.slug}`,
         buttonText: item.buttonText || null,
@@ -122,12 +127,8 @@ const getPublicItem = async (req, res) => {
       });
     }
 
-    await prisma.item.update({
-      where: { id: item.id },
-      data: {
-        views: { increment: 1 }
-      }
-    });
+    // Note: View counting is handled by trackView in analyticsController
+    // Do NOT increment here to avoid double counting
 
     res.json({
       status: 'success',
@@ -389,10 +390,10 @@ const removeThumbnail = async (req, res) => {
 
 const deleteItem = async (req, res) => {
   try {
-    if (req.teamRole === 'VIEWER') {
+    if (req.teamRole === 'VIEWER' || req.teamRole === 'EDITOR') {
       return res.status(403).json({
         status: 'error',
-        message: 'VIEWER role does not have permission to delete items',
+        message: 'Only ADMIN role can delete items',
       });
     }
 

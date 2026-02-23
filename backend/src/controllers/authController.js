@@ -299,6 +299,41 @@ const completeSignup = async (req, res) => {
           console.error('❌ Failed to send welcome email:', emailError.message);
         }
 
+        // ⏳ Respect Resend rate limit (2 req/sec)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // ✅ Send payment receipt email
+        try {
+          const amount = session.amount_total ? (session.amount_total / 100) : 0;
+          const currency = session.currency ? session.currency.toUpperCase() : 'USD';
+          
+          const planNames = {
+            INDIVIDUAL: 'Individual',
+            ORG_SMALL: 'Small Organization',
+            ORG_MEDIUM: 'Medium Organization',
+            ORG_ENTERPRISE: 'Enterprise',
+          };
+          const planName = planNames[user.role] || user.role || 'Individual';
+
+          if (amount > 0) {
+            await emailService.sendPaymentReceiptEmail(
+              user.email,
+              user.name,
+              amount,
+              currency,
+              planName
+            );
+            console.log('✅ Payment receipt sent to:', user.email, '- Amount:', amount, currency);
+          } else {
+            console.log('⚠️ Skipping receipt email - amount is 0');
+          }
+        } catch (emailError) {
+          console.error('❌ Failed to send payment receipt:', emailError.message);
+        }
+
+        // ⏳ Respect Resend rate limit (2 req/sec)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
         try {
           await emailService.sendAdminNotification({
             userName: user.name,
@@ -690,6 +725,43 @@ const handleUpgradePlan = async (req, res) => {
 
     console.log('✅ User upgraded successfully');
 
+    // ═══ Send upgrade receipt + admin notification emails ═══
+    const planNames = {
+      INDIVIDUAL: 'Individual',
+      ORG_SMALL: 'Small Organization',
+      ORG_MEDIUM: 'Medium Organization',
+      ORG_ENTERPRISE: 'Enterprise',
+    };
+
+    try {
+      const emailService = require('../services/emailService');
+      
+      // Send upgrade receipt to user
+      await emailService.sendUpgradeReceiptEmail({
+        email: updatedUser.email,
+        name: updatedUser.name || 'Valued Customer',
+        oldPlan: planNames[user.role] || user.role,
+        newPlan: planNames[newPlan] || newPlan,
+        amountCharged: upgradeResult.proratedAmount || 0,
+        creditApplied: upgradeResult.creditApplied || 0,
+        nextBillingDate: upgradeResult.currentPeriodEnd,
+      });
+      console.log('📧 Upgrade receipt email sent to:', updatedUser.email);
+
+      // Send admin notification
+      await emailService.sendAdminNotification({
+        userName: updatedUser.name,
+        userEmail: updatedUser.email,
+        plan: newPlan,
+        amount: upgradeResult.proratedAmount,
+        subscriptionId: upgradeResult.subscriptionId,
+      });
+      console.log('📧 Admin upgrade notification sent');
+    } catch (emailError) {
+      console.error('❌ Failed to send upgrade emails:', emailError.message);
+      // Don't fail the upgrade just because email failed
+    }
+
     res.json({
       status: 'success',
       message: 'Plan upgraded successfully!',
@@ -705,6 +777,7 @@ const handleUpgradePlan = async (req, res) => {
         oldPlan: user.role,
         newPlan: newPlan,
         proratedAmount: upgradeResult.proratedAmount,
+        creditApplied: upgradeResult.creditApplied || 0,
         nextBillingDate: upgradeResult.currentPeriodEnd,
       }
     });

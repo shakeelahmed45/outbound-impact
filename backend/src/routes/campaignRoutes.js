@@ -14,6 +14,9 @@ router.get('/public/:slug', campaignController.getPublicCampaign);
 // ✅ NEW: Verify campaign password
 router.post('/public/:slug/verify', campaignController.verifyCampaignPassword);
 
+// ✅ NEW: Track campaign page view (public, no auth needed)
+router.post('/public/:slug/track', campaignController.trackCampaignView);
+
 // ═══════════════════════════════════════════════════════════════════
 // 🔒 PROTECTED ROUTES (Authentication required)
 // ═══════════════════════════════════════════════════════════════════
@@ -35,5 +38,8 @@ router.post('/assign', authMiddleware, resolveEffectiveUserId, campaignControlle
 
 // Update campaign item order
 router.put('/:slug/order', authMiddleware, resolveEffectiveUserId, campaignController.updateCampaignOrder);
+
+// ✅ NEW: Regenerate QR code with tracking parameter
+router.post('/:id/regenerate-qr', authMiddleware, resolveEffectiveUserId, campaignController.regenerateCampaignQR);
 
 module.exports = router;

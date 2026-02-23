@@ -1,8 +1,10 @@
 const prisma = require('../lib/prisma');
+const { buildOrgFilter } = require("../helpers/orgScope");
+const { notifyViewMilestone } = require('../services/notificationService');
 
 const trackView = async (req, res) => {
   try {
-    const { slug } = req.body;
+    const { slug, source } = req.body;
 
     if (!slug) {
       return res.status(400).json({
@@ -22,11 +24,10 @@ const trackView = async (req, res) => {
       });
     }
 
+    // Determine view source from param
+    const viewSource = (source || 'direct').toLowerCase();
+
     const userAgent = req.headers['user-agent'] || '';
-    const ipAddress = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 
-                      req.headers['x-real-ip'] || 
-                      req.connection.remoteAddress || 
-                      req.socket.remoteAddress;
 
     let device = 'Desktop';
     if (/mobile/i.test(userAgent)) {
@@ -61,6 +62,11 @@ const trackView = async (req, res) => {
 
     let country = 'Unknown';
     try {
+      const ipAddress = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 
+                        req.headers['x-real-ip'] || 
+                        req.connection.remoteAddress || 
+                        req.socket.remoteAddress;
+
       if (ipAddress && 
           !ipAddress.includes('127.0.0.1') && 
           !ipAddress.includes('localhost') &&
@@ -81,15 +87,60 @@ const trackView = async (req, res) => {
       console.log('Geolocation lookup failed, using Unknown:', geoError.message);
     }
 
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // STEP 1: Create Analytics record (for dashboard counts)
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     await prisma.analytics.create({
       data: {
         itemId: item.id,
+        source: viewSource,
         country: country,
         device: device,
         browser: browser,
         os: os,
       },
     });
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // STEP 2: Increment view counters on the Item
+    // Use try/catch so if viewsQr columns don't exist,
+    // we still fall back to just incrementing total views
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    try {
+      const incrementData = { views: { increment: 1 } };
+      if (viewSource === 'qr') {
+        incrementData.viewsQr = { increment: 1 };
+      } else if (viewSource === 'nfc') {
+        incrementData.viewsNfc = { increment: 1 };
+      } else {
+        incrementData.viewsDirect = { increment: 1 };
+      }
+
+      await prisma.item.update({
+        where: { id: item.id },
+        data: incrementData,
+      });
+
+      // ðŸ”” Notify: view milestone check
+      const updatedItem = await prisma.item.findUnique({
+        where: { id: item.id },
+        select: { views: true, title: true, userId: true },
+      });
+      if (updatedItem) {
+        await notifyViewMilestone(updatedItem.userId, updatedItem.title, updatedItem.views);
+      }
+    } catch (updateError) {
+      // Fallback: if source columns don't exist, just increment total views
+      console.log('Source column update failed, falling back to views only:', updateError.message);
+      try {
+        await prisma.item.update({
+          where: { id: item.id },
+          data: { views: { increment: 1 } },
+        });
+      } catch (fallbackError) {
+        console.error('Even basic views increment failed:', fallbackError.message);
+      }
+    }
 
     res.json({
       status: 'success',
@@ -109,7 +160,7 @@ const getAnalytics = async (req, res) => {
     const userId = req.effectiveUserId;
 
     const items = await prisma.item.findMany({
-      where: { userId },
+      where: { userId, ...buildOrgFilter(req) },
       select: {
         id: true,
         title: true,
@@ -161,46 +212,45 @@ const getAnalytics = async (req, res) => {
       }));
 
     const campaigns = await prisma.campaign.findMany({
-      where: { userId },
+      where: { userId, ...buildOrgFilter(req) },
       include: {
         _count: {
           select: { items: true },
         },
-        items: {
-          select: {
-            id: true,
-          },
-        },
       },
     });
 
-    const campaignStats = await Promise.all(
-      campaigns.map(async (campaign) => {
-        const campaignItemIds = campaign.items.map(item => item.id);
-        const views = await prisma.analytics.count({
-          where: {
-            itemId: { in: campaignItemIds }
-          }
-        });
-        
-        return {
-          id: campaign.id,
-          name: campaign.name,
-          itemCount: campaign._count.items,
-          views: views,
-        };
-      })
-    );
+    const campaignSummary = campaigns.map(c => ({
+      id: c.id,
+      name: c.name,
+      itemCount: c._count.items,
+    }));
+
+    // Source breakdown from Analytics table
+    let sourceBreakdown = { qr: 0, nfc: 0, direct: 0 };
+    try {
+      const sourceCounts = await prisma.analytics.groupBy({
+        by: ['source'],
+        where: { itemId: { in: itemIds } },
+        _count: { source: true },
+      });
+      sourceCounts.forEach(sc => {
+        if (sc.source === 'qr') sourceBreakdown.qr = sc._count.source;
+        else if (sc.source === 'nfc') sourceBreakdown.nfc = sc._count.source;
+        else sourceBreakdown.direct += sc._count.source;
+      });
+    } catch (e) {
+      console.log('Source breakdown query failed:', e.message);
+    }
 
     res.json({
       status: 'success',
-      analytics: {
-        totalItems,
-        totalViews,
-        itemsByType,
-        recentItems,
-        campaignStats,
-      },
+      totalItems,
+      totalViews,
+      itemsByType,
+      recentItems,
+      campaigns: campaignSummary,
+      sourceBreakdown,
     });
   } catch (error) {
     console.error('Get analytics error:', error);
@@ -227,59 +277,38 @@ const getItemAnalytics = async (req, res) => {
       });
     }
 
-    const totalViews = await prisma.analytics.count({
-      where: { itemId: id }
-    });
-
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    // Get all analytics records for this item in the last 30 days
-    const analyticsRecords = await prisma.analytics.findMany({
-      where: {
-        itemId: id,
-        createdAt: { gte: thirtyDaysAgo }
-      },
-      select: {
-        createdAt: true,
-      },
-    });
-
-    // Group by date (not timestamp)
-    const viewsByDateMap = {};
-    analyticsRecords.forEach(record => {
-      const dateStr = record.createdAt.toISOString().split('T')[0];
-      if (!viewsByDateMap[dateStr]) {
-        viewsByDateMap[dateStr] = 0;
-      }
-      viewsByDateMap[dateStr]++;
-    });
-
-    // Convert to array format
-    const formattedViewsByDate = Object.entries(viewsByDateMap).map(([date, views]) => ({
-      date,
-      views
-    })).sort((a, b) => a.date.localeCompare(b.date));
-
-    const topLocations = await prisma.analytics.groupBy({
-      by: ['country'],
+    const analytics = await prisma.analytics.findMany({
       where: { itemId: id },
-      _count: true,
-      orderBy: { _count: { country: 'desc' } },
-      take: 5
+      orderBy: { createdAt: 'desc' },
     });
 
-    const formattedLocations = topLocations.map(loc => ({
-      country: loc.country || 'Unknown',
-      views: loc._count
-    }));
+    const totalViews = analytics.length;
+
+    const byCountry = {};
+    const byDevice = {};
+    const byBrowser = {};
+    const bySource = {};
+
+    analytics.forEach(record => {
+      byCountry[record.country || 'Unknown'] = (byCountry[record.country || 'Unknown'] || 0) + 1;
+      byDevice[record.device || 'Unknown'] = (byDevice[record.device || 'Unknown'] || 0) + 1;
+      byBrowser[record.browser || 'Unknown'] = (byBrowser[record.browser || 'Unknown'] || 0) + 1;
+      bySource[record.source || 'direct'] = (bySource[record.source || 'direct'] || 0) + 1;
+    });
 
     res.json({
       status: 'success',
+      item: {
+        id: item.id,
+        title: item.title,
+        type: item.type,
+      },
       analytics: {
         totalViews,
-        viewsByDate: formattedViewsByDate,
-        topLocations: formattedLocations,
+        byCountry,
+        byDevice,
+        byBrowser,
+        bySource,
       },
     });
   } catch (error) {
@@ -295,9 +324,8 @@ const getActivityData = async (req, res) => {
   try {
     const userId = req.effectiveUserId;
 
-    // Get all items for the user
     const items = await prisma.item.findMany({
-      where: { userId },
+      where: { userId, ...buildOrgFilter(req) },
       select: { id: true },
     });
 
@@ -310,20 +338,19 @@ const getActivityData = async (req, res) => {
       });
     }
 
-    // Get all analytics records for user's items
     const analyticsRecords = await prisma.analytics.findMany({
       where: {
         itemId: { in: itemIds }
       },
       select: {
         createdAt: true,
+        source: true,
       },
       orderBy: {
         createdAt: 'desc'
       },
     });
 
-    // Process data by date
     const activityByDate = {};
     
     analyticsRecords.forEach(record => {
@@ -332,13 +359,18 @@ const getActivityData = async (req, res) => {
         activityByDate[dateStr] = {
           date: dateStr,
           views: 0,
+          qrScans: 0,
+          nfcTaps: 0,
+          directViews: 0,
           createdAt: record.createdAt,
         };
       }
       activityByDate[dateStr].views += 1;
+      if (record.source === 'qr') activityByDate[dateStr].qrScans += 1;
+      else if (record.source === 'nfc') activityByDate[dateStr].nfcTaps += 1;
+      else activityByDate[dateStr].directViews += 1;
     });
 
-    // Convert to array and sort by date
     const activity = Object.values(activityByDate).sort((a, b) => 
       new Date(a.date) - new Date(b.date)
     );
@@ -360,59 +392,40 @@ const getTimeOfDayActivity = async (req, res) => {
   try {
     const userId = req.effectiveUserId;
 
-    // Get all items for the user
     const items = await prisma.item.findMany({
-      where: { userId },
+      where: { userId, ...buildOrgFilter(req) },
       select: { id: true },
     });
 
     const itemIds = items.map(item => item.id);
 
     if (itemIds.length === 0) {
-      return res.json({
-        status: 'success',
-        activityByHour: Array.from({ length: 24 }, (_, i) => ({
-          hour: i,
-          hourLabel: `${String(i).padStart(2, '0')}:00`,
-          views: 0
-        }))
-      });
+      return res.json({ status: 'success', hourly: [] });
     }
 
-    // Get all analytics records for user's items
-    const analyticsRecords = await prisma.analytics.findMany({
-      where: {
-        itemId: { in: itemIds }
-      },
-      select: {
-        createdAt: true,
-      },
+    const records = await prisma.analytics.findMany({
+      where: { itemId: { in: itemIds } },
+      select: { createdAt: true },
     });
 
-    // Count views by hour (0-23)
-    const hourCounts = Array(24).fill(0);
-    
-    analyticsRecords.forEach(record => {
-      const hour = record.createdAt.getHours();
+    const hourCounts = new Array(24).fill(0);
+    records.forEach(r => {
+      const hour = new Date(r.createdAt).getHours();
       hourCounts[hour]++;
     });
 
-    // Format response
-    const activityByHour = hourCounts.map((count, hour) => ({
+    const hourly = hourCounts.map((count, hour) => ({
       hour,
-      hourLabel: `${String(hour).padStart(2, '0')}:00`,
-      views: count
+      label: `${hour.toString().padStart(2, '0')}:00`,
+      views: count,
     }));
 
-    res.json({
-      status: 'success',
-      activityByHour,
-    });
+    res.json({ status: 'success', hourly });
   } catch (error) {
-    console.error('Get time of day activity error:', error);
+    console.error('Get time of day error:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Failed to get time of day activity',
+      message: 'Failed to get time of day data',
     });
   }
 };

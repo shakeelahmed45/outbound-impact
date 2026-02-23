@@ -5,6 +5,7 @@ import {
   Download, Search, Filter, X, Loader2, Share2, Lock, ExternalLink, Paperclip, Save, Folder, Upload
 } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
+import { canEdit, canDelete } from '../store/authStore';
 import api from '../services/api';
 import { useToast } from '../hooks/useToast';
 import Toast from '../components/common/Toast';
@@ -438,6 +439,8 @@ const ItemsPage = () => {
                       <Eye size={16} />
                       View
                     </button>
+                    {/* ✅ Edit — hidden for VIEWER */}
+                    {canEdit() && (
                     <button
                       onClick={() => handleEditClick(item)}
                       className="flex-1 px-3 py-2 border-2 border-primary text-primary rounded-lg font-semibold text-sm hover:bg-purple-50 transition flex items-center justify-center gap-1"
@@ -445,12 +448,16 @@ const ItemsPage = () => {
                       <Edit size={16} />
                       Edit
                     </button>
+                    )}
+                    {/* ✅ Delete — hidden for VIEWER + EDITOR */}
+                    {canDelete() && (
                     <button
                       onClick={() => handleDelete(item.id)}
                       className="px-3 py-2 border-2 border-red-500 text-red-500 rounded-lg font-semibold text-sm hover:bg-red-50 transition"
                     >
                       <Trash2 size={16} />
                     </button>
+                    )}
                   </div>
                 </div>
               </div>

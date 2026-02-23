@@ -562,8 +562,77 @@ const reactivateSubscription = async (req, res) => {
   }
 };
 
+/**
+ * ✅ CREATE STRIPE BILLING PORTAL SESSION
+ * 
+ * Opens Stripe's hosted portal where users can:
+ * - Update payment method (credit/debit card)
+ * - View billing history & invoices
+ * - Download receipts
+ */
+const createBillingPortal = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    console.log('🔗 Creating billing portal session for user:', userId);
+
+    // Get user with subscription data
+    let user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        stripeCustomerId: true,
+        subscriptionStatus: true,
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    // Try to sync if missing
+    user = await syncSubscriptionDataIfMissing(user);
+
+    if (!user.stripeCustomerId) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'No billing account found. Please subscribe to a plan first.'
+      });
+    }
+
+    console.log('✅ Creating portal for Stripe customer:', user.stripeCustomerId);
+
+    // Create Stripe Billing Portal session
+    const session = await stripe.billingPortal.sessions.create({
+      customer: user.stripeCustomerId,
+      return_url: `${process.env.FRONTEND_URL}/dashboard/settings`,
+    });
+
+    console.log('✅ Billing portal session created:', session.url);
+
+    res.json({
+      status: 'success',
+      portalUrl: session.url,
+    });
+
+  } catch (error) {
+    console.error('❌ Billing portal error:', error);
+    console.error('   Error message:', error.message);
+    
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to open billing portal'
+    });
+  }
+};
+
 module.exports = {
   toggleAutoRenewal,
   cancelSubscription,
   reactivateSubscription,
+  createBillingPortal,
 };

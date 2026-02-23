@@ -7,4 +7,10 @@ const { resolveEffectiveUserId } = require('../middleware/resolveEffectiveUserId
 // ✅ FIXED: Add resolveEffectiveUserId middleware
 router.get('/stats', authMiddleware, resolveEffectiveUserId, dashboardController.getDashboardStats);
 
+// ✅ NEW: Views Over Time (daily/weekly chart data)
+router.get('/views-over-time', authMiddleware, resolveEffectiveUserId, dashboardController.getViewsOverTime);
+
+// ✅ NEW: Recent Activity (latest items with views)
+router.get('/recent-activity', authMiddleware, resolveEffectiveUserId, dashboardController.getRecentActivity);
+
 module.exports = router;

@@ -124,6 +124,11 @@ api.interceptors.response.use(
         api.clearCache('items');
       } else if (url.includes('/analytics')) {
         api.clearCache('analytics');
+      } else if (url.includes('/organizations')) {
+        api.clearCache('organizations');
+        api.clearCache('team');
+      } else if (url.includes('/team')) {
+        api.clearCache('team');
       }
     }
     

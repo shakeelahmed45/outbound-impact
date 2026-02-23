@@ -109,7 +109,13 @@ const getCheckoutSession = async (sessionId) => {
 };
 
 /**
- * Upgrade user's plan with prorated billing
+ * Upgrade user's plan with 7-day credit billing logic
+ * 
+ * Within 7 days of subscription start:
+ *   → Credit old plan price to customer balance → charge only the difference
+ * After 7 days:
+ *   → Charge full new plan price (no credit)
+ * 
  * @param {Object} user - Current user object from database
  * @param {String} newPriceId - New Stripe price ID
  * @param {String} newPlanName - New plan name (ORG_SMALL, ORG_MEDIUM, etc.)
@@ -117,27 +123,26 @@ const getCheckoutSession = async (sessionId) => {
  */
 const upgradePlan = async (user, newPriceId, newPlanName) => {
   try {
-    console.log('=== UPGRADE PLAN DEBUG ===');
+    console.log('=== UPGRADE PLAN ===');
     console.log('User:', user.email);
+    console.log('Current role:', user.role);
     console.log('Current subscription:', user.subscriptionId);
     console.log('New price ID:', newPriceId);
     console.log('New plan:', newPlanName);
 
-    // ✅ UPDATED: Individual plan is now also subscription-based
-    // For users upgrading from INDIVIDUAL (if no subscriptionId exists yet)
+    // ═══ Case 1: No existing subscription (e.g. free/Individual without Stripe sub) ═══
     if (!user.subscriptionId && user.stripeCustomerId) {
-      // Create new subscription with customer
       const subscription = await stripe.subscriptions.create({
         customer: user.stripeCustomerId,
         items: [{ price: newPriceId }],
-        proration_behavior: 'none', // No proration for first subscription
+        proration_behavior: 'none',
         metadata: {
           planName: newPlanName,
           upgradedFrom: user.role,
         },
       });
 
-      console.log('Created new subscription:', subscription.id);
+      console.log('✅ Created new subscription:', subscription.id);
 
       return {
         subscriptionId: subscription.id,
@@ -145,101 +150,216 @@ const upgradePlan = async (user, newPriceId, newPlanName) => {
         currentPeriodStart: new Date(subscription.current_period_start * 1000),
         currentPeriodEnd: new Date(subscription.current_period_end * 1000),
         priceId: newPriceId,
-        proratedAmount: subscription.items.data[0].price.unit_amount / 100, // Full amount for new subscription
+        proratedAmount: subscription.items.data[0].price.unit_amount / 100,
+        creditApplied: 0,
       };
     }
 
-    // For subscription-to-subscription upgrades
     if (!user.subscriptionId) {
       throw new Error('User has no active subscription to upgrade');
     }
 
-    // Get current subscription details
-    const currentSubscription = await stripe.subscriptions.retrieve(user.subscriptionId);
-    
-    console.log('Current subscription details:', {
-      id: currentSubscription.id,
-      status: currentSubscription.status,
-      current_period_start: currentSubscription.current_period_start,
-      current_period_end: currentSubscription.current_period_end,
-    });
+    // ═══ Case 2: Existing subscription → 7-day credit logic ═══
+    let currentSubscription;
+    try {
+      currentSubscription = await stripe.subscriptions.retrieve(user.subscriptionId);
+    } catch (retrieveError) {
+      // Subscription no longer exists (possibly from a previous failed upgrade)
+      console.warn('⚠️ Subscription not found in Stripe:', user.subscriptionId);
+      console.warn('   Treating as no active subscription — creating fresh subscription');
+      
+      // Ensure customer has a payment method
+      const customer = await stripe.customers.retrieve(user.stripeCustomerId);
+      const paymentMethod = customer.invoice_settings?.default_payment_method || customer.default_source;
+      
+      if (!paymentMethod) {
+        throw new Error('No payment method found. Please update your payment method in Settings before upgrading.');
+      }
 
-    // Calculate prorated amount
-    const now = Math.floor(Date.now() / 1000);
-    const periodStart = currentSubscription.current_period_start;
-    const periodEnd = currentSubscription.current_period_end;
-    const totalPeriod = periodEnd - periodStart;
-    const usedPeriod = now - periodStart;
-    const remainingPeriod = periodEnd - now;
-    const usagePercent = (usedPeriod / totalPeriod) * 100;
-
-    console.log('Proration calculation:', {
-      now,
-      periodStart,
-      periodEnd,
-      totalPeriod: `${totalPeriod} seconds (${(totalPeriod / 86400).toFixed(1)} days)`,
-      usedPeriod: `${usedPeriod} seconds (${(usedPeriod / 86400).toFixed(1)} days)`,
-      remainingPeriod: `${remainingPeriod} seconds (${(remainingPeriod / 86400).toFixed(1)} days)`,
-      usagePercent: `${usagePercent.toFixed(2)}%`,
-    });
-
-    // Update subscription with new price
-    // Stripe automatically handles proration
-    const updatedSubscription = await stripe.subscriptions.update(
-      user.subscriptionId,
-      {
-        items: [{
-          id: currentSubscription.items.data[0].id,
-          price: newPriceId,
-        }],
-        proration_behavior: 'create_prorations', // Automatically calculate prorated amounts
+      const subscription = await stripe.subscriptions.create({
+        customer: user.stripeCustomerId,
+        items: [{ price: newPriceId }],
+        default_payment_method: paymentMethod,
+        proration_behavior: 'none',
         metadata: {
           planName: newPlanName,
           upgradedFrom: user.role,
-          upgradeDate: new Date().toISOString(),
         },
+      });
+
+      console.log('✅ Created fresh subscription:', subscription.id);
+
+      return {
+        subscriptionId: subscription.id,
+        status: subscription.status,
+        currentPeriodStart: new Date(subscription.current_period_start * 1000),
+        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+        priceId: newPriceId,
+        proratedAmount: subscription.items.data[0].price.unit_amount / 100,
+        creditApplied: 0,
+      };
+    }
+
+    // If subscription is already canceled, treat same as above
+    if (currentSubscription.status === 'canceled') {
+      console.warn('⚠️ Subscription already canceled — creating fresh subscription');
+      
+      const customer = await stripe.customers.retrieve(user.stripeCustomerId);
+      const paymentMethod = customer.invoice_settings?.default_payment_method || customer.default_source;
+      
+      if (!paymentMethod) {
+        throw new Error('No payment method found. Please update your payment method in Settings before upgrading.');
       }
-    );
 
-    console.log('Subscription updated successfully');
-    console.log('New subscription details:', {
-      id: updatedSubscription.id,
-      status: updatedSubscription.status,
-      proration_created: 'yes',
+      const subscription = await stripe.subscriptions.create({
+        customer: user.stripeCustomerId,
+        items: [{ price: newPriceId }],
+        default_payment_method: paymentMethod,
+        proration_behavior: 'none',
+        metadata: {
+          planName: newPlanName,
+          upgradedFrom: user.role,
+        },
+      });
+
+      return {
+        subscriptionId: subscription.id,
+        status: subscription.status,
+        currentPeriodStart: new Date(subscription.current_period_start * 1000),
+        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+        priceId: newPriceId,
+        proratedAmount: subscription.items.data[0].price.unit_amount / 100,
+        creditApplied: 0,
+      };
+    }
+
+    console.log('Current subscription:', {
+      id: currentSubscription.id,
+      status: currentSubscription.status,
+      current_period_start: new Date(currentSubscription.current_period_start * 1000).toISOString(),
     });
 
-    // Get the upcoming invoice to see the prorated amount
-    const upcomingInvoice = await stripe.invoices.retrieveUpcoming({
+    // ═══ Capture payment method BEFORE canceling old subscription ═══
+    let defaultPaymentMethod = currentSubscription.default_payment_method;
+    
+    if (!defaultPaymentMethod) {
+      // Try to get from customer's default
+      const customer = await stripe.customers.retrieve(user.stripeCustomerId);
+      defaultPaymentMethod = customer.invoice_settings?.default_payment_method || customer.default_source;
+    }
+
+    if (!defaultPaymentMethod) {
+      // Last resort: get from the latest invoice's payment intent
+      const invoices = await stripe.invoices.list({
+        subscription: user.subscriptionId,
+        status: 'paid',
+        limit: 1,
+      });
+      if (invoices.data.length > 0 && invoices.data[0].payment_intent) {
+        const pi = await stripe.paymentIntents.retrieve(invoices.data[0].payment_intent);
+        defaultPaymentMethod = pi.payment_method;
+      }
+    }
+
+    if (!defaultPaymentMethod) {
+      throw new Error('No payment method found. Please update your payment method in Settings before upgrading.');
+    }
+
+    console.log('💳 Payment method captured:', defaultPaymentMethod);
+
+    // Ensure the payment method is set as customer default
+    await stripe.customers.update(user.stripeCustomerId, {
+      invoice_settings: { default_payment_method: defaultPaymentMethod },
+    });
+    console.log('✅ Payment method set as customer default');
+
+    // Calculate days since subscription start
+    const periodStartDate = new Date(currentSubscription.current_period_start * 1000);
+    const now = new Date();
+    const daysSinceStart = Math.floor((now - periodStartDate) / (1000 * 60 * 60 * 24));
+    const isWithin7Days = daysSinceStart <= 7;
+
+    console.log('📅 Days since period start:', daysSinceStart);
+    console.log('💰 Within 7-day credit window:', isWithin7Days ? 'YES' : 'NO');
+
+    let creditApplied = 0;
+
+    if (isWithin7Days) {
+      // ═══ Within 7 days: Credit old plan amount to customer balance ═══
+      // Find the latest paid invoice for this subscription
+      const invoices = await stripe.invoices.list({
+        subscription: user.subscriptionId,
+        status: 'paid',
+        limit: 1,
+      });
+
+      if (invoices.data.length > 0) {
+        const lastPaidAmount = invoices.data[0].amount_paid; // in cents
+        creditApplied = lastPaidAmount / 100; // in dollars
+
+        console.log('💰 Old plan paid amount:', creditApplied, 'USD');
+        console.log('💰 Applying credit to customer balance...');
+
+        // Add credit to customer balance (negative = credit)
+        await stripe.customers.createBalanceTransaction(user.stripeCustomerId, {
+          amount: -lastPaidAmount, // negative = credit
+          currency: 'usd',
+          description: `Upgrade credit: ${user.role} → ${newPlanName} (within 7-day window)`,
+        });
+
+        console.log('✅ Credit of $' + creditApplied + ' applied to customer balance');
+      }
+    } else {
+      console.log('⚠️ Past 7-day window — no credit applied, full price charged');
+    }
+
+    // Cancel old subscription immediately
+    console.log('🗑️ Canceling old subscription...');
+    await stripe.subscriptions.cancel(user.subscriptionId);
+    console.log('✅ Old subscription canceled');
+
+    // Create new subscription (credit balance auto-applies if within 7 days)
+    console.log('🆕 Creating new subscription for:', newPlanName);
+    const newSubscription = await stripe.subscriptions.create({
       customer: user.stripeCustomerId,
-      subscription: user.subscriptionId,
+      items: [{ price: newPriceId }],
+      default_payment_method: defaultPaymentMethod,
+      proration_behavior: 'none',
+      metadata: {
+        planName: newPlanName,
+        upgradedFrom: user.role,
+        upgradeDate: new Date().toISOString(),
+        creditApplied: creditApplied.toString(),
+      },
     });
 
-    console.log('Upcoming invoice:', {
-      amount_due: upcomingInvoice.amount_due / 100, // Convert cents to dollars
-      currency: upcomingInvoice.currency,
-      lines: upcomingInvoice.lines.data.map(line => ({
-        description: line.description,
-        amount: line.amount / 100,
-        proration: line.proration,
-      })),
+    console.log('✅ New subscription created:', newSubscription.id);
+
+    // Get the actual charge amount from the latest invoice
+    const newInvoice = await stripe.invoices.list({
+      subscription: newSubscription.id,
+      limit: 1,
     });
+
+    const actualCharged = newInvoice.data.length > 0 
+      ? newInvoice.data[0].amount_paid / 100 
+      : newSubscription.items.data[0].price.unit_amount / 100;
+
+    console.log('💰 Actual amount charged:', actualCharged, 'USD');
+    console.log('💰 Credit applied:', creditApplied, 'USD');
 
     return {
-      subscriptionId: updatedSubscription.id,
-      status: updatedSubscription.status,
-      currentPeriodStart: new Date(updatedSubscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(updatedSubscription.current_period_end * 1000),
+      subscriptionId: newSubscription.id,
+      status: newSubscription.status,
+      currentPeriodStart: new Date(newSubscription.current_period_start * 1000),
+      currentPeriodEnd: new Date(newSubscription.current_period_end * 1000),
       priceId: newPriceId,
-      proratedAmount: upcomingInvoice.amount_due / 100, // Amount to charge (in dollars)
-      proratedInvoice: {
-        subtotal: upcomingInvoice.subtotal / 100,
-        total: upcomingInvoice.total / 100,
-        amountDue: upcomingInvoice.amount_due / 100,
-      },
+      proratedAmount: actualCharged,
+      creditApplied: creditApplied,
     };
 
   } catch (error) {
-    console.error('Upgrade plan error:', error);
+    console.error('❌ Upgrade plan error:', error);
     throw error;
   }
 };

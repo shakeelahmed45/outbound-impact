@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, Folder, Play, FileText, Music, Image as ImageIcon, Eye, Mic, ArrowLeft, Share2, Copy, Check, X, Lock, Loader2, Key, Shield, ExternalLink, Link } from 'lucide-react';
 import axios from 'axios';
@@ -288,6 +288,29 @@ const PublicCampaignViewer = () => {
   const [isCustomizeMode, setIsCustomizeMode] = useState(false);
   const [draggedItem, setDraggedItem] = useState(null);
   const [savingOrder, setSavingOrder] = useState(false);
+
+  // 📊 VIEW TRACKING
+  const hasTrackedCampaign = useRef(false);
+
+  // Track campaign page view ONCE (not on preview, not on password screen)
+  useEffect(() => {
+    if (!campaign || !campaign.items) return;
+    if (hasTrackedCampaign.current) return;
+    if (requiresPassword) return;
+    if (isPreviewMode) return;
+
+    hasTrackedCampaign.current = true;
+
+    // Detect source from URL params (?s=qr or ?source=nfc)
+    const urlSource = searchParams.get('s') || searchParams.get('source') || 'direct';
+
+    axios.post(
+      `${import.meta.env.VITE_API_URL}/campaigns/public/${slug}/track`,
+      { source: urlSource }
+    ).catch(err => {
+      console.log('Failed to track campaign view:', err.message);
+    });
+  }, [campaign, requiresPassword, isPreviewMode, slug]);
 
   // ✅ Check if user can customize content order
   const canCustomizeContent = () => {
@@ -1106,9 +1129,11 @@ const PublicCampaignViewer = () => {
     const scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
     sessionStorage.setItem(`campaign_scroll_${slug}`, scrollPosition.toString());
     
-    // Preserve preview parameter when navigating to item
+    // ✅ Pass through source (qr/nfc) so item view tracks correctly
     const previewParam = isPreviewMode ? '&preview=true' : '';
-    navigate(`/l/${item.slug}?from=${slug}${previewParam}`);
+    const urlSource = searchParams.get('s') || searchParams.get('source') || '';
+    const sourceParam = urlSource ? `&s=${urlSource}` : '';
+    navigate(`/l/${item.slug}?from=${slug}${sourceParam}${previewParam}`);
   };
 
   // ✅ PASSWORD PROMPT UI (before loading check)

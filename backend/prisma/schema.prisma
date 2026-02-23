@@ -50,6 +50,7 @@ model User {
   teamMembers       TeamMember[]       @relation("OrganizationMembers")
   memberOf          TeamMember[]       @relation("MemberOf")
   feedback          Feedback[]
+  organizations     Organization[]
   chatConversations ChatConversation[]
 
   // 🆕 PHASE 3: Admin invitation relation
@@ -61,11 +62,18 @@ model User {
   webhooks             Webhook[]
   integrations         Integration[]
   auditLogs            AuditLog[]
+  notifications        Notification[]
+  cohorts              Cohort[]
+  workflows            Workflow[]
+
+  // 📬 Inbox messaging relations
+  sentMessages      Message[] @relation("MessageSender")
+  receivedMessages  Message[] @relation("MessageRecipient")
 
   @@index([email])
   @@index([resetToken])
   @@index([status])
-  @@index([role])  // 🆕 PHASE 3: Index for role-based queries
+  @@index([role])
 }
 
 enum Role {
@@ -74,7 +82,7 @@ enum Role {
   ORG_MEDIUM
   ORG_ENTERPRISE
   ADMIN
-  CUSTOMER_SUPPORT  // 🆕 PHASE 3: New role for limited access
+  CUSTOMER_SUPPORT
 }
 
 model Item {
@@ -95,6 +103,9 @@ model Item {
   nfcEnabled   Boolean   @default(false)
   nfcUrl       String?
 
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
   buttonText  String?
   buttonUrl   String?
   attachments Json?   @db.JsonB
@@ -112,6 +123,7 @@ model Item {
   @@index([userId])
   @@index([slug])
   @@index([sharingEnabled])
+  @@index([organizationId])
 }
 
 enum MediaType {
@@ -132,22 +144,30 @@ model Campaign {
   logoUrl     String?
   qrCodeUrl   String?
   userId      String
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   
   passwordProtected Boolean  @default(false)
   passwordHash      String?
 
   itemOrder   String[] @default([])
+  views       Int      @default(0)
+  viewsQr     Int      @default(0)
+  viewsNfc    Int      @default(0)
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items Item[]
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items         Item[]
+  cohortStreams  CohortStream[]
 
   @@index([userId])
   @@index([slug])
   @@index([category])
   @@index([passwordProtected])
+  @@index([organizationId])
 }
 
 model TeamMember {
@@ -159,7 +179,13 @@ model TeamMember {
   status       String   @default("PENDING")
   token        String?  @unique
   message      String?
+  roleChangeRequested    Boolean   @default(false)
+  requestedRole          String?
+  roleChangeNote         String?   @db.Text
+  roleChangeRequestedAt  DateTime?
   createdAt    DateTime @default(now())
+
+  organizationAssignments OrganizationMember[]
 
   user       User  @relation(fields: [userId], references: [id], onDelete: Cascade, name: "OrganizationMembers")
   memberUser User? @relation(fields: [memberUserId], references: [id], onDelete: Cascade, name: "MemberOf")
@@ -237,7 +263,7 @@ model ChatConversation {
   @@index([status])
   @@index([lastMessageAt])
   @@index([isAiHandling])
-  @@index([feedbackRating])  // 🆕 PHASE 3: Index for feedback queries
+  @@index([feedbackRating])
 }
 
 enum ChatStatus {
@@ -349,10 +375,10 @@ model ChatBotAnalytics {
 model AdminInvitation {
   id          String   @id @default(uuid())
   email       String
-  role        Role     // ADMIN or CUSTOMER_SUPPORT
+  role        Role
   token       String   @unique
   invitedBy   String
-  status      String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED
+  status      String   @default("PENDING")
   expiresAt   DateTime
   createdAt   DateTime @default(now())
   
@@ -441,4 +467,197 @@ model AuditLog {
   
   @@index([userId])
   @@index([createdAt])
+}
+
+// ========================================
+// 🔔 NOTIFICATIONS
+// ========================================
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   @default("info")
+  category  String   @default("general")
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, read])
+  @@index([createdAt])
+  @@index([category])
+}
+
+// ========================================
+// 🎯 COHORT FEATURE
+// ========================================
+
+model Cohort {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  slug        String   @unique
+  qrCodeUrl   String?
+  status      String   @default("active")
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     CohortMember[]
+  streams     CohortStream[]
+
+  @@index([userId])
+  @@index([slug])
+  @@index([status])
+  @@index([organizationId])
+}
+
+model CohortMember {
+  id        String   @id @default(uuid())
+  cohortId  String
+  cohort    Cohort   @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  name      String?
+  email     String?
+  phone     String?
+  createdAt DateTime @default(now())
+
+  @@index([cohortId])
+  @@unique([cohortId, email])
+}
+
+model CohortStream {
+  id         String   @id @default(uuid())
+  cohortId   String
+  cohort     Cohort   @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([cohortId, campaignId])
+  @@index([cohortId])
+  @@index([campaignId])
+}
+
+model Workflow {
+  id               String    @id @default(uuid())
+  userId           String
+  submittedById    String
+  submittedByName  String?
+  submittedByEmail String?
+
+  assetName        String
+  assetType        String?
+  assetUrl         String?   @db.Text
+  itemId           String?
+  campaignId       String?
+
+  status           String    @default("DRAFT")
+  version          String    @default("v1.0")
+  feedback         String?   @db.Text
+  comments         Int       @default(0)
+
+  reviewedBy       String?
+  reviewedAt       DateTime?
+  submittedAt      DateTime?
+  approvedAt       DateTime?
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([submittedById])
+}
+
+// ════════════════════════════════════════
+// 🏢 ORGANIZATION FEATURE
+// ════════════════════════════════════════
+
+model Organization {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?  @db.Text
+  color       String   @default("#7c3aed")
+  icon        String   @default("folder")
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items       Item[]
+  campaigns   Campaign[]
+  cohorts     Cohort[]
+  members     OrganizationMember[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model OrganizationMember {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  teamMemberId   String
+  teamMember     TeamMember   @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, teamMemberId])
+  @@index([organizationId])
+  @@index([teamMemberId])
+}
+
+// ════════════════════════════════════════
+// 📬 INBOX MESSAGING
+// ════════════════════════════════════════
+
+model Message {
+  id          String   @id @default(uuid())
+  senderId    String
+  recipientId String?
+
+  type        String   @default("internal")
+
+  toEmail     String?
+  fromName    String?
+
+  subject     String
+  body        String   @db.Text
+
+  read        Boolean  @default(false)
+  starred     Boolean  @default(false)
+  archived    Boolean  @default(false)
+
+  parentId    String?
+  parent      Message? @relation("MessageReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies     Message[] @relation("MessageReplies")
+
+  emailStatus String?  @default("pending")
+  emailId     String?
+
+  metadata    Json?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sender      User     @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient   User?    @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([senderId])
+  @@index([recipientId])
+  @@index([type])
+  @@index([read])
+  @@index([createdAt])
+  @@index([parentId])
 }

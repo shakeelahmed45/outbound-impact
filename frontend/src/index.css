@@ -152,3 +152,17 @@ body {
 .shadow-primary-lg {
   box-shadow: 0 10px 40px rgba(128, 0, 128, 0.3);
 }
+
+/* Mobile sidebar slide-in animation */
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slideInLeft {
+  animation: slideInLeft 0.25s ease-out;
+}

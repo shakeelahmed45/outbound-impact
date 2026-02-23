@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Folder, Trash2, Edit2, FileText, Tag, Eye, TrendingUp, Download, Share2, ExternalLink, Wifi, Upload as UploadIcon, X, Image as ImageIcon, Lock, Unlock } from 'lucide-react';
+import { Plus, Folder, Trash2, Edit2, FileText, Tag, Eye, TrendingUp, Download, Share2, ExternalLink, Wifi, Upload as UploadIcon, X, Image as ImageIcon, Lock, Unlock, RefreshCw } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import NFCWriter from '../components/NFCWriter';
 import ShareModal from '../components/share/ShareModal';
@@ -7,6 +7,7 @@ import EditItemModal from '../components/EditItemModal';
 import Tooltip from '../components/common/Tooltip';
 import Toast from '../components/common/Toast';
 import api from '../services/api';
+import useAuthStore, { canEdit, canDelete } from '../store/authStore';
 
 const STREAM_CATEGORIES = [
   'Tickets',
@@ -63,6 +64,13 @@ const CampaignsPage = () => {
   const closeToast = () => {
     setToast({ show: false, message: '', type: 'success' });
   };
+
+  // Individual plan: 2-stream limit
+  const { user } = useAuthStore();
+  const effectiveUser = user?.isTeamMember ? user.organization : user;
+  const isIndividual = effectiveUser?.role === 'INDIVIDUAL';
+  const INDIVIDUAL_STREAM_LIMIT = 2;
+  const individualLimitReached = isIndividual && campaigns.length >= INDIVIDUAL_STREAM_LIMIT;
 
   useEffect(() => {
     document.title = 'Streams | Outbound Impact';
@@ -146,7 +154,7 @@ const CampaignsPage = () => {
       });
 
       if (response.data.status === 'success') {
-        return response.data.item?.thumbnailUrl || response.data.mediaUrl;
+        return response.data.item?.mediaUrl || response.data.item?.thumbnailUrl || null;
       }
       return null;
     } catch (error) {
@@ -421,11 +429,41 @@ const CampaignsPage = () => {
     }, 0);
   };
 
+  const getCampaignQrScans = (campaignId) => {
+    const campaignItems = getCampaignItems(campaignId);
+    return campaignItems.reduce((total, item) => {
+      return total + (item.viewsQr || 0);
+    }, 0);
+  };
+
+  const getCampaignNfcTaps = (campaignId) => {
+    const campaignItems = getCampaignItems(campaignId);
+    return campaignItems.reduce((total, item) => {
+      return total + (item.viewsNfc || 0);
+    }, 0);
+  };
+
+  const getCampaignDirectViews = (campaignId) => {
+    const campaignItems = getCampaignItems(campaignId);
+    return campaignItems.reduce((total, item) => {
+      return total + (item.viewsDirect || 0);
+    }, 0);
+  };
+
   const downloadCampaignQR = async (campaign) => {
-    if (!campaign.qrCodeUrl) return;
-    
     try {
-      const response = await fetch(campaign.qrCodeUrl);
+      // ✅ Always regenerate QR with tracking before download
+      const regenRes = await api.post(`/campaigns/${campaign.id}/regenerate-qr`);
+      const qrUrl = regenRes.data.qrCodeUrl || campaign.qrCodeUrl;
+      
+      if (!qrUrl) return;
+      
+      // Update local state with new QR URL
+      setCampaigns(prev => prev.map(c => 
+        c.id === campaign.id ? { ...c, qrCodeUrl: qrUrl } : c
+      ));
+
+      const response = await fetch(qrUrl);
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -437,13 +475,30 @@ const CampaignsPage = () => {
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.error('Failed to download QR code:', error);
-      window.open(campaign.qrCodeUrl, '_blank');
+      // Fallback: download existing QR
+      if (campaign.qrCodeUrl) window.open(campaign.qrCodeUrl, '_blank');
     }
   };
 
   const openShareModal = (campaign) => {
     setShareSelectedCampaign(campaign);
     setShowShareModal(true);
+  };
+
+  const regenerateQR = async (campaign) => {
+    if (!confirm('Regenerate QR code with tracking? This replaces the old QR code image.')) return;
+    try {
+      const response = await api.post(`/campaigns/${campaign.id}/regenerate-qr`);
+      if (response.data.status === 'success') {
+        setCampaigns(campaigns.map(c => 
+          c.id === campaign.id ? { ...c, qrCodeUrl: response.data.qrCodeUrl } : c
+        ));
+        showToast('QR code regenerated with tracking!', 'success');
+      }
+    } catch (error) {
+      console.error('Failed to regenerate QR:', error);
+      showToast('Failed to regenerate QR code', 'error');
+    }
   };
 
   const closeShareModal = () => {
@@ -491,19 +546,46 @@ const CampaignsPage = () => {
             <h1 className="text-3xl font-bold text-primary mb-2">Streams</h1>
             <p className="text-secondary">Organize your content into streams with QR codes</p>
           </div>
+          {/* ✅ Create — hidden for VIEWER, limit-checked for Individual */}
+          {canEdit() && (
           <button
-            onClick={() => setShowCreateModal(true)}
-            className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all flex items-center gap-2"
+            onClick={() => {
+              if (individualLimitReached) {
+                showToast('Stream limit reached on Personal plan. Upgrade to create more!', 'error');
+                return;
+              }
+              setShowCreateModal(true);
+            }}
+            className={`text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all flex items-center gap-2 ${
+              individualLimitReached ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gradient-to-r from-primary to-secondary'
+            }`}
           >
             <Plus size={20} />
-            Create Stream
+            {individualLimitReached ? 'Upgrade to Add More' : 'Create Stream'}
           </button>
+          )}
         </div>
+
+        {/* Individual plan limit info */}
+        {isIndividual && (
+          <div className="mb-6 flex items-center justify-between bg-purple-50 border border-purple-200 rounded-xl px-5 py-3">
+            <p className="text-sm text-purple-700">
+              <strong>{campaigns.length}/{INDIVIDUAL_STREAM_LIMIT}</strong> streams used on Personal plan
+              {individualLimitReached && <span className="ml-2 text-orange-600 font-medium">• Limit reached</span>}
+            </p>
+            {individualLimitReached && (
+              <button onClick={() => window.location.href = '/dashboard/settings'} className="text-sm font-medium text-purple-600 hover:text-purple-700">
+                Upgrade →
+              </button>
+            )}
+          </div>
+        )}
 
         {campaigns.length === 0 ? (
           <div className="text-center py-12">
             <Folder size={64} className="mx-auto text-gray-300 mb-4" />
             <p className="text-gray-500 mb-4">No streams yet. Create your first stream!</p>
+            {canEdit() && (
             <button
               onClick={() => setShowCreateModal(true)}
               className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all inline-flex items-center gap-2"
@@ -511,12 +593,16 @@ const CampaignsPage = () => {
               <Plus size={20} />
               Create Stream
             </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {campaigns.map((campaign) => {
               const itemsCount = getCampaignItems(campaign.id).length;
-              const totalViews = getCampaignTotalViews(campaign.id);
+              const contentViews = getCampaignTotalViews(campaign.id);
+              const streamViews = campaign.views || 0;
+              const qrScans = campaign.viewsQr || 0;
+              const nfcTaps = campaign.viewsNfc || 0;
 
               return (
                 <div
@@ -557,28 +643,50 @@ const CampaignsPage = () => {
                     <p className="text-gray-600 text-sm mb-4 line-clamp-2">{campaign.description}</p>
                   )}
 
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div className="bg-blue-50 p-3 rounded-lg">
-                      <div className="flex items-center gap-2 text-blue-600 mb-1">
-                        <FileText size={16} />
+                  {/* ═══════════════════════════════════
+                      ANALYTICS STATS GRID - 5 metrics
+                     ═══════════════════════════════════ */}
+                  <div className="grid grid-cols-3 gap-2 mb-2">
+                    <div className="bg-blue-50 p-2.5 rounded-lg">
+                      <div className="flex items-center gap-1 text-blue-600 mb-1">
+                        <FileText size={13} />
                         <span className="text-xs font-medium">Items</span>
-                        <Tooltip 
-                          content="Number of media files in this stream" 
-                          iconSize={14}
-                        />
                       </div>
-                      <p className="text-xl font-bold text-blue-700">{itemsCount}</p>
+                      <p className="text-lg font-bold text-blue-700">{itemsCount}</p>
                     </div>
-                    <div className="bg-green-50 p-3 rounded-lg">
-                      <div className="flex items-center gap-2 text-green-600 mb-1">
-                        <TrendingUp size={16} />
-                        <span className="text-xs font-medium">Views</span>
-                        <Tooltip 
-                          content="Total views across all items in this stream" 
-                          iconSize={14}
-                        />
+                    <div className="bg-indigo-50 p-2.5 rounded-lg">
+                      <div className="flex items-center gap-1 text-indigo-600 mb-1">
+                        <Eye size={13} />
+                        <span className="text-xs font-medium">Stream Views</span>
+                        <Tooltip content="Times the stream page was viewed" iconSize={10} />
                       </div>
-                      <p className="text-xl font-bold text-green-700">{totalViews}</p>
+                      <p className="text-lg font-bold text-indigo-700">{streamViews.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-green-50 p-2.5 rounded-lg">
+                      <div className="flex items-center gap-1 text-green-600 mb-1">
+                        <TrendingUp size={13} />
+                        <span className="text-xs font-medium">Content Views</span>
+                        <Tooltip content="Total views of individual items" iconSize={10} />
+                      </div>
+                      <p className="text-lg font-bold text-green-700">{contentViews.toLocaleString()}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    <div className="bg-purple-50 p-2.5 rounded-lg">
+                      <div className="flex items-center gap-1 text-purple-600 mb-1">
+                        <Download size={13} />
+                        <span className="text-xs font-medium">QR Scans</span>
+                        <Tooltip content="Views from QR code scans" iconSize={10} />
+                      </div>
+                      <p className="text-lg font-bold text-purple-700">{qrScans.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-orange-50 p-2.5 rounded-lg">
+                      <div className="flex items-center gap-1 text-orange-600 mb-1">
+                        <Wifi size={13} />
+                        <span className="text-xs font-medium">NFC Taps</span>
+                        <Tooltip content="Views from NFC tag taps" iconSize={10} />
+                      </div>
+                      <p className="text-lg font-bold text-orange-700">{nfcTaps.toLocaleString()}</p>
                     </div>
                   </div>
 
@@ -622,6 +730,14 @@ const CampaignsPage = () => {
                           <ExternalLink size={16} />
                           <span>Preview</span>
                         </button>
+
+                        <button
+                          onClick={() => regenerateQR(campaign)}
+                          className="flex items-center gap-2 px-3 py-2 border border-green-300 text-green-700 rounded-lg text-sm font-medium hover:bg-green-50 transition"
+                          title="Regenerate QR code with scan tracking"
+                        >
+                          <RefreshCw size={16} />
+                        </button>
                       </div>
                       
                       <div className="mt-3 p-2 bg-gray-50 rounded-lg">
@@ -647,18 +763,24 @@ const CampaignsPage = () => {
                     >
                       Manage
                     </button>
+                    {/* ✅ Edit — hidden for VIEWER */}
+                    {canEdit() && (
                     <button
                       onClick={() => openEditModal(campaign)}
                       className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
                     >
                       <Edit2 size={18} />
                     </button>
+                    )}
+                    {/* ✅ Delete — hidden for VIEWER + EDITOR */}
+                    {canDelete() && (
                     <button
                       onClick={() => handleDelete(campaign.id)}
                       className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all"
                     >
                       <Trash2 size={18} />
                     </button>
+                    )}
                   </div>
                 </div>
               );
@@ -841,6 +963,7 @@ const CampaignsPage = () => {
                     Cancel
                   </button>
                   <button
+                    type="button"
                     onClick={handleCreate}
                     disabled={uploadingLogo}
                     className="flex-1 bg-gradient-to-r from-primary to-secondary text-white px-4 py-2.5 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 text-sm"
@@ -1088,6 +1211,8 @@ const CampaignsPage = () => {
                           <Eye size={14} />
                           View
                         </button>
+                        {/* ✅ Edit — hidden for VIEWER */}
+                        {canEdit() && (
                         <button
                           onClick={() => handleEditItem(item)}
                           className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-blue-600 hover:bg-blue-50 rounded text-xs font-medium transition"
@@ -1095,6 +1220,9 @@ const CampaignsPage = () => {
                           <Edit2 size={14} />
                           Edit
                         </button>
+                        )}
+                        {/* ✅ Remove — hidden for VIEWER + EDITOR */}
+                        {canDelete() && (
                         <button
                           onClick={() => handleRemoveItemFromCampaign(item.id)}
                           className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-red-600 hover:bg-red-50 rounded text-xs font-medium transition"
@@ -1102,6 +1230,7 @@ const CampaignsPage = () => {
                           <Trash2 size={14} />
                           Remove
                         </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1192,6 +1321,48 @@ const CampaignsPage = () => {
                     `Save Items (${selectedItems.length} selected)`
                   )}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════
+            BOTTOM — Upgrade for Individual, Summary for others
+           ═══════════════════════════════════ */}
+        {isIndividual ? (
+          <div className="mt-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-bold text-xl mb-1">Ready to grow?</h3>
+                <p className="text-blue-100 text-sm">Upgrade to Small Business for unlimited streams, stream analytics, team messaging, and more!</p>
+              </div>
+              <button onClick={() => window.location.href = '/dashboard/settings'} className="px-6 py-3 bg-white text-purple-600 rounded-lg font-bold hover:bg-slate-100 transition-colors flex-shrink-0">Upgrade Now</button>
+            </div>
+          </div>
+        ) : campaigns.length > 0 && (
+          <div className="mt-8 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 border border-purple-100">
+            <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Summary</h3>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-white rounded-lg p-4 text-center shadow-sm">
+                <Folder size={20} className="mx-auto text-primary mb-2" />
+                <p className="text-2xl font-bold text-primary">{campaigns.length}</p>
+                <p className="text-xs text-gray-500 mt-1">Total Streams</p>
+              </div>
+              <div className="bg-white rounded-lg p-4 text-center shadow-sm">
+                <Download size={20} className="mx-auto text-purple-600 mb-2" />
+                <p className="text-2xl font-bold text-purple-600">
+                  {campaigns.reduce((total, c) => {
+                    return total + (c.viewsQr || 0);
+                  }, 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Total QR Scans</p>
+              </div>
+              <div className="bg-white rounded-lg p-4 text-center shadow-sm">
+                <Eye size={20} className="mx-auto text-indigo-600 mb-2" />
+                <p className="text-2xl font-bold text-indigo-600">
+                  {campaigns.reduce((total, c) => total + (c.views || 0), 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Total Stream Views</p>
               </div>
             </div>
           </div>

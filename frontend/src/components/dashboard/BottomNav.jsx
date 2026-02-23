@@ -1,4 +1,4 @@
-import { Home, Upload, BarChart3, Settings, Users, FolderOpen } from 'lucide-react';
+import { Home, Upload, BarChart3, Settings, Users, FolderOpen, UserCircle } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
 
@@ -7,24 +7,45 @@ const BottomNav = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
 
-  // ✅ REMOVED RESTRICTION - Team features now available for ALL plans including INDIVIDUAL
-  const isSmallOrAbove = user?.role === 'ORG_SMALL' || user?.role === 'ORG_MEDIUM' || user?.role === 'ORG_ENTERPRISE';
+  // Use org owner's role for team members
+  const effectiveRole = user?.isTeamMember ? user?.organization?.role : user?.role;
+  const isSmallOrAbove = effectiveRole === 'ORG_SMALL' || effectiveRole === 'ORG_MEDIUM' || effectiveRole === 'ORG_ENTERPRISE';
+  const isMediumOrAbove = effectiveRole === 'ORG_MEDIUM' || effectiveRole === 'ORG_ENTERPRISE';
+  const isTeamViewer = user?.isTeamMember && user?.teamRole === 'VIEWER';
+
+  // ✅ NEW: VIEWER + EDITOR cannot access billing or manage team
+  const canAccessBilling = !user?.isTeamMember || user?.teamRole === 'ADMIN';
+  const canAccessContributors = !user?.isTeamMember || user?.teamRole === 'ADMIN';
 
   const navItems = [
     { path: '/dashboard', icon: Home, label: 'Home' },
-    { path: '/dashboard/upload', icon: Upload, label: 'Upload' },
-    { path: '/dashboard/items', icon: FolderOpen, label: 'Messages' },
-    // Show Advanced Analytics for Small, Medium, and Enterprise
-    // Show regular Analytics for Individual users only
-    isSmallOrAbove
-      ? { path: '/dashboard/advanced-analytics', icon: BarChart3, label: 'Analytics' }
-      : { path: '/dashboard/analytics', icon: BarChart3, label: 'Analytics' },
   ];
 
-  // ✅ REMOVED RESTRICTION - Team navigation now available for ALL users
-  navItems.push({ path: '/dashboard/team', icon: Users, label: 'Contributor' });
+  // Upload — hidden for VIEWER team members
+  if (!isTeamViewer) {
+    navItems.push({ path: '/dashboard/upload', icon: Upload, label: 'Upload' });
+  }
 
-  navItems.push({ path: '/dashboard/settings', icon: Settings, label: 'Settings' });
+  navItems.push({ path: '/dashboard/items', icon: FolderOpen, label: 'Content' });
+
+  // Analytics — Medium+ gets advanced, Individual gets basic
+  if (isMediumOrAbove) {
+    navItems.push({ path: '/dashboard/advanced-analytics', icon: BarChart3, label: 'Analytics' });
+  } else {
+    navItems.push({ path: '/dashboard/analytics', icon: BarChart3, label: 'Analytics' });
+  }
+
+  // ✅ Contributor — hidden for VIEWER + EDITOR (only ADMIN/owner)
+  if (isSmallOrAbove && canAccessContributors) {
+    navItems.push({ path: '/dashboard/team', icon: Users, label: 'Contributor' });
+  }
+
+  // ✅ NEW: VIEWER/EDITOR see Profile instead of Settings (billing)
+  if (canAccessBilling) {
+    navItems.push({ path: '/dashboard/settings', icon: Settings, label: 'Settings' });
+  } else {
+    navItems.push({ path: '/dashboard/profile', icon: UserCircle, label: 'Profile' });
+  }
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">

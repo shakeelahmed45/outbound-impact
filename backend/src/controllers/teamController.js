@@ -2,6 +2,7 @@ const prisma = require('../lib/prisma');
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const { sendTeamInvitationEmail, sendInvitationReminderEmail } = require('../services/emailService');
+const { notifyTeamInviteSent, notifyTeamMemberJoined, notifyTeamMemberRemoved } = require('../services/notificationService');
 
 // Generate unique invitation token
 const generateInvitationToken = () => {
@@ -87,6 +88,17 @@ const inviteTeamMember = async (req, res) => {
         status: 'error',
         message: 'User not found',
       });
+    }
+
+    // ✅ STRICT: Individual plan → 2 contributors max
+    if (user.role === 'INDIVIDUAL') {
+      const teamCount = await prisma.teamMember.count({ where: { userId } });
+      if (teamCount >= 2) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'Contributor limit reached (2/2). Please upgrade your plan to invite more team members.'
+        });
+      }
     }
 
     // ✅ CRITICAL CHECK: Prevent inviting already registered emails (case-insensitive)
@@ -182,6 +194,9 @@ const inviteTeamMember = async (req, res) => {
     console.log(`✅ Team member invited: ${normalizedEmail} as ${role} by ${user.email}`);
     console.log(`📧 Invitation email sent: ${emailSent ? 'Yes' : 'No (but invitation created)'}`);
     console.log(`🔗 Invitation link: ${invitationLink}`);
+
+    // 🔔 Notify: invitation sent
+    await notifyTeamInviteSent(userId, normalizedEmail, role);
 
     res.status(201).json({
       status: 'success',
@@ -376,6 +391,9 @@ const acceptInvitation = async (req, res) => {
 
     console.log(`✅ Invitation accepted: ${normalizedEmail} joined ${teamMember.user.name}'s team`);
 
+    // 🔔 Notify org owner: new member joined
+    await notifyTeamMemberJoined(teamMember.userId, memberUser.name, normalizedEmail);
+
     res.json({
       status: 'success',
       message: 'Invitation accepted successfully',
@@ -517,6 +535,9 @@ const removeTeamMember = async (req, res) => {
         message: 'Team member not found',
       });
     }
+
+    // 🔔 Notify: team member removed
+    await notifyTeamMemberRemoved(userId, teamMember.email);
 
     if (teamMember.memberUserId) {
       try {
@@ -686,6 +707,95 @@ const updateTeamMemberRole = async (req, res) => {
   }
 };
 
+// ✅ REQUEST ROLE CHANGE — Used by team members (especially VIEWERs)
+const requestRoleChange = async (req, res) => {
+  try {
+    const userId = req.user.userId; // The actual logged-in team member
+    const { requestedRole, note } = req.body;
+
+    if (!requestedRole) {
+      return res.status(400).json({ status: 'error', message: 'Requested role is required' });
+    }
+
+    const validRoles = ['VIEWER', 'EDITOR', 'ADMIN'];
+    if (!validRoles.includes(requestedRole)) {
+      return res.status(400).json({ status: 'error', message: 'Invalid role' });
+    }
+
+    // Find this user's team membership
+    const teamMember = await prisma.teamMember.findFirst({
+      where: { memberUserId: userId, status: 'ACCEPTED' },
+    });
+
+    if (!teamMember) {
+      return res.status(404).json({ status: 'error', message: 'You are not a team member of any organization' });
+    }
+
+    // Don't allow requesting same role
+    if (teamMember.role === requestedRole) {
+      return res.status(400).json({ status: 'error', message: `You already have the ${requestedRole} role` });
+    }
+
+    // Check if already requested
+    if (teamMember.roleChangeRequested) {
+      return res.status(400).json({ status: 'error', message: 'You already have a pending role change request' });
+    }
+
+    await prisma.teamMember.update({
+      where: { id: teamMember.id },
+      data: {
+        roleChangeRequested: true,
+        requestedRole,
+        roleChangeNote: note?.trim() || null,
+        roleChangeRequestedAt: new Date(),
+      },
+    });
+
+    console.log(`📩 Role change requested: ${teamMember.email} wants ${requestedRole} (currently ${teamMember.role})`);
+
+    res.json({
+      status: 'success',
+      message: 'Role change request submitted. The organization owner will review your request.',
+    });
+  } catch (error) {
+    console.error('Request role change error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to submit role change request' });
+  }
+};
+
+// ✅ DISMISS ROLE REQUEST — Used by org owner to clear request (without changing role)
+const dismissRoleRequest = async (req, res) => {
+  try {
+    const userId = req.user.userId; // Org owner
+    const { id } = req.params; // TeamMember ID
+
+    const teamMember = await prisma.teamMember.findFirst({
+      where: { id, userId },
+    });
+
+    if (!teamMember) {
+      return res.status(404).json({ status: 'error', message: 'Team member not found' });
+    }
+
+    await prisma.teamMember.update({
+      where: { id },
+      data: {
+        roleChangeRequested: false,
+        requestedRole: null,
+        roleChangeNote: null,
+        roleChangeRequestedAt: null,
+      },
+    });
+
+    console.log(`❌ Role change request dismissed for: ${teamMember.email}`);
+
+    res.json({ status: 'success', message: 'Role change request dismissed' });
+  } catch (error) {
+    console.error('Dismiss role request error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to dismiss request' });
+  }
+};
+
 module.exports = {
   getTeamMembers,
   inviteTeamMember,
@@ -696,4 +806,6 @@ module.exports = {
   removeTeamMember,
   updateTeamMember,
   updateTeamMemberRole, // ✅ NEW: Export the new function
+  requestRoleChange,
+  dismissRoleRequest,
 };

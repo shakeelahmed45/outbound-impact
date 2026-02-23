@@ -3,8 +3,9 @@ import { useState } from 'react';
 import NetworkWarning from './components/common/NetworkWarning';
 import SplashScreen from './components/common/SplashScreen';
 import ProtectedRoute from './components/common/ProtectedRoute';
+import RequireEditAccess from './components/common/RequireEditAccess';
 import RootRedirect from './components/common/RootRedirect';
-import GlobalAiChatWidget from './components/GlobalAiChatWidget';  // ✨ NEW: AI Chat Widget
+import GlobalAiChatWidget from './components/GlobalAiChatWidget';
 import SignUp from './pages/SignUp';
 import SignIn from './pages/SignIn';
 import Plans from './pages/Plans';
@@ -16,9 +17,13 @@ import AnalyticsPage from './pages/AnalyticsPage';
 import TeamPage from './pages/TeamPage';
 import CampaignsPage from './pages/CampaignsPage';
 import SettingsPage from './pages/SettingsPage';
-import LiveChatPage from './pages/LiveChatPage';
+import SupportPage from './pages/SupportPage';
+import ActivityPage from './pages/ActivityPage';
+import InboxPage from './pages/InboxPage';
+import ProfilePage from './pages/ProfilePage';
 import PublicViewer from './pages/PublicViewer';
 import PublicCampaignViewer from './pages/PublicCampaignViewer';
+import PublicCohortViewer from './pages/PublicCohortViewer';
 import EnterprisePage from './pages/EnterprisePage';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -28,12 +33,13 @@ import AdminFeedbackPage from './pages/admin/AdminFeedbackPage';
 import AdminLiveChatPage from './pages/admin/AdminLiveChatPage';
 import UserDetailPage from './pages/admin/UserDetailPage';
 import TeamManagementPage from './pages/admin/TeamManagementPage';
-import ApiAccessPage from './pages/enterprise/ApiAccessPage';
-import WhiteLabelPage from './pages/enterprise/WhiteLabelPage';
-import IntegrationsPage from './pages/enterprise/IntegrationsPage';
 import AdvancedAnalyticsPage from './pages/enterprise/AdvancedAnalyticsPage';
 import SecurityPage from './pages/enterprise/SecurityPage';
-import UserGuidePage from './pages/UserGuidePage';
+import CohortsPage from './pages/enterprise/CohortsPage';
+import WorkflowsPage from './pages/enterprise/WorkflowsPage';
+import OrganizationsPage from './pages/enterprise/OrganizationsPage';
+import AuditLogPage from './pages/enterprise/AuditLogPage';
+import CompliancePage from './pages/enterprise/CompliancePage';
 import AcceptInvitation from './pages/AcceptInvitation';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
@@ -69,31 +75,47 @@ function App() {
         {/* Public Routes */}
         <Route path="/l/:slug" element={<PublicViewer />} />
         <Route path="/c/:slug" element={<PublicCampaignViewer />} />
+        <Route path="/g/:slug" element={<PublicCohortViewer />} />
         
         {/* Team Invitation Route */}
         <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
         
-        {/* User Dashboard Routes */}
+        {/* ═══════════════════════════════════
+            USER DASHBOARD ROUTES
+           ═══════════════════════════════════ */}
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-        <Route path="/dashboard/upload" element={<ProtectedRoute><UploadPage /></ProtectedRoute>} />
+        <Route path="/dashboard/upload" element={<ProtectedRoute><RequireEditAccess><UploadPage /></RequireEditAccess></ProtectedRoute>} />
         <Route path="/dashboard/items" element={<ProtectedRoute><ItemsPage /></ProtectedRoute>} />
         <Route path="/dashboard/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
         <Route path="/dashboard/team" element={<ProtectedRoute><TeamPage /></ProtectedRoute>} />
         <Route path="/dashboard/campaigns" element={<ProtectedRoute><CampaignsPage /></ProtectedRoute>} />
         <Route path="/dashboard/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-        <Route path="/dashboard/guide" element={<ProtectedRoute><UserGuidePage /></ProtectedRoute>} />
+        <Route path="/dashboard/support" element={<ProtectedRoute><SupportPage /></ProtectedRoute>} />
+        <Route path="/dashboard/activity" element={<ProtectedRoute><ActivityPage /></ProtectedRoute>} />
+        <Route path="/dashboard/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
+        <Route path="/dashboard/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
         
-        {/* Live Chat Route */}
-        <Route path="/live-chat" element={<ProtectedRoute><LiveChatPage /></ProtectedRoute>} />
+        {/* Backwards compatibility redirects */}
+        <Route path="/dashboard/guide" element={<Navigate to="/dashboard/support" replace />} />
+        <Route path="/live-chat" element={<Navigate to="/dashboard/support" replace />} />
         
-        {/* Enterprise Routes */}
-        <Route path="/dashboard/api-access" element={<ProtectedRoute><ApiAccessPage /></ProtectedRoute>} />
-        <Route path="/dashboard/white-label" element={<ProtectedRoute><WhiteLabelPage /></ProtectedRoute>} />
-        <Route path="/dashboard/integrations" element={<ProtectedRoute><IntegrationsPage /></ProtectedRoute>} />
+        {/* ═══════════════════════════════════
+            ENTERPRISE ROUTES
+           ═══════════════════════════════════ */}
         <Route path="/dashboard/advanced-analytics" element={<ProtectedRoute><AdvancedAnalyticsPage /></ProtectedRoute>} />
         <Route path="/dashboard/security" element={<ProtectedRoute><SecurityPage /></ProtectedRoute>} />
+        <Route path="/dashboard/cohorts" element={<ProtectedRoute><CohortsPage /></ProtectedRoute>} />
+        <Route path="/dashboard/workflows" element={<ProtectedRoute><WorkflowsPage /></ProtectedRoute>} />
+        <Route path="/dashboard/organizations" element={<ProtectedRoute><OrganizationsPage /></ProtectedRoute>} />
+        <Route path="/dashboard/audit" element={<ProtectedRoute><AuditLogPage /></ProtectedRoute>} />
+        <Route path="/dashboard/compliance" element={<ProtectedRoute><CompliancePage /></ProtectedRoute>} />
         
-        {/* Admin Routes */}
+        {/* Backwards compatibility: old API Access route */}
+        <Route path="/dashboard/api-access" element={<Navigate to="/dashboard/settings" replace />} />
+        
+        {/* ═══════════════════════════════════
+            ADMIN ROUTES
+           ═══════════════════════════════════ */}
         <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/admin-panel" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
         <Route path="/admin-panel/users" element={<ProtectedRoute><AdminUsers /></ProtectedRoute>} />
@@ -104,7 +126,7 @@ function App() {
         <Route path="/admin-panel/team" element={<ProtectedRoute><TeamManagementPage /></ProtectedRoute>} />
       </Routes>
       
-      {/* ✨ NEW: Global AI Chat Widget (appears on all pages except dashboard which has its own) */}
+      {/* Global AI Chat Widget (appears on non-dashboard pages) */}
       <GlobalAiChatWidget showBlinkingPrompt={false} />
     </BrowserRouter>
   );

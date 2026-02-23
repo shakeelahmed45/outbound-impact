@@ -1,12 +1,44 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, Mail, Trash2, AlertCircle, Loader2, RefreshCw, Clock, CheckCircle, XCircle, X, Edit2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { UserPlus, Mail, Trash2, AlertCircle, Loader2, RefreshCw, Clock, CheckCircle, XCircle, X, Edit2, ArrowUpCircle, MessageSquare, ShieldAlert } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import Toast from '../components/common/Toast';
-import useAuthStore from '../store/authStore';
+import useAuthStore, { canManageTeam } from '../store/authStore';
 import api from '../services/api';
 
 const TeamPage = () => {
   const { user, setUser } = useAuthStore();
+  const navigate = useNavigate();
+
+  // ✅ VIEWER + EDITOR cannot access team management
+  if (!canManageTeam()) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center max-w-md">
+            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <ShieldAlert size={40} className="text-red-600" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">
+              Access Restricted
+            </h1>
+            <p className="text-gray-600 mb-2">
+              <strong>Your role: {user?.teamRole}</strong>
+            </p>
+            <p className="text-gray-600 mb-6">
+              Only the account owner or team admins can manage contributors.
+            </p>
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="gradient-btn text-white px-6 py-3 rounded-lg font-semibold"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
   const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -22,6 +54,8 @@ const TeamPage = () => {
   const [showWarningPopup, setShowWarningPopup] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState(null);
+  const [dismissingId, setDismissingId] = useState(null);
+  const [approvingRequestId, setApprovingRequestId] = useState(null);
 
   // Toast State
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
@@ -33,6 +67,12 @@ const TeamPage = () => {
   const closeToast = () => {
     setToast({ show: false, message: '', type: 'success' });
   };
+
+  // Individual plan: 2-contributor limit
+  const effectiveUser = user?.isTeamMember ? user.organization : user;
+  const isIndividual = effectiveUser?.role === 'INDIVIDUAL';
+  const INDIVIDUAL_CONTRIBUTOR_LIMIT = 2;
+  const individualLimitReached = isIndividual && teamMembers.length >= INDIVIDUAL_CONTRIBUTOR_LIMIT;
 
   useEffect(() => {
     document.title = 'Contributors Management | Outbound Impact';
@@ -167,6 +207,53 @@ const TeamPage = () => {
     setMemberToDelete(null);
   };
 
+  // ✅ Approve role request (change role + clear request)
+  const handleApproveRequest = async (member) => {
+    setApprovingRequestId(member.id);
+    try {
+      // First update the role
+      const roleRes = await api.put(`/team/${member.id}/role`, { role: member.requestedRole });
+      if (roleRes.data.status === 'success') {
+        // Then dismiss the request
+        await api.post(`/team/${member.id}/dismiss-request`);
+        // Update local state
+        setTeamMembers(teamMembers.map(m =>
+          m.id === member.id
+            ? { ...m, role: member.requestedRole, roleChangeRequested: false, requestedRole: null, roleChangeNote: null, roleChangeRequestedAt: null }
+            : m
+        ));
+        showToast(`${member.email} upgraded to ${member.requestedRole}!`, 'success');
+      }
+    } catch (error) {
+      console.error('Failed to approve request:', error);
+      showToast('Failed to approve request', 'error');
+    } finally {
+      setApprovingRequestId(null);
+    }
+  };
+
+  // ✅ Dismiss role request (clear without changing role)
+  const handleDismissRequest = async (memberId) => {
+    setDismissingId(memberId);
+    try {
+      await api.post(`/team/${memberId}/dismiss-request`);
+      setTeamMembers(teamMembers.map(m =>
+        m.id === memberId
+          ? { ...m, roleChangeRequested: false, requestedRole: null, roleChangeNote: null, roleChangeRequestedAt: null }
+          : m
+      ));
+      showToast('Request dismissed', 'success');
+    } catch (error) {
+      console.error('Failed to dismiss request:', error);
+      showToast('Failed to dismiss request', 'error');
+    } finally {
+      setDismissingId(null);
+    }
+  };
+
+  // Filter members with pending role requests
+  const pendingRequests = teamMembers.filter(m => m.roleChangeRequested);
+
   const getStatusBadge = (status) => {
     const badges = {
       PENDING: {
@@ -242,20 +329,127 @@ const TeamPage = () => {
           </div>
           <button
             onClick={() => {
+              if (individualLimitReached) {
+                showToast('Contributor limit reached on Personal plan (2 max). Upgrade to invite more!', 'error');
+                return;
+              }
               setShowInviteModal(true);
               setError('');
             }}
-            className="gradient-btn text-white px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:shadow-lg transition-all text-sm sm:text-base whitespace-nowrap"
+            className={`text-white px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:shadow-lg transition-all text-sm sm:text-base whitespace-nowrap ${
+              individualLimitReached ? 'bg-orange-500 hover:bg-orange-600' : 'gradient-btn'
+            }`}
           >
             <UserPlus size={18} className="sm:w-5 sm:h-5" />
-            Invite Contributor
+            {individualLimitReached ? 'Upgrade to Add More' : 'Invite Contributor'}
           </button>
         </div>
+
+        {/* Individual plan limit info */}
+        {isIndividual && (
+          <div className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-xl px-5 py-3 mb-4">
+            <p className="text-sm text-purple-700">
+              <strong>{teamMembers.length}/{INDIVIDUAL_CONTRIBUTOR_LIMIT}</strong> contributors used on Personal plan
+              {individualLimitReached && <span className="ml-2 text-orange-600 font-medium">• Limit reached</span>}
+            </p>
+            {individualLimitReached && (
+              <button onClick={() => window.location.href = '/dashboard/settings'} className="text-sm font-medium text-purple-600 hover:text-purple-700">
+                Upgrade →
+              </button>
+            )}
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-center gap-3">
             <AlertCircle className="text-red-600 flex-shrink-0" size={20} />
             <p className="text-red-800 font-medium">{error}</p>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════
+            ROLE CHANGE REQUESTS — Shown to org owner
+           ═══════════════════════════════════════════════ */}
+        {pendingRequests.length > 0 && (
+          <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-4 sm:p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                <ArrowUpCircle size={18} className="text-orange-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900 text-sm sm:text-base">Role Change Requests</h3>
+                <p className="text-xs text-gray-500">{pendingRequests.length} pending request{pendingRequests.length > 1 ? 's' : ''}</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {pendingRequests.map((member) => {
+                const roleIcons = { VIEWER: '👁️', EDITOR: '✏️', ADMIN: '👑' };
+                const timeSince = (() => {
+                  if (!member.roleChangeRequestedAt) return '';
+                  const diff = Math.floor((Date.now() - new Date(member.roleChangeRequestedAt)) / 1000);
+                  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+                  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+                  return `${Math.floor(diff / 86400)}d ago`;
+                })();
+
+                return (
+                  <div key={member.id} className="bg-white rounded-lg border border-orange-100 p-3 sm:p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                      {/* Member info */}
+                      <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                        <div className="w-9 h-9 bg-gradient-to-br from-orange-400 to-amber-500 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                          {member.email[0].toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-900 text-sm truncate">{member.email}</p>
+                          <p className="text-xs text-gray-500">
+                            {roleIcons[member.role]} {member.role} → {roleIcons[member.requestedRole]} <strong>{member.requestedRole}</strong>
+                            {timeSince && <span className="ml-1 text-gray-400">• {timeSince}</span>}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Note */}
+                      {member.roleChangeNote && (
+                        <div className="flex items-start gap-1.5 bg-gray-50 rounded-lg px-3 py-2 sm:max-w-[280px]">
+                          <MessageSquare size={13} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-gray-600 line-clamp-2">{member.roleChangeNote}</p>
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      <div className="flex gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => handleApproveRequest(member)}
+                          disabled={approvingRequestId === member.id}
+                          className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 transition-colors flex items-center gap-1 disabled:opacity-50"
+                        >
+                          {approvingRequestId === member.id ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <CheckCircle size={12} />
+                          )}
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleDismissRequest(member.id)}
+                          disabled={dismissingId === member.id}
+                          className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-300 transition-colors flex items-center gap-1 disabled:opacity-50"
+                        >
+                          {dismissingId === member.id ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <XCircle size={12} />
+                          )}
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -554,6 +748,19 @@ const TeamPage = () => {
                   Remove
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Individual plan upgrade banner */}
+        {isIndividual && (
+          <div className="mt-6 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-bold text-xl mb-1">Ready to grow?</h3>
+                <p className="text-blue-100 text-sm">Upgrade to Small Business for more contributors, team messaging, advanced analytics, and more!</p>
+              </div>
+              <button onClick={() => window.location.href = '/dashboard/settings'} className="px-6 py-3 bg-white text-purple-600 rounded-lg font-bold hover:bg-slate-100 transition-colors flex-shrink-0">Upgrade Now</button>
             </div>
           </div>
         )}

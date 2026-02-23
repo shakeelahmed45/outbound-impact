@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { TrendingUp, Eye, FolderOpen, BarChart3, Download, FileText, Clock } from 'lucide-react';
+import { TrendingUp, Eye, FolderOpen, BarChart3, Download, FileText, Clock, QrCode, Upload, Sparkles } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
+import useAuthStore from '../store/authStore';
 import api from '../services/api';
 
 const AnalyticsPage = () => {
@@ -10,18 +11,27 @@ const AnalyticsPage = () => {
   const [showExportToast, setShowExportToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [exportingPDF, setExportingPDF] = useState(false);
+  const [dashStats, setDashStats] = useState(null);
 
   useEffect(() => {
     document.title = 'Analytics | Outbound Impact';
     fetchAnalytics();
     fetchHourlyData();
+    fetchDashStats();
   }, []);
+
+  const fetchDashStats = async () => {
+    try {
+      const res = await api.get('/dashboard/stats');
+      if (res.data.status === 'success') setDashStats(res.data.stats);
+    } catch (e) { /* silent */ }
+  };
 
   const fetchAnalytics = async () => {
     try {
       const response = await api.get('/analytics');
       if (response.data.status === 'success') {
-        setAnalytics(response.data.analytics);
+        setAnalytics(response.data);
       }
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
@@ -341,11 +351,61 @@ const AnalyticsPage = () => {
 
   const hourlyStats = getHourlyStats();
 
+  // Role detection
+  const { user } = useAuthStore();
+  const effectiveUser = user?.isTeamMember ? user.organization : user;
+  const isIndividual = effectiveUser?.role === 'INDIVIDUAL';
+
   if (loading) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // ═══ Individual plan → Pablo-style simple analytics ═══
+  if (isIndividual) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-6xl mx-auto">
+          <div className="bg-white rounded-xl border border-slate-200 p-6">
+            <h2 className="text-2xl font-bold text-slate-900 mb-6">Analytics</h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="bg-slate-50 rounded-xl p-6 text-center">
+                <Eye size={32} className="mx-auto text-green-600 mb-2" />
+                <p className="text-3xl font-bold text-slate-900">{analytics?.totalViews || 0}</p>
+                <p className="text-sm text-slate-600">Total Views</p>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-6 text-center">
+                <QrCode size={32} className="mx-auto text-purple-600 mb-2" />
+                <p className="text-3xl font-bold text-slate-900">{dashStats?.qrCodesGenerated || 0}</p>
+                <p className="text-sm text-slate-600">QR Codes Created</p>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-6 text-center">
+                <Upload size={32} className="mx-auto text-blue-600 mb-2" />
+                <p className="text-3xl font-bold text-slate-900">{analytics?.totalItems || 0}</p>
+                <p className="text-sm text-slate-600">Items Uploaded</p>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 text-center">
+              <Sparkles size={32} className="mx-auto text-purple-600 mb-2" />
+              <h3 className="font-bold text-slate-900 mb-2">Want More Analytics?</h3>
+              <p className="text-slate-600 mb-4">
+                Upgrade to see detailed insights, geographic data, device breakdowns, and more!
+              </p>
+              <button
+                onClick={() => window.location.href = '/dashboard/settings'}
+                className="px-6 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700"
+              >
+                Upgrade Plan
+              </button>
+            </div>
+          </div>
         </div>
       </DashboardLayout>
     );
