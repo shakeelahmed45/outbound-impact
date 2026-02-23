@@ -27,8 +27,8 @@ router.post('/invitation/:token/decline', teamInvitationController.declineInvita
 //         from reaching teamRoutes for regular users
 // ═══════════════════════════════════════════════════════════
 
-// Invite new team member
-router.post('/invite', authMiddleware, requireAdmin, teamInvitationController.inviteTeamMember);
+// Invite new team member (ADMIN PANEL ONLY)
+router.post('/admin-invite', authMiddleware, requireAdmin, teamInvitationController.inviteTeamMember);
 
 // Get all invitations
 router.get('/invitations', authMiddleware, requireAdmin, teamInvitationController.getAllInvitations);
