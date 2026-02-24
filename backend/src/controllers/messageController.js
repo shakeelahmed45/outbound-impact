@@ -26,7 +26,12 @@ const sendMessageNotificationEmail = async (recipientEmail, recipientName, sende
       from: 'Outbound Impact <noreply@outboundimpact.org>',
       to: [recipientEmail],
       replyTo: 'support@outboundimpact.org',
-      subject: `💬 New message from ${senderName}: ${subject}`,
+      subject: `New message from ${senderName}: ${subject}`,
+      headers: {
+        'List-Unsubscribe': '<mailto:support@outboundimpact.org?subject=unsubscribe>',
+        'X-Entity-Ref-ID': `msg-${Date.now()}`,
+      },
+      text: `Hi ${recipientName || 'there'},\n\n${senderName} sent you a message:\n\nSubject: ${subject}\n\n${preview}\n\nView & reply in your inbox: https://outboundimpact.com/dashboard/inbox\n\n— Outbound Impact`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -276,7 +281,14 @@ const sendInternal = async (req, res) => {
       });
       recipientUsers.forEach(ru => {
         sendMessageNotificationEmail(ru.email, ru.name, sender?.name || 'Team Member', subject, body)
-          .catch(() => {}); // Fire-and-forget
+          .then(result => {
+            if (result.success) {
+              console.log('✅ Bulk message notification email sent to:', ru.email);
+            } else {
+              console.error('❌ Bulk message notification email failed for:', ru.email, result.error);
+            }
+          })
+          .catch(err => console.error('❌ Bulk message notification email error:', err.message));
       });
 
       return res.status(201).json({
@@ -345,7 +357,16 @@ const sendInternal = async (req, res) => {
     });
     if (recipientUser?.email) {
       sendMessageNotificationEmail(recipientUser.email, recipientUser.name, sender?.name || 'Team Member', subject, body)
-        .catch(() => {}); // Fire-and-forget
+        .then(result => {
+          if (result.success) {
+            console.log('✅ Internal message notification email sent to:', recipientUser.email);
+          } else {
+            console.error('❌ Internal message notification email failed for:', recipientUser.email, result.error);
+          }
+        })
+        .catch(err => console.error('❌ Internal message notification email error:', err.message));
+    } else {
+      console.warn('⚠️ No email found for recipient:', recipientId);
     }
 
     res.status(201).json({ status: 'success', message: 'Message sent', data: message });
@@ -378,7 +399,7 @@ const sendExternal = async (req, res) => {
     // Check if recipient is also a platform user (for recipientId linking)
     const recipientUser = await prisma.user.findUnique({
       where: { email: to },
-      select: { id: true },
+      select: { id: true, name: true, email: true },
     });
 
     // Create message record first
@@ -395,6 +416,31 @@ const sendExternal = async (req, res) => {
         parentId: parentId || null,
       },
     });
+
+    // ✅ If recipient is a platform user, create in-app notification
+    if (recipientUser?.id) {
+      await prisma.notification.create({
+        data: {
+          userId: recipientUser.id,
+          type: 'message',
+          category: 'inbox',
+          title: `New message from ${sender?.name || 'Someone'}`,
+          message: subject,
+          metadata: { messageId: message.id, senderId, isExternal: true },
+        },
+      }).catch(err => console.error('❌ External notification creation failed:', err.message));
+
+      // ✅ Also send email notification to the platform user
+      sendMessageNotificationEmail(recipientUser.email, recipientUser.name, sender?.name || 'Outbound Impact User', subject, body)
+        .then(result => {
+          if (result.success) {
+            console.log('✅ External message notification email sent to platform user:', recipientUser.email);
+          } else {
+            console.error('❌ External message notification email failed:', recipientUser.email, result.error);
+          }
+        })
+        .catch(err => console.error('❌ External message notification email error:', err.message));
+    }
 
     // Try sending via Resend
     let emailSent = false;

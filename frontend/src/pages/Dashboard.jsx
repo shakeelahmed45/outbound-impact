@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, Eye, QrCode, BarChart3, Users, Folder, Crown, Video, Music, FileText, Image as ImageIcon, Code, ChevronRight, Clock, Smartphone, MousePointer, ArrowUp, ArrowDown, ArrowUpCircle, Send, Loader2, CheckCircle } from 'lucide-react';
+import { Upload, Eye, QrCode, BarChart3, Users, Folder, Key, Palette, Zap, Shield, Crown, Video, Music, FileText, Image as ImageIcon, Code, ChevronRight, Clock, Smartphone, MousePointer, ArrowUp, ArrowDown, ArrowUpCircle, Send, Loader2, CheckCircle, Pencil, ShieldCheck } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import Tooltip from '../components/common/Tooltip';
 import useAuthStore from '../store/authStore';
@@ -18,6 +18,8 @@ const Dashboard = () => {
   const [hoveredPoint, setHoveredPoint] = useState(null);
 
   const isTeamMemberViewer = user?.isTeamMember && user?.teamRole === 'VIEWER';
+  const isTeamMemberEditor = user?.isTeamMember && user?.teamRole === 'EDITOR';
+  const isTeamMemberAdmin = user?.isTeamMember && user?.teamRole === 'ADMIN';
   const isTeamMember = user?.isTeamMember;
   const effectiveUser = user?.isTeamMember ? user.organization : user;
   const effectiveRole = effectiveUser?.role;
@@ -191,7 +193,17 @@ const Dashboard = () => {
                     <Eye size={16} /> VIEWER
                   </span>
                 )}
-                {isEnterprise && !isTeamMemberViewer && (
+                {isTeamMemberEditor && (
+                  <span className="inline-flex items-center gap-2 bg-gradient-to-r from-green-400 to-emerald-600 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                    <Pencil size={16} /> EDITOR
+                  </span>
+                )}
+                {isTeamMemberAdmin && (
+                  <span className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-400 to-red-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                    <ShieldCheck size={16} /> ADMIN
+                  </span>
+                )}
+                {isEnterprise && !isTeamMemberViewer && !isTeamMemberEditor && !isTeamMemberAdmin && (
                   <span className="inline-flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white px-4 py-1 rounded-full text-sm font-semibold">
                     <Crown size={16} /> Enterprise
                   </span>
@@ -324,7 +336,7 @@ const Dashboard = () => {
             <span className="text-sm text-gray-500 mb-1 block">Total Views</span>
             <p className="text-3xl font-bold text-gray-900">{(stats?.totalViews || 0).toLocaleString()}</p>
             <p className="text-xs text-gray-400 mt-1">All access methods</p>
-            <button onClick={() => navigate((isMedium || isEnterprise) ? '/dashboard/advanced-analytics' : '/dashboard/analytics')} className="text-primary text-sm font-medium mt-3 flex items-center gap-1 hover:gap-2 transition-all">
+            <button onClick={() => navigate(isOrganization ? '/dashboard/advanced-analytics' : '/dashboard/analytics')} className="text-primary text-sm font-medium mt-3 flex items-center gap-1 hover:gap-2 transition-all">
               View details <ChevronRight size={16} />
             </button>
           </div>
@@ -499,7 +511,7 @@ const Dashboard = () => {
           <h3 className="text-xl font-bold text-primary mb-4 flex items-center gap-2">
             Quick Actions <Tooltip content="Common tasks for quick access" />
           </h3>
-          <div className={`grid grid-cols-2 md:grid-cols-4 gap-4`}>
+          <div className={`grid grid-cols-2 ${isEnterprise && !isTeamMemberViewer ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4`}>
             {!isTeamMemberViewer && (
               <button onClick={() => navigate('/dashboard/upload')} className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center">
                 <Upload className="mx-auto mb-2 text-primary" size={24} />
@@ -510,14 +522,38 @@ const Dashboard = () => {
               <QrCode className="mx-auto mb-2 text-primary" size={24} />
               <span className="text-sm font-semibold text-gray-700">My Items</span>
             </button>
-            <button onClick={() => navigate((isMedium || isEnterprise) ? '/dashboard/advanced-analytics' : '/dashboard/analytics')} className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center">
+            <button onClick={() => navigate(isOrganization ? '/dashboard/advanced-analytics' : '/dashboard/analytics')} className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center">
               <BarChart3 className="mx-auto mb-2 text-primary" size={24} />
-              <span className="text-sm font-semibold text-gray-700">{(isMedium || isEnterprise) ? 'Advanced Analytics' : 'Analytics'}</span>
+              <span className="text-sm font-semibold text-gray-700">{isOrganization ? 'Advanced Analytics' : 'Analytics'}</span>
             </button>
             <button onClick={() => navigate('/dashboard/campaigns')} className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center">
               <Folder className="mx-auto mb-2 text-primary" size={24} />
               <span className="text-sm font-semibold text-gray-700">Streams</span>
             </button>
+            {isEnterprise && !isTeamMemberViewer && (
+              <>
+                <button onClick={() => navigate('/dashboard/api-access')} className="p-4 border-2 border-yellow-300 bg-yellow-50 rounded-xl hover:border-yellow-500 hover:bg-yellow-100 transition-all text-center">
+                  <Key className="mx-auto mb-2 text-yellow-600" size={24} />
+                  <span className="text-sm font-semibold text-gray-700">API Access</span>
+                </button>
+                <button onClick={() => navigate('/dashboard/white-label')} className="p-4 border-2 border-yellow-300 bg-yellow-50 rounded-xl hover:border-yellow-500 hover:bg-yellow-100 transition-all text-center">
+                  <Palette className="mx-auto mb-2 text-yellow-600" size={24} />
+                  <span className="text-sm font-semibold text-gray-700">White Label</span>
+                </button>
+                <button onClick={() => navigate('/dashboard/integrations')} className="p-4 border-2 border-yellow-300 bg-yellow-50 rounded-xl hover:border-yellow-500 hover:bg-yellow-100 transition-all text-center">
+                  <Zap className="mx-auto mb-2 text-yellow-600" size={24} />
+                  <span className="text-sm font-semibold text-gray-700">Integrations</span>
+                </button>
+                <button onClick={() => navigate('/dashboard/advanced-analytics')} className="p-4 border-2 border-yellow-300 bg-yellow-50 rounded-xl hover:border-yellow-500 hover:bg-yellow-100 transition-all text-center">
+                  <BarChart3 className="mx-auto mb-2 text-yellow-600" size={24} />
+                  <span className="text-sm font-semibold text-gray-700">Advanced Analytics</span>
+                </button>
+                <button onClick={() => navigate('/dashboard/security')} className="p-4 border-2 border-yellow-300 bg-yellow-50 rounded-xl hover:border-yellow-500 hover:bg-yellow-100 transition-all text-center">
+                  <Shield className="mx-auto mb-2 text-yellow-600" size={24} />
+                  <span className="text-sm font-semibold text-gray-700">Security & 2FA</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
 

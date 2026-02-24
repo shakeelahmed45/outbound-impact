@@ -28,26 +28,9 @@ const AcceptInvitation = () => {
     fetchInvitationDetails();
   }, [token]);
 
-  // ✅ FIXED: Helper to check if this is an admin role invitation
-  const isAdminRole = (role) => {
-    return role === 'ADMIN' || role === 'CUSTOMER_SUPPORT';
-  };
-
-  // ✅ FIXED: Get the appropriate sign-in URL based on role
-  const getSignInUrl = () => {
-    if (invitation && isAdminRole(invitation.role)) {
-      return '/admin-login';
-    }
-    return '/signin';
-  };
-
-  // ✅ FIXED: Get the sign-in button text
-  const getSignInButtonText = () => {
-    if (invitation && isAdminRole(invitation.role)) {
-      return 'Go to Admin Login';
-    }
-    return 'Sign In to Continue';
-  };
+  // Team invitations always use regular sign-in (not admin panel)
+  const getSignInUrl = () => '/signin';
+  const getSignInButtonText = () => 'Sign In to Continue';
 
   const fetchInvitationDetails = async () => {
     try {
@@ -170,7 +153,7 @@ const AcceptInvitation = () => {
   }
 
   if (actionComplete) {
-    const isAdmin = invitation && isAdminRole(invitation.role);
+    const isAdmin = false; // Team invitations always use regular flow
     
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center p-4">
@@ -243,7 +226,7 @@ const AcceptInvitation = () => {
   }
 
   if (showPasswordSetup) {
-    const isAdmin = invitation && isAdminRole(invitation.role);
+    const isAdmin = false; // Team invitations always use regular flow
     
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center p-4">
@@ -394,7 +377,7 @@ const AcceptInvitation = () => {
   const isExpired = invitation.isExpired;
   const alreadyAccepted = invitation.status === 'ACCEPTED';
   const alreadyDeclined = invitation.status === 'DECLINED';
-  const isAdmin = isAdminRole(invitation.role);
+  const isAdmin = false; // Team invitations always use regular flow
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center p-4">

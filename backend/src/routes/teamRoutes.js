@@ -2,12 +2,13 @@ const express = require('express');
 const router = express.Router();
 const teamController = require('../controllers/teamController');
 const authMiddleware = require('../middleware/auth');
+const { resolveEffectiveUserId } = require('../middleware/resolveEffectiveUserId');
 
-// Get all team members
-router.get('/', authMiddleware, teamController.getTeamMembers);
+// Get all team members (team members need effectiveUserId to see owner's team)
+router.get('/', authMiddleware, resolveEffectiveUserId, teamController.getTeamMembers);
 
 // Invite a new team member
-router.post('/invite', authMiddleware, teamController.inviteTeamMember);
+router.post('/invite', authMiddleware, resolveEffectiveUserId, teamController.inviteTeamMember);
 
 // ✅ NEW: Request role change (used by team members)
 router.post('/request-role-change', authMiddleware, teamController.requestRoleChange);

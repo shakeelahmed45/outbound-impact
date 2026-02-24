@@ -11,7 +11,8 @@ const generateInvitationToken = () => {
 
 const getTeamMembers = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    // ✅ Use effectiveUserId so team ADMIN members can see the owner's team
+    const userId = req.effectiveUserId || req.user.userId;
 
     // ✅ REMOVED RESTRICTION - Team features now available for ALL plans including INDIVIDUAL
     const user = await prisma.user.findUnique({
@@ -46,7 +47,17 @@ const getTeamMembers = async (req, res) => {
 
 const inviteTeamMember = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    // ✅ Use effectiveUserId so team ADMIN members can invite on behalf of the owner
+    const userId = req.effectiveUserId || req.user.userId;
+
+    // ✅ Only account owner or ADMIN team members can invite
+    if (req.isTeamMember && req.teamRole !== 'ADMIN') {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Only account owners and Admin team members can invite new members',
+      });
+    }
+
     const { email, role, message } = req.body; // ✨ Added message field
 
     if (!email || !role) {
