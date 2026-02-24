@@ -2,7 +2,93 @@ const prisma = require('../lib/prisma');
 const { getAutoAssignOrgId } = require("../helpers/orgScope");
 const { uploadToBunny, generateFileName, generateSlug } = require('../services/bunnyService');
 const QRCode = require('qrcode');
-const { notifyUpload, notifyStorageWarning } = require('../services/notificationService');
+const { notifyUpload, notifyStorageWarning, createNotification } = require('../services/notificationService');
+const { sendEditorUploadNotification } = require('../services/emailService');
+
+// ═══════════════════════════════════════════════════════════
+// CONTENT APPROVAL LOGIC
+// Enterprise + EDITOR → PENDING_APPROVAL (Workflow auto-created)
+// All other plans + EDITOR → PUBLISHED (auto-publish + email notification)
+// Owner or ADMIN uploads → always PUBLISHED, no notification
+// ═══════════════════════════════════════════════════════════
+const resolveContentApproval = (req, ownerRole) => {
+  if (!req.isTeamMember || req.teamRole !== 'EDITOR') {
+    return { status: 'PUBLISHED', needsApproval: false, sendEmail: false };
+  }
+  if (ownerRole === 'ORG_ENTERPRISE') {
+    return { status: 'PENDING_APPROVAL', needsApproval: true, sendEmail: true };
+  }
+  return { status: 'PUBLISHED', needsApproval: false, sendEmail: true };
+};
+
+// Auto-create a Workflow entry linked to the new Item (Enterprise only)
+const autoCreateWorkflow = async (item, req) => {
+  try {
+    const actualUserId = req.user.userId;
+    const submitter = await prisma.user.findUnique({
+      where: { id: actualUserId },
+      select: { name: true, email: true },
+    });
+
+    await prisma.workflow.create({
+      data: {
+        userId: item.userId,
+        submittedById: actualUserId,
+        submittedByName: submitter?.name || 'Editor',
+        submittedByEmail: submitter?.email || '',
+        assetName: item.title,
+        assetType: item.type,
+        assetUrl: `${process.env.FRONTEND_URL || 'https://outboundimpact.net'}/l/${item.slug}`,
+        itemId: item.id,
+        status: 'PENDING_REVIEW',
+        submittedAt: new Date(),
+      },
+    });
+    console.log(`📋 Auto-created Workflow for "${item.title}" (PENDING_REVIEW)`);
+  } catch (error) {
+    console.error('Failed to auto-create workflow:', error.message);
+  }
+};
+
+// Send notification emails to account owner + all ADMIN team members
+const notifyOwnerAndAdmins = async (ownerId, uploaderEmail, itemTitle, itemType, needsApproval) => {
+  try {
+    const owner = await prisma.user.findUnique({
+      where: { id: ownerId },
+      select: { email: true, name: true },
+    });
+    if (!owner) return;
+
+    const adminMembers = await prisma.teamMember.findMany({
+      where: { userId: ownerId, role: 'ADMIN', status: 'ACCEPTED', memberUserId: { not: null } },
+      include: { memberUser: { select: { email: true, name: true } } },
+    });
+
+    const recipients = [{ email: owner.email, name: owner.name }];
+    for (const admin of adminMembers) {
+      if (admin.memberUser) recipients.push({ email: admin.memberUser.email, name: admin.memberUser.name });
+    }
+
+    const dashboardUrl = needsApproval
+      ? `${process.env.FRONTEND_URL || 'https://outboundimpact.net'}/dashboard/workflows`
+      : `${process.env.FRONTEND_URL || 'https://outboundimpact.net'}/dashboard/items`;
+
+    for (const r of recipients) {
+      await sendEditorUploadNotification({
+        recipientEmail: r.email,
+        recipientName: r.name,
+        editorEmail: uploaderEmail,
+        itemTitle,
+        itemType,
+        needsApproval,
+        dashboardUrl,
+      });
+    }
+    console.log(`📧 Upload notification sent to ${recipients.length} recipient(s) (${needsApproval ? 'PENDING' : 'AUTO-PUBLISHED'})`);
+  } catch (error) {
+    console.error('Failed to send upload notifications:', error.message);
+  }
+};
 
 // ═══════════════════════════════════════════════════════════
 // PLAN LIMITS — Strict enforcement
@@ -263,6 +349,10 @@ const uploadFile = async (req, res) => {
       data: { storageUsed: BigInt(newStorageUsed) }
     });
 
+    // ═══ Content Approval ═══
+    const ownerUser = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    const approval = resolveContentApproval(req, ownerUser.role);
+
     // Create item
     const item = await prisma.item.create({
       data: {
@@ -280,26 +370,42 @@ const uploadFile = async (req, res) => {
         attachments: attachments || null,
         sharingEnabled: sharingEnabled !== undefined ? sharingEnabled : true,
         organizationId: req.body.organizationId || getAutoAssignOrgId(req),
+        status: approval.status,
+        uploadedByUserId: req.isTeamMember ? req.user.userId : null,
+        uploadedByEmail: req.isTeamMember ? req.user.email : null,
       }
     });
 
-    // 🔔 Notify: upload success
+    // 🔔 In-app notification for uploader
     await notifyUpload(userId, title, type);
 
-    // 🔔 Notify: storage warning if > 80%
+    // 🔔 Storage warning
     const storageLimit = Number(user.storageLimit || 2147483648);
     const storagePercent = storageLimit > 0 ? Math.round((newStorageUsed / storageLimit) * 100) : 0;
     await notifyStorageWarning(userId, storagePercent);
 
+    // 📋 Enterprise: auto-create Workflow for approval
+    if (approval.needsApproval) {
+      await autoCreateWorkflow(item, req);
+    }
+
+    // 📧 Email to owner + admins
+    if (approval.sendEmail) {
+      notifyOwnerAndAdmins(userId, req.user.email, title, type, approval.needsApproval);
+    }
+
     res.status(201).json({
       status: 'success',
-      message: 'File uploaded successfully',
+      message: approval.needsApproval
+        ? 'Content submitted for approval. Your team admin will review it in Workflows.'
+        : 'File uploaded successfully',
       item: {
         id: item.id,
         title: item.title,
         slug: item.slug,
         mediaUrl: item.mediaUrl,
         qrCodeUrl: item.qrCodeUrl,
+        contentStatus: approval.status,
       }
     });
 
@@ -395,6 +501,10 @@ const createTextPost = async (req, res) => {
     const qrUploadResult = await uploadToBunny(qrBuffer, qrFileName, 'image/png');
     const qrCodeUrl = qrUploadResult.success ? qrUploadResult.url : qrCodeDataUrl;
 
+    // ═══ Content Approval ═══
+    const ownerUser = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    const approval = resolveContentApproval(req, ownerUser.role);
+
     const item = await prisma.item.create({
       data: {
         userId,
@@ -410,20 +520,28 @@ const createTextPost = async (req, res) => {
         attachments: attachments || null,
         sharingEnabled: sharingEnabled !== undefined ? sharingEnabled : true,
         organizationId: req.body.organizationId || getAutoAssignOrgId(req),
+        status: approval.status,
+        uploadedByUserId: req.isTeamMember ? req.user.userId : null,
+        uploadedByEmail: req.isTeamMember ? req.user.email : null,
       }
     });
 
-    // 🔔 Notify: text post created
     await notifyUpload(userId, title, 'text');
+
+    if (approval.needsApproval) await autoCreateWorkflow(item, req);
+    if (approval.sendEmail) notifyOwnerAndAdmins(userId, req.user.email, title, 'TEXT', approval.needsApproval);
 
     res.status(201).json({
       status: 'success',
-      message: 'Text post created successfully',
+      message: approval.needsApproval
+        ? 'Text post submitted for approval. Your team admin will review it in Workflows.'
+        : 'Text post created successfully',
       item: {
         id: item.id,
         title: item.title,
         slug: item.slug,
         qrCodeUrl: item.qrCodeUrl,
+        contentStatus: approval.status,
       }
     });
 
@@ -506,6 +624,10 @@ const createEmbedPost = async (req, res) => {
       }
     }
 
+    // ═══ Content Approval ═══
+    const ownerUser = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    const approval = resolveContentApproval(req, ownerUser.role);
+
     const item = await prisma.item.create({
       data: {
         userId,
@@ -520,20 +642,28 @@ const createEmbedPost = async (req, res) => {
         fileSize: BigInt(0),
         sharingEnabled: sharingEnabled !== undefined ? sharingEnabled : true,
         organizationId: req.body.organizationId || getAutoAssignOrgId(req),
+        status: approval.status,
+        uploadedByUserId: req.isTeamMember ? req.user.userId : null,
+        uploadedByEmail: req.isTeamMember ? req.user.email : null,
       }
     });
 
-    // 🔔 Notify: embed post created
     await notifyUpload(userId, title, 'embed');
+
+    if (approval.needsApproval) await autoCreateWorkflow(item, req);
+    if (approval.sendEmail) notifyOwnerAndAdmins(userId, req.user.email, title, 'EMBED', approval.needsApproval);
 
     res.status(201).json({
       status: 'success',
-      message: 'Embed post created successfully',
+      message: approval.needsApproval
+        ? 'Embed post submitted for approval. Your team admin will review it in Workflows.'
+        : 'Embed post created successfully',
       item: {
         id: item.id,
         title: item.title,
         slug: item.slug,
         qrCodeUrl: item.qrCodeUrl,
+        contentStatus: approval.status,
       }
     });
 

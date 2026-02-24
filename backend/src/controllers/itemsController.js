@@ -45,7 +45,9 @@ const getUserItems = async (req, res) => {
         publicUrl: `${process.env.FRONTEND_URL}/l/${item.slug}`,
         buttonText: item.buttonText || null,
         buttonUrl: item.buttonUrl || null,
-        sharingEnabled: item.sharingEnabled !== undefined ? item.sharingEnabled : true, // âœ… NEW
+        sharingEnabled: item.sharingEnabled !== undefined ? item.sharingEnabled : true,
+        contentStatus: item.status || 'PUBLISHED',
+        uploadedByEmail: item.uploadedByEmail || null,
       }))
     });
 
@@ -91,7 +93,9 @@ const getItemById = async (req, res) => {
         publicUrl: `${process.env.FRONTEND_URL}/l/${item.slug}`,
         buttonText: item.buttonText || null,
         buttonUrl: item.buttonUrl || null,
-        sharingEnabled: item.sharingEnabled !== undefined ? item.sharingEnabled : true, // âœ… NEW
+        sharingEnabled: item.sharingEnabled !== undefined ? item.sharingEnabled : true,
+        contentStatus: item.status || 'PUBLISHED',
+        uploadedByEmail: item.uploadedByEmail || null,
       }
     });
 
@@ -127,6 +131,14 @@ const getPublicItem = async (req, res) => {
       });
     }
 
+    // ✅ Block public access for items pending approval
+    if (item.status === 'PENDING_APPROVAL') {
+      return res.status(404).json({
+        status: 'error',
+        message: 'This content is pending approval and not yet available.'
+      });
+    }
+
     // Note: View counting is handled by trackView in analyticsController
     // Do NOT increment here to avoid double counting
 
@@ -135,7 +147,9 @@ const getPublicItem = async (req, res) => {
       item: {
         ...item,
         fileSize: item.fileSize.toString(),
-        sharingEnabled: item.sharingEnabled !== undefined ? item.sharingEnabled : true, // âœ… NEW
+        sharingEnabled: item.sharingEnabled !== undefined ? item.sharingEnabled : true,
+        contentStatus: item.status || 'PUBLISHED',
+        uploadedByEmail: item.uploadedByEmail || null,
       }
     });
 

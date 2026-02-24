@@ -1657,6 +1657,89 @@ const sendUpgradeReceiptEmail = async ({ email, name, oldPlan, newPlan, amountCh
   }
 };
 
+// ═══════════════════════════════════════════════════════════
+// 📧 EDITOR UPLOAD NOTIFICATION
+// Sent to account owner + ADMIN team members when an Editor uploads content
+// ═══════════════════════════════════════════════════════════
+const sendEditorUploadNotification = async ({ recipientEmail, recipientName, editorEmail, itemTitle, itemType, needsApproval, dashboardUrl }) => {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.log('⚠️ Resend not configured - skipping editor upload notification');
+      return { success: false, error: 'Resend not configured' };
+    }
+
+    const typeLabels = { IMAGE: 'Image', VIDEO: 'Video', AUDIO: 'Audio', TEXT: 'Text Post', EMBED: 'Embed' };
+    const typeLabel = typeLabels[itemType] || itemType;
+
+    const subject = needsApproval
+      ? `⏳ Content Pending Approval: "${itemTitle}" by ${editorEmail}`
+      : `📤 New Content Published: "${itemTitle}" by ${editorEmail}`;
+
+    const statusBadge = needsApproval
+      ? '<span style="display:inline-block;background:#FEF3C7;color:#92400E;padding:6px 16px;border-radius:20px;font-weight:bold;font-size:14px;">⏳ Pending Approval</span>'
+      : '<span style="display:inline-block;background:#D1FAE5;color:#065F46;padding:6px 16px;border-radius:20px;font-weight:bold;font-size:14px;">✅ Auto-Published</span>';
+
+    const actionSection = needsApproval
+      ? `<div style="background:#FEF3C7;border-left:4px solid #F59E0B;padding:20px;border-radius:0 8px 8px 0;margin:25px 0;">
+          <p style="margin:0 0 10px;font-weight:bold;color:#92400E;font-size:15px;">⚠️ Action Required</p>
+          <p style="margin:0;color:#78350F;font-size:14px;">This content requires your approval before it becomes publicly accessible. Please review it in the Workflows page.</p>
+        </div>
+        <div style="text-align:center;margin:30px 0;">
+          <a href="${dashboardUrl}" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#800080 0%,#9333EA 100%);color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;">Review in Workflows →</a>
+        </div>`
+      : `<div style="background:#D1FAE5;border-left:4px solid #10B981;padding:20px;border-radius:0 8px 8px 0;margin:25px 0;">
+          <p style="margin:0 0 10px;font-weight:bold;color:#065F46;font-size:15px;">✅ Auto-Published</p>
+          <p style="margin:0;color:#064E3B;font-size:14px;">This content has been automatically published and is now publicly accessible.</p>
+        </div>
+        <div style="text-align:center;margin:30px 0;">
+          <a href="${dashboardUrl}" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#800080 0%,#9333EA 100%);color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;">View in Dashboard →</a>
+        </div>`;
+
+    const { data, error } = await resend.emails.send({
+      from: 'Outbound Impact <noreply@outboundimpact.org>',
+      to: [recipientEmail],
+      replyTo: 'support@outboundimpact.org',
+      subject,
+      html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background-color:#f5f5f5;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:40px 20px;"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;box-shadow:0 4px 6px rgba(0,0,0,0.1);overflow:hidden;">
+<tr><td style="background:linear-gradient(135deg,#800080 0%,#9333EA 100%);padding:40px 40px 30px;text-align:center;">
+  <h1 style="color:#ffffff;margin:0;font-size:26px;">${needsApproval ? '⏳ Content Needs Review' : '📤 New Content Uploaded'}</h1>
+  <p style="color:#e9d5ff;margin:10px 0 0;font-size:15px;">A team member has uploaded new content</p>
+</td></tr>
+<tr><td style="padding:40px;">
+  <p style="color:#333;font-size:16px;line-height:1.6;margin:0 0 20px;">Hi ${recipientName || 'there'},</p>
+  <p style="color:#333;font-size:16px;line-height:1.6;margin:0 0 25px;"><strong>${editorEmail}</strong> (Editor) has uploaded new content to your account:</p>
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin:25px 0;"><tr>
+    <td style="background:linear-gradient(135deg,#f5f3ff 0%,#ede9fe 100%);padding:20px;border-radius:12px;border:1px solid #e9d5ff;">
+      <p style="margin:0 0 8px;font-weight:bold;color:#800080;font-size:18px;">${itemTitle}</p>
+      <p style="margin:0 0 12px;color:#6b7280;font-size:14px;">Type: ${typeLabel}</p>
+      <div>${statusBadge}</div>
+    </td>
+  </tr></table>
+  ${actionSection}
+  <p style="color:#999;font-size:13px;margin:30px 0 0;padding-top:20px;border-top:1px solid #eee;">You're receiving this because you're the account owner or an admin.</p>
+</td></tr>
+<tr><td style="background-color:#f9f9f9;padding:30px 40px;text-align:center;border-top:1px solid #eee;">
+  <p style="margin:0;font-size:14px;color:#6b7280;"><strong style="color:#800080;">Outbound Impact</strong> — Share Content. Track Analytics. Grow Your Reach.</p>
+  <p style="margin:10px 0 0;font-size:12px;color:#ccc;">© ${new Date().getFullYear()} Outbound Impact. All rights reserved.</p>
+</td></tr>
+</table></td></tr></table></body></html>`
+    });
+
+    if (error) {
+      console.error('❌ Failed to send editor upload notification:', error);
+      return { success: false, error: error.message };
+    }
+    console.log('✅ Editor upload notification sent to:', recipientEmail, '(ID:', data.id, ')');
+    return { success: true, messageId: data.id };
+  } catch (error) {
+    console.error('❌ Failed to send editor upload notification:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendWelcomeEmail,
   sendAdminNotification,
@@ -1673,5 +1756,6 @@ module.exports = {
   sendAdminTeamInvitationEmail,
   sendCohortMemberEmail,
   sendUpgradeReceiptEmail,
+  sendEditorUploadNotification,
   testConnection
 };

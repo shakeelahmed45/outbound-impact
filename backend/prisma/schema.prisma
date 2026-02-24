@@ -112,6 +112,10 @@ model Item {
 
   sharingEnabled Boolean @default(true)
 
+  status           String  @default("PUBLISHED")
+  uploadedByUserId String?
+  uploadedByEmail  String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -123,6 +127,7 @@ model Item {
   @@index([userId])
   @@index([slug])
   @@index([sharingEnabled])
+  @@index([status])
   @@index([organizationId])
 }
 
@@ -179,6 +184,7 @@ model TeamMember {
   status       String   @default("PENDING")
   token        String?  @unique
   message      String?
+  allowedFeatures Json?
   roleChangeRequested    Boolean   @default(false)
   requestedRole          String?
   roleChangeNote         String?   @db.Text

@@ -225,7 +225,27 @@ const approveWorkflow = async (req, res) => {
       },
     });
 
-    console.log(`✅ Workflow approved: "${updated.assetName}" by ${reviewer.name}`);
+    // ✅ If linked to an Item, publish it
+    if (workflow.itemId) {
+      await prisma.item.update({
+        where: { id: workflow.itemId },
+        data: { status: 'PUBLISHED' },
+      }).catch(err => console.error('Failed to publish linked item:', err.message));
+
+      // Notify the editor who uploaded
+      if (workflow.submittedById) {
+        const { createNotification } = require('../services/notificationService');
+        await createNotification(workflow.submittedById, {
+          type: 'success',
+          category: 'upload',
+          title: 'Content Approved! ✅',
+          message: `Your upload "${workflow.assetName}" has been approved and is now live.`,
+          metadata: { itemId: workflow.itemId, workflowId: workflow.id },
+        });
+      }
+    }
+
+    console.log(`✅ Workflow approved: "${updated.assetName}" by ${reviewer.name}${workflow.itemId ? ' → Item published' : ''}`);
 
     res.json({ status: 'success', message: 'Content approved', workflow: updated });
   } catch (error) {
@@ -277,6 +297,18 @@ const requestChanges = async (req, res) => {
     });
 
     console.log(`🔄 Changes requested on: "${updated.assetName}" by ${reviewer.name}`);
+
+    // ✅ Notify the editor who submitted
+    if (workflow.submittedById) {
+      const { createNotification } = require('../services/notificationService');
+      await createNotification(workflow.submittedById, {
+        type: 'warning',
+        category: 'upload',
+        title: 'Changes Requested',
+        message: `Your submission "${workflow.assetName}" needs changes: "${feedback.trim().substring(0, 100)}${feedback.length > 100 ? '...' : ''}"`,
+        metadata: { workflowId: workflow.id, feedback: feedback.trim() },
+      });
+    }
 
     res.json({ status: 'success', message: 'Changes requested', workflow: updated });
   } catch (error) {

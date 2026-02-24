@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Image, Video, Music, FileText, Link, Trash2, Edit, Eye, BarChart3, 
-  Download, Search, Filter, X, Loader2, Share2, Lock, ExternalLink, Paperclip, Save, Folder, Upload
+  Download, Search, Filter, X, Loader2, Share2, Lock, ExternalLink, Paperclip, Save, Folder, Upload,
+  Clock, XCircle
 } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import { canEdit, canDelete } from '../store/authStore';
@@ -284,6 +285,23 @@ const ItemsPage = () => {
         </div>
 
         {/* Search and Filter */}
+        {/* Pending Approval Banner */}
+        {items.filter(i => i.contentStatus === 'PENDING_APPROVAL').length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                <Clock size={20} className="text-amber-600" />
+              </div>
+              <div>
+                <p className="font-bold text-amber-800 text-sm">
+                  {items.filter(i => i.contentStatus === 'PENDING_APPROVAL').length} item(s) pending approval
+                </p>
+                <p className="text-xs text-amber-600">Review and approve in the Workflows page</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="relative">
@@ -374,6 +392,16 @@ const ItemsPage = () => {
                       <span>{item.type}</span>
                     </div>
                   </div>
+
+                  {/* Content Status Badge */}
+                  {item.contentStatus === 'PENDING_APPROVAL' && (
+                    <div className="absolute bottom-3 left-3 right-3">
+                      <div className="flex items-center gap-2 px-3 py-2 bg-amber-500 text-white rounded-lg text-xs font-bold shadow-lg">
+                        <Clock size={14} />
+                        <span>Pending Approval — Review in Workflows</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Content */}
@@ -429,6 +457,13 @@ const ItemsPage = () => {
                       </button>
                     </div>
                   </div>
+
+                  {/* Uploaded-by info */}
+                  {item.uploadedByEmail && (
+                    <p className="text-xs text-gray-400 mb-2">
+                      Uploaded by: <span className="font-medium text-gray-600">{item.uploadedByEmail}</span>
+                    </p>
+                  )}
 
                   {/* Actions */}
                   <div className="flex gap-2">
