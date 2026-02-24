@@ -111,7 +111,7 @@ function App() {
         <Route path="/dashboard/compliance" element={<ProtectedRoute><CompliancePage /></ProtectedRoute>} />
         
         {/* Backwards compatibility: old API Access route */}
-        <Route path="/dashboard/api-access" element={<Navigate to="/dashboard/settings" replace />} />
+        {/* Old Enterprise routes removed - API Access, White Label, Integrations no longer exist */}
         
         {/* ═══════════════════════════════════
             ADMIN ROUTES

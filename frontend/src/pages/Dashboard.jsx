@@ -530,30 +530,6 @@ const Dashboard = () => {
               <Folder className="mx-auto mb-2 text-primary" size={24} />
               <span className="text-sm font-semibold text-gray-700">Streams</span>
             </button>
-            {isEnterprise && !isTeamMemberViewer && (
-              <>
-                <button onClick={() => navigate('/dashboard/api-access')} className="p-4 border-2 border-yellow-300 bg-yellow-50 rounded-xl hover:border-yellow-500 hover:bg-yellow-100 transition-all text-center">
-                  <Key className="mx-auto mb-2 text-yellow-600" size={24} />
-                  <span className="text-sm font-semibold text-gray-700">API Access</span>
-                </button>
-                <button onClick={() => navigate('/dashboard/white-label')} className="p-4 border-2 border-yellow-300 bg-yellow-50 rounded-xl hover:border-yellow-500 hover:bg-yellow-100 transition-all text-center">
-                  <Palette className="mx-auto mb-2 text-yellow-600" size={24} />
-                  <span className="text-sm font-semibold text-gray-700">White Label</span>
-                </button>
-                <button onClick={() => navigate('/dashboard/integrations')} className="p-4 border-2 border-yellow-300 bg-yellow-50 rounded-xl hover:border-yellow-500 hover:bg-yellow-100 transition-all text-center">
-                  <Zap className="mx-auto mb-2 text-yellow-600" size={24} />
-                  <span className="text-sm font-semibold text-gray-700">Integrations</span>
-                </button>
-                <button onClick={() => navigate('/dashboard/advanced-analytics')} className="p-4 border-2 border-yellow-300 bg-yellow-50 rounded-xl hover:border-yellow-500 hover:bg-yellow-100 transition-all text-center">
-                  <BarChart3 className="mx-auto mb-2 text-yellow-600" size={24} />
-                  <span className="text-sm font-semibold text-gray-700">Advanced Analytics</span>
-                </button>
-                <button onClick={() => navigate('/dashboard/security')} className="p-4 border-2 border-yellow-300 bg-yellow-50 rounded-xl hover:border-yellow-500 hover:bg-yellow-100 transition-all text-center">
-                  <Shield className="mx-auto mb-2 text-yellow-600" size={24} />
-                  <span className="text-sm font-semibold text-gray-700">Security & 2FA</span>
-                </button>
-              </>
-            )}
           </div>
         </div>
 

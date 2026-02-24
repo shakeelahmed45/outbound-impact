@@ -58,7 +58,7 @@ const inviteTeamMember = async (req, res) => {
       });
     }
 
-    const { email, role, message } = req.body; // ✨ Added message field
+    const { email, role, message, allowedFeatures } = req.body; // ✨ Added message + allowedFeatures
 
     if (!email || !role) {
       return res.status(400).json({
@@ -101,23 +101,13 @@ const inviteTeamMember = async (req, res) => {
       });
     }
 
-    // ═══════════════════════════════════════════════════════
-    // ✅ STRICT: Enforce contributor limits per plan
-    // ═══════════════════════════════════════════════════════
-    const CONTRIBUTOR_LIMITS = {
-      INDIVIDUAL: 2,
-      ORG_SMALL: 3,
-      ORG_MEDIUM: 20,
-      ORG_ENTERPRISE: 50,
-    };
-
-    const contributorLimit = CONTRIBUTOR_LIMITS[user.role];
-    if (contributorLimit !== undefined) {
+    // ✅ STRICT: Individual plan → 2 contributors max
+    if (user.role === 'INDIVIDUAL') {
       const teamCount = await prisma.teamMember.count({ where: { userId } });
-      if (teamCount >= contributorLimit) {
+      if (teamCount >= 2) {
         return res.status(403).json({
           status: 'error',
-          message: `Contributor limit reached (${teamCount}/${contributorLimit}). Please upgrade your plan to invite more team members.`
+          message: 'Contributor limit reached (2/2). Please upgrade your plan to invite more team members.'
         });
       }
     }
@@ -181,6 +171,7 @@ const inviteTeamMember = async (req, res) => {
         status: 'PENDING',
         token,
         message: message || null, // ✨ Save custom message
+        allowedFeatures: role === 'ADMIN' ? null : (allowedFeatures || null), // ✅ ADMIN=full access(null), VIEWER/EDITOR=selected features
       },
     });
 
@@ -817,6 +808,41 @@ const dismissRoleRequest = async (req, res) => {
   }
 };
 
+// ═══════════════════════════════════════════════════════════
+// PUT /team/:id/features — Update allowed features for a team member
+// ═══════════════════════════════════════════════════════════
+const updateFeatures = async (req, res) => {
+  try {
+    const userId = req.effectiveUserId || req.user.userId;
+    const { id } = req.params;
+    const { allowedFeatures } = req.body;
+
+    if (req.isTeamMember && req.teamRole !== 'ADMIN') {
+      return res.status(403).json({ status: 'error', message: 'Only account owner or ADMIN can update features' });
+    }
+
+    const member = await prisma.teamMember.findFirst({ where: { id, userId } });
+    if (!member) {
+      return res.status(404).json({ status: 'error', message: 'Team member not found' });
+    }
+
+    if (member.role === 'ADMIN') {
+      return res.status(400).json({ status: 'error', message: 'ADMIN role always has full access' });
+    }
+
+    const updated = await prisma.teamMember.update({
+      where: { id },
+      data: { allowedFeatures: allowedFeatures || null },
+    });
+
+    console.log(`✅ Features updated for ${member.email}: ${JSON.stringify(allowedFeatures)}`);
+    res.json({ status: 'success', message: 'Features updated', member: { id: updated.id, email: updated.email, role: updated.role, allowedFeatures: updated.allowedFeatures } });
+  } catch (error) {
+    console.error('Update features error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to update features' });
+  }
+};
+
 module.exports = {
   getTeamMembers,
   inviteTeamMember,
@@ -829,4 +855,5 @@ module.exports = {
   updateTeamMemberRole, // ✅ NEW: Export the new function
   requestRoleChange,
   dismissRoleRequest,
+  updateFeatures,
 };

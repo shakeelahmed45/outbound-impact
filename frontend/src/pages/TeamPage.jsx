@@ -50,6 +50,11 @@ const TeamPage = () => {
     role: 'VIEWER',
     message: '',
   });
+  const [selectedFeatures, setSelectedFeatures] = useState([]); // ✅ Feature access control
+  const [showEditFeaturesModal, setShowEditFeaturesModal] = useState(false); // ✅ Edit features modal
+  const [editFeaturesMember, setEditFeaturesMember] = useState(null); // ✅ Which member to edit
+  const [editFeaturesSelected, setEditFeaturesSelected] = useState([]); // ✅ Features being edited
+  const [savingFeatures, setSavingFeatures] = useState(false);
   const [error, setError] = useState('');
   const [showWarningPopup, setShowWarningPopup] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -68,18 +73,43 @@ const TeamPage = () => {
     setToast({ show: false, message: '', type: 'success' });
   };
 
-  // ═══ Contributor limits per plan ═══
+  // Individual plan: 2-contributor limit
   const effectiveUser = user?.isTeamMember ? user.organization : user;
-  const CONTRIBUTOR_LIMITS = {
-    INDIVIDUAL: 2,
-    ORG_SMALL: 3,
-    ORG_MEDIUM: 20,
-    ORG_ENTERPRISE: 50,
+  const isIndividual = effectiveUser?.role === 'INDIVIDUAL';
+  const isSmall = effectiveUser?.role === 'ORG_SMALL';
+  const isMedium = effectiveUser?.role === 'ORG_MEDIUM';
+  const isEnterprise = effectiveUser?.role === 'ORG_ENTERPRISE';
+  const INDIVIDUAL_CONTRIBUTOR_LIMIT = 2;
+  const individualLimitReached = isIndividual && teamMembers.length >= INDIVIDUAL_CONTRIBUTOR_LIMIT;
+
+  // ✅ Feature list per plan — these are the features the owner can grant to VIEWER/EDITOR
+  const getAvailableFeatures = () => {
+    const base = [
+      { key: 'uploads', label: 'Uploads', desc: 'Upload new content' },
+      { key: 'items', label: 'My Items', desc: 'View and manage items' },
+      { key: 'streams', label: 'Streams', desc: 'Manage streams/campaigns' },
+    ];
+    if (isIndividual) {
+      return [...base, { key: 'analytics', label: 'Analytics', desc: 'View analytics data' }];
+    }
+    const orgBase = [
+      ...base,
+      { key: 'analytics', label: 'Analytics', desc: 'View analytics data' },
+      { key: 'activity', label: 'All Activity', desc: 'View activity log' },
+      { key: 'messages', label: 'Messages', desc: 'Send and receive messages' },
+    ];
+    if (isSmall || isMedium) return orgBase;
+    // Enterprise — add enterprise-only features
+    return [
+      ...orgBase,
+      { key: 'cohorts', label: 'Cohorts', desc: 'Manage user cohorts' },
+      { key: 'workflows', label: 'Workflows', desc: 'Content approval workflows' },
+      { key: 'organizations', label: 'Organizations', desc: 'Multi-brand management' },
+      { key: 'audit', label: 'Audit Log', desc: 'Track all system changes' },
+      { key: 'compliance', label: 'Compliance', desc: 'Compliance & delivery analytics' },
+    ];
   };
-  const planRole = effectiveUser?.role || 'INDIVIDUAL';
-  const contributorLimit = CONTRIBUTOR_LIMITS[planRole] || 0;
-  const isIndividual = planRole === 'INDIVIDUAL';
-  const limitReached = teamMembers.length >= contributorLimit;
+  const availableFeatures = getAvailableFeatures();
 
   useEffect(() => {
     document.title = 'Contributors Management | Outbound Impact';
@@ -118,11 +148,14 @@ const TeamPage = () => {
     setInviting(true);
 
     try {
-      const response = await api.post('/team/invite', formData);
+      const response = await api.post('/team/invite', {
+        ...formData,
+        allowedFeatures: formData.role === 'ADMIN' ? null : selectedFeatures,
+      });
       if (response.data.status === 'success') {
         setTeamMembers([response.data.teamMember, ...teamMembers]);
         setShowInviteModal(false);
-        setFormData({ email: '', role: 'VIEWER', message: '' });
+        setFormData({ email: '', role: 'VIEWER', message: '' }); setSelectedFeatures([]);
         showToast('Contributor invited successfully! Invitation email sent.', 'success');
       }
     } catch (error) {
@@ -312,6 +345,24 @@ const TeamPage = () => {
     );
   }
 
+  // ✅ Save updated features for existing team member
+  const handleSaveFeatures = async () => {
+    if (!editFeaturesMember) return;
+    setSavingFeatures(true);
+    try {
+      await api.put(`/team/${editFeaturesMember.id}/features`, { allowedFeatures: editFeaturesSelected });
+      showToast('Features updated successfully!', 'success');
+      setShowEditFeaturesModal(false);
+      setEditFeaturesMember(null);
+      fetchInitialData(); // Refresh team members list
+    } catch (error) {
+      console.error('Failed to update features:', error);
+      showToast('Failed to update features', 'error');
+    } finally {
+      setSavingFeatures(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       {/* Toast Notification */}
@@ -336,30 +387,30 @@ const TeamPage = () => {
           </div>
           <button
             onClick={() => {
-              if (limitReached) {
-                showToast(`Contributor limit reached (${teamMembers.length}/${contributorLimit}). Upgrade to invite more!`, 'error');
+              if (individualLimitReached) {
+                showToast('Contributor limit reached on Personal plan (2 max). Upgrade to invite more!', 'error');
                 return;
               }
               setShowInviteModal(true);
               setError('');
             }}
             className={`text-white px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:shadow-lg transition-all text-sm sm:text-base whitespace-nowrap ${
-              limitReached ? 'bg-orange-500 hover:bg-orange-600' : 'gradient-btn'
+              individualLimitReached ? 'bg-orange-500 hover:bg-orange-600' : 'gradient-btn'
             }`}
           >
             <UserPlus size={18} className="sm:w-5 sm:h-5" />
-            {limitReached ? 'Upgrade to Add More' : 'Invite Contributor'}
+            {individualLimitReached ? 'Upgrade to Add More' : 'Invite Contributor'}
           </button>
         </div>
 
-        {/* ═══ Plan contributor limit info ═══ */}
-        {contributorLimit > 0 && (
-          <div className={`flex items-center justify-between ${limitReached ? 'bg-orange-50 border-orange-200' : 'bg-purple-50 border-purple-200'} border rounded-xl px-5 py-3 mb-4`}>
-            <p className={`text-sm ${limitReached ? 'text-orange-700' : 'text-purple-700'}`}>
-              <strong>{teamMembers.length}/{contributorLimit}</strong> contributors used
-              {limitReached && <span className="ml-2 text-orange-600 font-medium">• Limit reached</span>}
+        {/* Individual plan limit info */}
+        {isIndividual && (
+          <div className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-xl px-5 py-3 mb-4">
+            <p className="text-sm text-purple-700">
+              <strong>{teamMembers.length}/{INDIVIDUAL_CONTRIBUTOR_LIMIT}</strong> contributors used on Personal plan
+              {individualLimitReached && <span className="ml-2 text-orange-600 font-medium">• Limit reached</span>}
             </p>
-            {limitReached && (
+            {individualLimitReached && (
               <button onClick={() => window.location.href = '/dashboard/settings'} className="text-sm font-medium text-purple-600 hover:text-purple-700">
                 Upgrade →
               </button>
@@ -566,6 +617,19 @@ const TeamPage = () => {
                               <span className="hidden lg:inline">Resend</span>
                             </button>
                           )}
+                          {member.role !== 'ADMIN' && member.status === 'ACCEPTED' && (
+                          <button
+                            onClick={() => {
+                              setEditFeaturesMember(member);
+                              setEditFeaturesSelected(member.allowedFeatures || []);
+                              setShowEditFeaturesModal(true);
+                            }}
+                            className="text-purple-600 hover:text-purple-700 font-medium flex items-center gap-1 transition-colors text-xs lg:text-sm"
+                          >
+                            <Edit2 size={14} />
+                            <span className="hidden lg:inline">Features</span>
+                          </button>
+                          )}
                           <button
                             onClick={() => handleRemove(member)}
                             className="text-red-600 hover:text-red-700 font-medium flex items-center gap-1 transition-colors text-xs lg:text-sm"
@@ -671,6 +735,19 @@ const TeamPage = () => {
                         )}
                       </button>
                     )}
+                    {member.role !== 'ADMIN' && member.status === 'ACCEPTED' && (
+                    <button
+                      onClick={() => {
+                        setEditFeaturesMember(member);
+                        setEditFeaturesSelected(member.allowedFeatures || []);
+                        setShowEditFeaturesModal(true);
+                      }}
+                      className="flex-1 px-3 py-2 bg-purple-50 text-purple-600 hover:bg-purple-100 rounded-lg font-medium flex items-center justify-center gap-1.5 transition-colors text-sm"
+                    >
+                      <Edit2 size={16} />
+                      <span>Features</span>
+                    </button>
+                    )}
                     <button
                       onClick={() => handleRemove(member)}
                       className="flex-1 px-3 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg font-medium flex items-center justify-center gap-1.5 transition-colors text-sm"
@@ -759,13 +836,13 @@ const TeamPage = () => {
           </div>
         )}
 
-        {/* Plan upgrade banner — shown when contributor limit is reached */}
-        {limitReached && planRole !== 'ORG_ENTERPRISE' && (
+        {/* Individual plan upgrade banner */}
+        {isIndividual && (
           <div className="mt-6 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <h3 className="font-bold text-xl mb-1">Ready to grow?</h3>
-                <p className="text-blue-100 text-sm">Upgrade your plan for more contributors, storage, streams, and advanced features!</p>
+                <p className="text-blue-100 text-sm">Upgrade to Small Business for more contributors, team messaging, advanced analytics, and more!</p>
               </div>
               <button onClick={() => window.location.href = '/dashboard/settings'} className="px-6 py-3 bg-white text-purple-600 rounded-lg font-bold hover:bg-slate-100 transition-colors flex-shrink-0">Upgrade Now</button>
             </div>
@@ -799,7 +876,7 @@ const TeamPage = () => {
           <button
             onClick={() => {
               setShowInviteModal(false);
-              setFormData({ email: '', role: 'VIEWER', message: '' });
+              setFormData({ email: '', role: 'VIEWER', message: '' }); setSelectedFeatures([]);
               setError('');
             }}
             className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-full transition-all flex-shrink-0"
@@ -867,6 +944,62 @@ const TeamPage = () => {
               </select>
             </div>
 
+            {/* ✅ Feature Access Control — Only for VIEWER/EDITOR */}
+            {formData.role !== 'ADMIN' && (
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                Feature Access <span className="text-red-500">*</span>
+              </label>
+              <p className="text-xs text-gray-500 mb-2">Select which features this member can access</p>
+              <div className="border-2 border-gray-200 rounded-lg p-2.5 max-h-40 overflow-y-auto space-y-1.5">
+                {/* Select All */}
+                <label className="flex items-center gap-2 px-2 py-1 rounded hover:bg-purple-50 cursor-pointer border-b border-gray-100 pb-2 mb-1">
+                  <input
+                    type="checkbox"
+                    checked={selectedFeatures.length === availableFeatures.length}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedFeatures(availableFeatures.map(f => f.key));
+                      } else {
+                        setSelectedFeatures([]);
+                      }
+                    }}
+                    className="w-3.5 h-3.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  />
+                  <span className="text-xs font-bold text-gray-700">Select All</span>
+                </label>
+                {availableFeatures.map((feature) => (
+                  <label key={feature.key} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-purple-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedFeatures.includes(feature.key)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedFeatures(prev => [...prev, feature.key]);
+                        } else {
+                          setSelectedFeatures(prev => prev.filter(f => f !== feature.key));
+                        }
+                      }}
+                      className="w-3.5 h-3.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                    />
+                    <div>
+                      <span className="text-xs font-semibold text-gray-700">{feature.label}</span>
+                      <span className="text-xs text-gray-400 ml-1">— {feature.desc}</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              {selectedFeatures.length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">⚠️ No features selected — member won't see any pages</p>
+              )}
+            </div>
+            )}
+            {formData.role === 'ADMIN' && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-2.5">
+                <p className="text-xs text-green-700 font-medium">👑 Admin role has full access to all features automatically</p>
+              </div>
+            )}
+
             {/* Personal Message Field - Compact, fewer rows */}
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1.5">
@@ -897,7 +1030,7 @@ const TeamPage = () => {
             type="button"
             onClick={() => {
               setShowInviteModal(false);
-              setFormData({ email: '', role: 'VIEWER', message: '' });
+              setFormData({ email: '', role: 'VIEWER', message: '' }); setSelectedFeatures([]);
               setError('');
             }}
             className="flex-1 px-3 py-2 sm:px-4 sm:py-2.5 bg-white border-2 border-gray-300 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-50 hover:border-gray-400 transition-all"
@@ -928,6 +1061,94 @@ const TeamPage = () => {
     </div>
   </div>
 )}
+
+      {/* ═══════════════════════════════════════════════════════════
+          ✅ EDIT FEATURES MODAL
+         ═══════════════════════════════════════════════════════════ */}
+      {showEditFeaturesModal && editFeaturesMember && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-md flex flex-col" style={{ maxHeight: 'calc(100vh - 3rem)' }}>
+            {/* Header */}
+            <div className="flex-shrink-0 bg-gradient-to-r from-purple-600 to-violet-600 text-white px-4 py-3 sm:px-5 sm:py-4 rounded-t-xl sm:rounded-t-2xl">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                  <div className="bg-white/20 p-2 rounded-lg flex-shrink-0">
+                    <Edit2 size={18} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-base sm:text-lg font-bold truncate">Edit Feature Access</h2>
+                    <p className="text-purple-100 text-xs truncate">{editFeaturesMember.email} ({editFeaturesMember.role})</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setShowEditFeaturesModal(false); setEditFeaturesMember(null); }}
+                  className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-full transition-all flex-shrink-0"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-4 py-3 sm:px-5 sm:py-4">
+              <p className="text-xs text-gray-500 mb-3">Select which features this member can access:</p>
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-purple-50 cursor-pointer border-b border-gray-100 pb-2 mb-1">
+                  <input
+                    type="checkbox"
+                    checked={editFeaturesSelected.length === availableFeatures.length}
+                    onChange={(e) => {
+                      setEditFeaturesSelected(e.target.checked ? availableFeatures.map(f => f.key) : []);
+                    }}
+                    className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  />
+                  <span className="text-sm font-bold text-gray-700">Select All</span>
+                </label>
+                {availableFeatures.map((feature) => (
+                  <label key={feature.key} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-purple-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editFeaturesSelected.includes(feature.key)}
+                      onChange={(e) => {
+                        setEditFeaturesSelected(prev =>
+                          e.target.checked ? [...prev, feature.key] : prev.filter(f => f !== feature.key)
+                        );
+                      }}
+                      className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                    />
+                    <div>
+                      <span className="text-sm font-semibold text-gray-700">{feature.label}</span>
+                      <span className="text-xs text-gray-400 ml-1.5">— {feature.desc}</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              {editFeaturesSelected.length === 0 && (
+                <p className="text-xs text-amber-600 mt-2">⚠️ No features selected — member won't see any pages</p>
+              )}
+            </div>
+            {/* Footer */}
+            <div className="flex-shrink-0 bg-gray-50 px-4 py-2.5 sm:py-3 rounded-b-xl sm:rounded-b-2xl border-t border-gray-200">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setShowEditFeaturesModal(false); setEditFeaturesMember(null); }}
+                  className="flex-1 px-3 py-2 bg-white border-2 border-gray-300 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-all"
+                  disabled={savingFeatures}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveFeatures}
+                  disabled={savingFeatures}
+                  className="flex-1 px-3 py-2 gradient-btn text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-all disabled:opacity-50"
+                >
+                  {savingFeatures ? 'Saving...' : 'Save Features'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       </div>
     </DashboardLayout>
   );

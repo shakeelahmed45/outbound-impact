@@ -173,6 +173,30 @@ export const canManageTeam = () => {
 };
 
 // ═══════════════════════════════════════════════════════════
+// ✅ Feature-based access control for team members
+// Account owners + ADMIN = always full access
+// VIEWER/EDITOR = only features in their allowedFeatures array
+// ═══════════════════════════════════════════════════════════
+export const hasFeature = (featureKey) => {
+  const user = useAuthStore.getState().user;
+  
+  // Not a team member (account owner) = full access
+  if (!user?.isTeamMember) return true;
+  
+  // ADMIN team members = full access
+  if (user?.teamRole === 'ADMIN') return true;
+  
+  // VIEWER/EDITOR: check allowedFeatures array
+  // null/undefined = never set (existing members) = FULL ACCESS (backward compatible)
+  // empty array [] = explicitly no features granted
+  const features = user?.allowedFeatures;
+  if (!features) return true; // ✅ Existing members keep full access
+  if (!Array.isArray(features)) return true;
+  
+  return features.includes(featureKey);
+};
+
+// ═══════════════════════════════════════════════════════════
 // 🆕 NEW: Permission checking helpers
 // ═══════════════════════════════════════════════════════════
 export const isAdmin = () => {

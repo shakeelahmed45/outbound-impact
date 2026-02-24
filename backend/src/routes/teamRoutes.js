@@ -19,6 +19,9 @@ router.post('/:id/dismiss-request', authMiddleware, teamController.dismissRoleRe
 // ✅ Update team member role (must be BEFORE the general PUT /:id route)
 router.put('/:id/role', authMiddleware, teamController.updateTeamMemberRole);
 
+// ✅ NEW: Update allowed features for a team member
+router.put('/:id/features', authMiddleware, resolveEffectiveUserId, teamController.updateFeatures);
+
 // Update team member (general update)
 router.put('/:id', authMiddleware, teamController.updateTeamMember);
 

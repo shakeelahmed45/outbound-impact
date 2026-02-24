@@ -516,6 +516,7 @@ const signIn = async (req, res) => {
           storageLimit: user.storageLimit.toString(),
           isTeamMember: true,
           teamRole: teamMembership.role,
+          allowedFeatures: teamMembership.allowedFeatures || null,
           organization: {
             id: teamMembership.user.id,
             name: teamMembership.user.name,
@@ -623,6 +624,7 @@ const getCurrentUser = async (req, res) => {
           currentPeriodEnd: user.currentPeriodEnd,
           isTeamMember: true,
           teamRole: teamMembership.role,
+          allowedFeatures: teamMembership.allowedFeatures || null,
           organization: {
             id: teamMembership.user.id,
             name: teamMembership.user.name,

@@ -7,7 +7,7 @@ import {
   CreditCard, UserCircle, Building2, GitBranch,
   ClipboardCheck, FileCheck, Menu
 } from 'lucide-react';
-import useAuthStore from '../../store/authStore';
+import useAuthStore, { hasFeature } from '../../store/authStore';
 import api from '../../services/api';
 
 const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
@@ -187,8 +187,8 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
             expanded={contentExpanded}
             onToggle={() => setContentExpanded(!contentExpanded)}
           >
-            {/* Upload - All tiers (hidden for VIEWER team members) */}
-            {!isTeamViewer && (
+            {/* Upload - All tiers (hidden for VIEWER, feature-gated for EDITOR) */}
+            {!isTeamViewer && hasFeature('uploads') && (
               <SubNavItem
                 icon={Upload}
                 label="Upload"
@@ -196,15 +196,17 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
                 onClick={() => handleNavigate('/dashboard/upload')}
               />
             )}
-            {/* Messages (Items) - All tiers */}
+            {/* Messages (Items) - All tiers, feature-gated */}
+            {hasFeature('items') && (
             <SubNavItem
               icon={QrCode}
               label="My Items"
               active={isActive('/dashboard/items')}
               onClick={() => handleNavigate('/dashboard/items')}
             />
-            {/* Streams (Campaigns) - All tiers */}
-            {(isIndividual || isSmallOrAbove) && (
+            )}
+            {/* Streams (Campaigns) - All tiers, feature-gated */}
+            {(isIndividual || isSmallOrAbove) && hasFeature('streams') && (
               <SubNavItem
                 icon={Rocket}
                 label="Streams"
@@ -220,7 +222,7 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
             Individual = basic, Medium/Enterprise = advanced
             Small = hidden (no analytics page)
            ═══════════════════════════════════ */}
-        {isIndividual && (
+        {isIndividual && hasFeature('analytics') && (
           <NavItem
             icon={BarChart3}
             label="Analytics"
@@ -237,7 +239,7 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
             onClick={() => handleNavigate('/dashboard/team')}
           />
         )}
-        {isMediumOrAbove && (
+        {isMediumOrAbove && hasFeature('analytics') && (
           <NavItem
             icon={BarChart3}
             label="Analytics"
@@ -249,7 +251,7 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
         {/* ═══════════════════════════════════
             ALL ACTIVITY - Small, Medium, Enterprise
            ═══════════════════════════════════ */}
-        {isSmallOrAbove && (
+        {isSmallOrAbove && hasFeature('activity') && (
           <NavItem
             icon={Activity}
             label="All Activity"
@@ -262,7 +264,7 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
             INBOX (Messages) - Small, Medium, Enterprise
             Internal team + External email messaging
            ═══════════════════════════════════ */}
-        {isSmallOrAbove && (
+        {isSmallOrAbove && hasFeature('messages') && (
           <NavItem
             icon={MessageSquare}
             label="Messages"
@@ -284,20 +286,24 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
               onToggle={() => setEnterpriseExpanded(!enterpriseExpanded)}
               badge="PRO"
             >
+              {hasFeature('cohorts') && (
               <SubNavItem
                 icon={Users}
                 label="Cohorts"
                 active={isActive('/dashboard/cohorts')}
                 onClick={() => handleNavigate('/dashboard/cohorts')}
               />
+              )}
+              {hasFeature('workflows') && (
               <SubNavItem
                 icon={GitBranch}
                 label="Workflows"
                 active={isActive('/dashboard/workflows')}
                 onClick={() => handleNavigate('/dashboard/workflows')}
               />
-              {/* ✅ Organizations — hidden for VIEWER+EDITOR (they can't manage orgs) */}
-              {canAccessContributors && (
+              )}
+              {/* ✅ Organizations — hidden for VIEWER+EDITOR (they can't manage orgs), feature-gated */}
+              {canAccessContributors && hasFeature('organizations') && (
                 <SubNavItem
                   icon={Building2}
                   label="Organizations"
@@ -305,18 +311,22 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
                   onClick={() => handleNavigate('/dashboard/organizations')}
                 />
               )}
+              {hasFeature('audit') && (
               <SubNavItem
                 icon={ClipboardCheck}
                 label="Audit Log"
                 active={isActive('/dashboard/audit')}
                 onClick={() => handleNavigate('/dashboard/audit')}
               />
+              )}
+              {hasFeature('compliance') && (
               <SubNavItem
                 icon={FileCheck}
                 label="Compliance"
                 active={isActive('/dashboard/compliance')}
                 onClick={() => handleNavigate('/dashboard/compliance')}
               />
+              )}
             </CollapsibleSection>
           </div>
         )}
