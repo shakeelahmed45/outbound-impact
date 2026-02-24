@@ -4,6 +4,7 @@ import NetworkWarning from './components/common/NetworkWarning';
 import SplashScreen from './components/common/SplashScreen';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import RequireEditAccess from './components/common/RequireEditAccess';
+import RequireFeature from './components/common/RequireFeature';
 import RootRedirect from './components/common/RootRedirect';
 import GlobalAiChatWidget from './components/GlobalAiChatWidget';
 import SignUp from './pages/SignUp';
@@ -84,15 +85,15 @@ function App() {
             USER DASHBOARD ROUTES
            ═══════════════════════════════════ */}
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-        <Route path="/dashboard/upload" element={<ProtectedRoute><RequireEditAccess><UploadPage /></RequireEditAccess></ProtectedRoute>} />
-        <Route path="/dashboard/items" element={<ProtectedRoute><ItemsPage /></ProtectedRoute>} />
-        <Route path="/dashboard/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
+        <Route path="/dashboard/upload" element={<ProtectedRoute><RequireFeature feature="uploads"><RequireEditAccess><UploadPage /></RequireEditAccess></RequireFeature></ProtectedRoute>} />
+        <Route path="/dashboard/items" element={<ProtectedRoute><RequireFeature feature="items"><ItemsPage /></RequireFeature></ProtectedRoute>} />
+        <Route path="/dashboard/analytics" element={<ProtectedRoute><RequireFeature feature="analytics"><AnalyticsPage /></RequireFeature></ProtectedRoute>} />
         <Route path="/dashboard/team" element={<ProtectedRoute><TeamPage /></ProtectedRoute>} />
-        <Route path="/dashboard/campaigns" element={<ProtectedRoute><CampaignsPage /></ProtectedRoute>} />
+        <Route path="/dashboard/campaigns" element={<ProtectedRoute><RequireFeature feature="streams"><CampaignsPage /></RequireFeature></ProtectedRoute>} />
         <Route path="/dashboard/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/dashboard/support" element={<ProtectedRoute><SupportPage /></ProtectedRoute>} />
-        <Route path="/dashboard/activity" element={<ProtectedRoute><ActivityPage /></ProtectedRoute>} />
-        <Route path="/dashboard/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
+        <Route path="/dashboard/activity" element={<ProtectedRoute><RequireFeature feature="activity"><ActivityPage /></RequireFeature></ProtectedRoute>} />
+        <Route path="/dashboard/inbox" element={<ProtectedRoute><RequireFeature feature="messages"><InboxPage /></RequireFeature></ProtectedRoute>} />
         <Route path="/dashboard/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
         
         {/* Backwards compatibility redirects */}
@@ -100,15 +101,15 @@ function App() {
         <Route path="/live-chat" element={<Navigate to="/dashboard/support" replace />} />
         
         {/* ═══════════════════════════════════
-            ENTERPRISE ROUTES
+            ENTERPRISE ROUTES — All feature-gated
            ═══════════════════════════════════ */}
-        <Route path="/dashboard/advanced-analytics" element={<ProtectedRoute><AdvancedAnalyticsPage /></ProtectedRoute>} />
+        <Route path="/dashboard/advanced-analytics" element={<ProtectedRoute><RequireFeature feature="analytics"><AdvancedAnalyticsPage /></RequireFeature></ProtectedRoute>} />
         <Route path="/dashboard/security" element={<ProtectedRoute><SecurityPage /></ProtectedRoute>} />
-        <Route path="/dashboard/cohorts" element={<ProtectedRoute><CohortsPage /></ProtectedRoute>} />
-        <Route path="/dashboard/workflows" element={<ProtectedRoute><WorkflowsPage /></ProtectedRoute>} />
-        <Route path="/dashboard/organizations" element={<ProtectedRoute><OrganizationsPage /></ProtectedRoute>} />
-        <Route path="/dashboard/audit" element={<ProtectedRoute><AuditLogPage /></ProtectedRoute>} />
-        <Route path="/dashboard/compliance" element={<ProtectedRoute><CompliancePage /></ProtectedRoute>} />
+        <Route path="/dashboard/cohorts" element={<ProtectedRoute><RequireFeature feature="cohorts"><CohortsPage /></RequireFeature></ProtectedRoute>} />
+        <Route path="/dashboard/workflows" element={<ProtectedRoute><RequireFeature feature="workflows"><WorkflowsPage /></RequireFeature></ProtectedRoute>} />
+        <Route path="/dashboard/organizations" element={<ProtectedRoute><RequireFeature feature="organizations"><OrganizationsPage /></RequireFeature></ProtectedRoute>} />
+        <Route path="/dashboard/audit" element={<ProtectedRoute><RequireFeature feature="audit"><AuditLogPage /></RequireFeature></ProtectedRoute>} />
+        <Route path="/dashboard/compliance" element={<ProtectedRoute><RequireFeature feature="compliance"><CompliancePage /></RequireFeature></ProtectedRoute>} />
         
         {/* Backwards compatibility: old API Access route */}
         {/* Old Enterprise routes removed - API Access, White Label, Integrations no longer exist */}

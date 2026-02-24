@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Upload, Eye, QrCode, BarChart3, Users, Folder, Key, Palette, Zap, Shield, Crown, Video, Music, FileText, Image as ImageIcon, Code, ChevronRight, Clock, Smartphone, MousePointer, ArrowUp, ArrowDown, ArrowUpCircle, Send, Loader2, CheckCircle, Pencil, ShieldCheck } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import Tooltip from '../components/common/Tooltip';
-import useAuthStore from '../store/authStore';
+import useAuthStore, { hasFeature } from '../store/authStore';
 import api from '../services/api';
 import IndividualDashboard from './IndividualDashboard';
 
@@ -315,9 +315,11 @@ const Dashboard = () => {
             <span className="text-sm text-gray-500 mb-1 block">Uploads</span>
             <p className="text-3xl font-bold text-gray-900">{stats?.totalUploads || 0}</p>
             {stats?.changes?.uploads && <p className="text-xs text-gray-400 mt-1">vs last week</p>}
+            {hasFeature('items') && (
             <button onClick={() => navigate('/dashboard/items')} className="text-primary text-sm font-medium mt-3 flex items-center gap-1 hover:gap-2 transition-all">
               View details <ChevronRight size={16} />
             </button>
+            )}
           </div>
 
           {/* 2. Total Views */}
@@ -336,9 +338,11 @@ const Dashboard = () => {
             <span className="text-sm text-gray-500 mb-1 block">Total Views</span>
             <p className="text-3xl font-bold text-gray-900">{(stats?.totalViews || 0).toLocaleString()}</p>
             <p className="text-xs text-gray-400 mt-1">All access methods</p>
+            {hasFeature('analytics') && (
             <button onClick={() => navigate(isOrganization ? '/dashboard/advanced-analytics' : '/dashboard/analytics')} className="text-primary text-sm font-medium mt-3 flex items-center gap-1 hover:gap-2 transition-all">
               View details <ChevronRight size={16} />
             </button>
+            )}
           </div>
 
           {/* 3. QR Scans — Medium & Enterprise only */}
@@ -358,9 +362,11 @@ const Dashboard = () => {
             <span className="text-sm text-gray-500 mb-1 block">QR Scans</span>
             <p className="text-3xl font-bold text-gray-900">{(stats?.totalQrScans || 0).toLocaleString()}</p>
             <p className="text-xs text-gray-400 mt-1">Physical scans/taps</p>
+            {hasFeature('activity') && (
             <button onClick={() => navigate(isOrganization ? '/dashboard/activity' : '/dashboard/analytics')} className="text-primary text-sm font-medium mt-3 flex items-center gap-1 hover:gap-2 transition-all">
               View details <ChevronRight size={16} />
             </button>
+            )}
           </div>
           )}
 
@@ -381,9 +387,11 @@ const Dashboard = () => {
             <span className="text-sm text-gray-500 mb-1 block">Link Clicks</span>
             <p className="text-3xl font-bold text-gray-900">{(stats?.totalLinkClicks || 0).toLocaleString()}</p>
             <p className="text-xs text-gray-400 mt-1">Direct link access</p>
+            {hasFeature('activity') && (
             <button onClick={() => navigate(isOrganization ? '/dashboard/activity' : '/dashboard/analytics')} className="text-primary text-sm font-medium mt-3 flex items-center gap-1 hover:gap-2 transition-all">
               View details <ChevronRight size={16} />
             </button>
+            )}
           </div>
           )}
 
@@ -397,9 +405,11 @@ const Dashboard = () => {
             <span className="text-sm text-gray-500 mb-1 block">QR Codes</span>
             <p className="text-3xl font-bold text-gray-900">{stats?.totalQRCodes || 0}</p>
             <p className="text-xs text-gray-400 mt-1">Total codes created</p>
+            {hasFeature('streams') && (
             <button onClick={() => navigate('/dashboard/campaigns')} className="text-primary text-sm font-medium mt-3 flex items-center gap-1 hover:gap-2 transition-all">
               View details <ChevronRight size={16} />
             </button>
+            )}
           </div>
 
           {/* 6. Active Streams */}
@@ -412,9 +422,11 @@ const Dashboard = () => {
             <span className="text-sm text-gray-500 mb-1 block">Active Streams</span>
             <p className="text-3xl font-bold text-gray-900">{stats?.totalCampaigns || 0}</p>
             <p className="text-xs text-gray-400 mt-1">Content streams</p>
+            {hasFeature('streams') && (
             <button onClick={() => navigate('/dashboard/campaigns')} className="text-primary text-sm font-medium mt-3 flex items-center gap-1 hover:gap-2 transition-all">
               View details <ChevronRight size={16} />
             </button>
+            )}
           </div>
         </div>
 
@@ -512,24 +524,30 @@ const Dashboard = () => {
             Quick Actions <Tooltip content="Common tasks for quick access" />
           </h3>
           <div className={`grid grid-cols-2 ${isEnterprise && !isTeamMemberViewer ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4`}>
-            {!isTeamMemberViewer && (
+            {!isTeamMemberViewer && hasFeature('uploads') && (
               <button onClick={() => navigate('/dashboard/upload')} className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center">
                 <Upload className="mx-auto mb-2 text-primary" size={24} />
                 <span className="text-sm font-semibold text-gray-700">Upload New</span>
               </button>
             )}
+            {hasFeature('items') && (
             <button onClick={() => navigate('/dashboard/items')} className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center">
               <QrCode className="mx-auto mb-2 text-primary" size={24} />
               <span className="text-sm font-semibold text-gray-700">My Items</span>
             </button>
+            )}
+            {hasFeature('analytics') && (
             <button onClick={() => navigate(isOrganization ? '/dashboard/advanced-analytics' : '/dashboard/analytics')} className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center">
               <BarChart3 className="mx-auto mb-2 text-primary" size={24} />
               <span className="text-sm font-semibold text-gray-700">{isOrganization ? 'Advanced Analytics' : 'Analytics'}</span>
             </button>
+            )}
+            {hasFeature('streams') && (
             <button onClick={() => navigate('/dashboard/campaigns')} className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center">
               <Folder className="mx-auto mb-2 text-primary" size={24} />
               <span className="text-sm font-semibold text-gray-700">Streams</span>
             </button>
+            )}
           </div>
         </div>
 
@@ -542,10 +560,12 @@ const Dashboard = () => {
               <Clock size={20} className="text-primary" />
               Recent Activity
             </h3>
+            {hasFeature('activity') && (
             <button onClick={() => navigate('/dashboard/activity')}
               className="text-primary text-sm font-medium hover:underline flex items-center gap-1">
               View All <ChevronRight size={16} />
             </button>
+            )}
           </div>
 
           {recentActivity.length === 0 ? (
@@ -559,8 +579,8 @@ const Dashboard = () => {
                 const TypeIcon = getTypeIcon(item.type);
                 const typeColor = getTypeColor(item.type);
                 return (
-                  <div key={item.id} className="flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer group"
-                    onClick={() => navigate('/dashboard/items')}>
+                  <div key={item.id} className={`flex items-center gap-4 p-3 rounded-xl transition-colors ${hasFeature('items') ? 'hover:bg-gray-50 cursor-pointer' : ''} group`}
+                    onClick={() => hasFeature('items') && navigate('/dashboard/items')}>
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${typeColor}`}>
                       {item.thumbnailUrl ? (
                         <img src={item.thumbnailUrl} alt="" className="w-12 h-12 rounded-xl object-cover" />
