@@ -153,14 +153,24 @@ const createCampaign = async (req, res) => {
     const userId = req.effectiveUserId;
     const { name, description, category, logoUrl, passwordProtected, password } = req.body;
 
-    // ✅ STRICT: Individual plan → 2 streams max
+    // ═══════════════════════════════════════════════════════
+    // ✅ STRICT: Enforce stream limits per plan
+    // ═══════════════════════════════════════════════════════
+    const STREAM_LIMITS = {
+      INDIVIDUAL: 2,
+      ORG_SMALL: 5,
+      ORG_MEDIUM: 20,
+      ORG_ENTERPRISE: null, // unlimited
+    };
+
     const owner = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
-    if (owner?.role === 'INDIVIDUAL') {
+    const streamLimit = STREAM_LIMITS[owner?.role];
+    if (streamLimit !== null && streamLimit !== undefined) {
       const streamCount = await prisma.campaign.count({ where: { userId } });
-      if (streamCount >= 2) {
+      if (streamCount >= streamLimit) {
         return res.status(403).json({
           status: 'error',
-          message: 'Stream limit reached (2/2). Please upgrade your plan to create more streams.'
+          message: `Stream limit reached (${streamCount}/${streamLimit}). Please upgrade your plan to create more streams.`
         });
       }
     }

@@ -101,13 +101,23 @@ const inviteTeamMember = async (req, res) => {
       });
     }
 
-    // ✅ STRICT: Individual plan → 2 contributors max
-    if (user.role === 'INDIVIDUAL') {
+    // ═══════════════════════════════════════════════════════
+    // ✅ STRICT: Enforce contributor limits per plan
+    // ═══════════════════════════════════════════════════════
+    const CONTRIBUTOR_LIMITS = {
+      INDIVIDUAL: 2,
+      ORG_SMALL: 3,
+      ORG_MEDIUM: 20,
+      ORG_ENTERPRISE: 50,
+    };
+
+    const contributorLimit = CONTRIBUTOR_LIMITS[user.role];
+    if (contributorLimit !== undefined) {
       const teamCount = await prisma.teamMember.count({ where: { userId } });
-      if (teamCount >= 2) {
+      if (teamCount >= contributorLimit) {
         return res.status(403).json({
           status: 'error',
-          message: 'Contributor limit reached (2/2). Please upgrade your plan to invite more team members.'
+          message: `Contributor limit reached (${teamCount}/${contributorLimit}). Please upgrade your plan to invite more team members.`
         });
       }
     }

@@ -68,11 +68,18 @@ const TeamPage = () => {
     setToast({ show: false, message: '', type: 'success' });
   };
 
-  // Individual plan: 2-contributor limit
+  // ═══ Contributor limits per plan ═══
   const effectiveUser = user?.isTeamMember ? user.organization : user;
-  const isIndividual = effectiveUser?.role === 'INDIVIDUAL';
-  const INDIVIDUAL_CONTRIBUTOR_LIMIT = 2;
-  const individualLimitReached = isIndividual && teamMembers.length >= INDIVIDUAL_CONTRIBUTOR_LIMIT;
+  const CONTRIBUTOR_LIMITS = {
+    INDIVIDUAL: 2,
+    ORG_SMALL: 3,
+    ORG_MEDIUM: 20,
+    ORG_ENTERPRISE: 50,
+  };
+  const planRole = effectiveUser?.role || 'INDIVIDUAL';
+  const contributorLimit = CONTRIBUTOR_LIMITS[planRole] || 0;
+  const isIndividual = planRole === 'INDIVIDUAL';
+  const limitReached = teamMembers.length >= contributorLimit;
 
   useEffect(() => {
     document.title = 'Contributors Management | Outbound Impact';
@@ -329,30 +336,30 @@ const TeamPage = () => {
           </div>
           <button
             onClick={() => {
-              if (individualLimitReached) {
-                showToast('Contributor limit reached on Personal plan (2 max). Upgrade to invite more!', 'error');
+              if (limitReached) {
+                showToast(`Contributor limit reached (${teamMembers.length}/${contributorLimit}). Upgrade to invite more!`, 'error');
                 return;
               }
               setShowInviteModal(true);
               setError('');
             }}
             className={`text-white px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:shadow-lg transition-all text-sm sm:text-base whitespace-nowrap ${
-              individualLimitReached ? 'bg-orange-500 hover:bg-orange-600' : 'gradient-btn'
+              limitReached ? 'bg-orange-500 hover:bg-orange-600' : 'gradient-btn'
             }`}
           >
             <UserPlus size={18} className="sm:w-5 sm:h-5" />
-            {individualLimitReached ? 'Upgrade to Add More' : 'Invite Contributor'}
+            {limitReached ? 'Upgrade to Add More' : 'Invite Contributor'}
           </button>
         </div>
 
-        {/* Individual plan limit info */}
-        {isIndividual && (
-          <div className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-xl px-5 py-3 mb-4">
-            <p className="text-sm text-purple-700">
-              <strong>{teamMembers.length}/{INDIVIDUAL_CONTRIBUTOR_LIMIT}</strong> contributors used on Personal plan
-              {individualLimitReached && <span className="ml-2 text-orange-600 font-medium">• Limit reached</span>}
+        {/* ═══ Plan contributor limit info ═══ */}
+        {contributorLimit > 0 && (
+          <div className={`flex items-center justify-between ${limitReached ? 'bg-orange-50 border-orange-200' : 'bg-purple-50 border-purple-200'} border rounded-xl px-5 py-3 mb-4`}>
+            <p className={`text-sm ${limitReached ? 'text-orange-700' : 'text-purple-700'}`}>
+              <strong>{teamMembers.length}/{contributorLimit}</strong> contributors used
+              {limitReached && <span className="ml-2 text-orange-600 font-medium">• Limit reached</span>}
             </p>
-            {individualLimitReached && (
+            {limitReached && (
               <button onClick={() => window.location.href = '/dashboard/settings'} className="text-sm font-medium text-purple-600 hover:text-purple-700">
                 Upgrade →
               </button>
@@ -752,13 +759,13 @@ const TeamPage = () => {
           </div>
         )}
 
-        {/* Individual plan upgrade banner */}
-        {isIndividual && (
+        {/* Plan upgrade banner — shown when contributor limit is reached */}
+        {limitReached && planRole !== 'ORG_ENTERPRISE' && (
           <div className="mt-6 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <h3 className="font-bold text-xl mb-1">Ready to grow?</h3>
-                <p className="text-blue-100 text-sm">Upgrade to Small Business for more contributors, team messaging, advanced analytics, and more!</p>
+                <p className="text-blue-100 text-sm">Upgrade your plan for more contributors, storage, streams, and advanced features!</p>
               </div>
               <button onClick={() => window.location.href = '/dashboard/settings'} className="px-6 py-3 bg-white text-purple-600 rounded-lg font-bold hover:bg-slate-100 transition-colors flex-shrink-0">Upgrade Now</button>
             </div>

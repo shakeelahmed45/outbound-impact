@@ -65,12 +65,20 @@ const CampaignsPage = () => {
     setToast({ show: false, message: '', type: 'success' });
   };
 
-  // Individual plan: 2-stream limit
+  // ═══ Stream limits per plan ═══
   const { user } = useAuthStore();
   const effectiveUser = user?.isTeamMember ? user.organization : user;
-  const isIndividual = effectiveUser?.role === 'INDIVIDUAL';
-  const INDIVIDUAL_STREAM_LIMIT = 2;
-  const individualLimitReached = isIndividual && campaigns.length >= INDIVIDUAL_STREAM_LIMIT;
+  const STREAM_LIMITS = {
+    INDIVIDUAL: 2,
+    ORG_SMALL: 5,
+    ORG_MEDIUM: 20,
+    ORG_ENTERPRISE: null, // unlimited
+  };
+  const planRole = effectiveUser?.role || 'INDIVIDUAL';
+  const streamLimit = STREAM_LIMITS[planRole];
+  const isIndividual = planRole === 'INDIVIDUAL';
+  const isUnlimited = streamLimit === null;
+  const limitReached = !isUnlimited && campaigns.length >= streamLimit;
 
   useEffect(() => {
     document.title = 'Streams | Outbound Impact';
@@ -546,34 +554,34 @@ const CampaignsPage = () => {
             <h1 className="text-3xl font-bold text-primary mb-2">Streams</h1>
             <p className="text-secondary">Organize your content into streams with QR codes</p>
           </div>
-          {/* ✅ Create — hidden for VIEWER, limit-checked for Individual */}
+          {/* ✅ Create — hidden for VIEWER, limit-checked for all plans */}
           {canEdit() && (
           <button
             onClick={() => {
-              if (individualLimitReached) {
-                showToast('Stream limit reached on Personal plan. Upgrade to create more!', 'error');
+              if (limitReached) {
+                showToast(`Stream limit reached (${campaigns.length}/${streamLimit}). Upgrade to create more!`, 'error');
                 return;
               }
               setShowCreateModal(true);
             }}
             className={`text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all flex items-center gap-2 ${
-              individualLimitReached ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gradient-to-r from-primary to-secondary'
+              limitReached ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gradient-to-r from-primary to-secondary'
             }`}
           >
             <Plus size={20} />
-            {individualLimitReached ? 'Upgrade to Add More' : 'Create Stream'}
+            {limitReached ? 'Upgrade to Add More' : 'Create Stream'}
           </button>
           )}
         </div>
 
-        {/* Individual plan limit info */}
-        {isIndividual && (
-          <div className="mb-6 flex items-center justify-between bg-purple-50 border border-purple-200 rounded-xl px-5 py-3">
-            <p className="text-sm text-purple-700">
-              <strong>{campaigns.length}/{INDIVIDUAL_STREAM_LIMIT}</strong> streams used on Personal plan
-              {individualLimitReached && <span className="ml-2 text-orange-600 font-medium">• Limit reached</span>}
+        {/* ═══ Plan stream limit info ═══ */}
+        {!isUnlimited && (
+          <div className={`mb-6 flex items-center justify-between ${limitReached ? 'bg-orange-50 border-orange-200' : 'bg-purple-50 border-purple-200'} border rounded-xl px-5 py-3`}>
+            <p className={`text-sm ${limitReached ? 'text-orange-700' : 'text-purple-700'}`}>
+              <strong>{campaigns.length}/{streamLimit}</strong> streams used
+              {limitReached && <span className="ml-2 text-orange-600 font-medium">• Limit reached</span>}
             </p>
-            {individualLimitReached && (
+            {limitReached && (
               <button onClick={() => window.location.href = '/dashboard/settings'} className="text-sm font-medium text-purple-600 hover:text-purple-700">
                 Upgrade →
               </button>
@@ -1327,14 +1335,14 @@ const CampaignsPage = () => {
         )}
 
         {/* ═══════════════════════════════════
-            BOTTOM — Upgrade for Individual, Summary for others
+            BOTTOM — Upgrade when limit reached, Summary for others
            ═══════════════════════════════════ */}
-        {isIndividual ? (
+        {limitReached && planRole !== 'ORG_ENTERPRISE' ? (
           <div className="mt-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <h3 className="font-bold text-xl mb-1">Ready to grow?</h3>
-                <p className="text-blue-100 text-sm">Upgrade to Small Business for unlimited streams, stream analytics, team messaging, and more!</p>
+                <p className="text-blue-100 text-sm">Upgrade your plan for more streams, storage, contributors, and advanced features!</p>
               </div>
               <button onClick={() => window.location.href = '/dashboard/settings'} className="px-6 py-3 bg-white text-purple-600 rounded-lg font-bold hover:bg-slate-100 transition-colors flex-shrink-0">Upgrade Now</button>
             </div>
