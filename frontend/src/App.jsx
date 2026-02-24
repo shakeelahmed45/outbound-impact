@@ -7,8 +7,7 @@ import RequireEditAccess from './components/common/RequireEditAccess';
 import RequireFeature from './components/common/RequireFeature';
 import RootRedirect from './components/common/RootRedirect';
 import GlobalAiChatWidget from './components/GlobalAiChatWidget';
-import SignUp from './pages/SignUp';
-import SignIn from './pages/SignIn';
+import AuthPage from './pages/AuthPage';
 import Plans from './pages/Plans';
 import AuthSuccess from './pages/AuthSuccess';
 import Dashboard from './pages/Dashboard';
@@ -65,8 +64,8 @@ function App() {
       <NetworkWarning />
       <Routes>
         <Route path="/" element={<RootRedirect />} />
-        <Route path="/signup" element={<SignUp />} />
-        <Route path="/signin" element={<SignIn />} />
+        <Route path="/signup" element={<AuthPage />} />
+        <Route path="/signin" element={<AuthPage />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/plans" element={<Plans />} />
