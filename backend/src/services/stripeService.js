@@ -298,16 +298,23 @@ const upgradePlan = async (user, newPriceId, newPlanName) => {
         creditApplied = lastPaidAmount / 100; // in dollars
 
         console.log('💰 Old plan paid amount:', creditApplied, 'USD');
-        console.log('💰 Applying credit to customer balance...');
 
-        // Add credit to customer balance (negative = credit)
-        await stripe.customers.createBalanceTransaction(user.stripeCustomerId, {
-          amount: -lastPaidAmount, // negative = credit
-          currency: 'usd',
-          description: `Upgrade credit: ${user.role} → ${newPlanName} (within 7-day window)`,
-        });
+        // ✅ Only create balance transaction if amount is non-zero
+        if (lastPaidAmount > 0) {
+          console.log('💰 Applying credit to customer balance...');
 
-        console.log('✅ Credit of $' + creditApplied + ' applied to customer balance');
+          // Add credit to customer balance (negative = credit)
+          await stripe.customers.createBalanceTransaction(user.stripeCustomerId, {
+            amount: -lastPaidAmount, // negative = credit
+            currency: 'usd',
+            description: `Upgrade credit: ${user.role} → ${newPlanName} (within 7-day window)`,
+          });
+
+          console.log('✅ Credit of $' + creditApplied + ' applied to customer balance');
+        } else {
+          console.log('⚠️ No paid amount found on last invoice — skipping credit');
+          creditApplied = 0;
+        }
       }
     } else {
       console.log('⚠️ Past 7-day window — no credit applied, full price charged');
