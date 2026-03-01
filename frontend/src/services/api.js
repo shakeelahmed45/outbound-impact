@@ -55,13 +55,11 @@ api.clearCache = (pattern) => {
   }
 };
 
-// ✅ ENHANCED: Request interceptor with better token handling
+// ✅ Request interceptor with token handling
 api.interceptors.request.use(
   (config) => {
-    // ✅ Get token from localStorage (works with Zustand persist)
     const token = localStorage.getItem('token');
     
-    // ✅ IMPORTANT: Also check Zustand persist storage
     if (!token) {
       try {
         const authStorage = localStorage.getItem('auth-storage');
@@ -106,7 +104,7 @@ api.interceptors.request.use(
   }
 );
 
-// ✅ FIXED: Response interceptor with SMART redirect based on user role
+// ✅ Response interceptor — handles all enforcement codes
 api.interceptors.response.use(
   (response) => {
     // Cache successful GET responses
@@ -118,28 +116,73 @@ api.interceptors.response.use(
     // Clear cache on mutations
     if (['post', 'put', 'delete', 'patch'].includes(response.config.method)) {
       const url = response.config.url;
-      if (url.includes('/campaigns')) {
-        api.clearCache('campaigns');
-      } else if (url.includes('/items')) {
-        api.clearCache('items');
-      } else if (url.includes('/analytics')) {
-        api.clearCache('analytics');
-      } else if (url.includes('/organizations')) {
-        api.clearCache('organizations');
-        api.clearCache('team');
-      } else if (url.includes('/team')) {
-        api.clearCache('team');
-      }
+      if (url.includes('/campaigns')) api.clearCache('campaigns');
+      else if (url.includes('/items')) api.clearCache('items');
+      else if (url.includes('/analytics')) api.clearCache('analytics');
+      else if (url.includes('/organizations')) { api.clearCache('organizations'); api.clearCache('team'); }
+      else if (url.includes('/team')) api.clearCache('team');
     }
     
     return response;
   },
   (error) => {
-    // ✅ FIXED: Better 401 handling with SMART redirect
-    if (error.response?.status === 401) {
-      console.log('🚨 401 Unauthorized detected');
+    const status = error.response?.status;
+    const code = error.response?.data?.code;
+    const message = error.response?.data?.message;
+
+    // ═══════════════════════════════════════════
+    // 403: ACCOUNT_SUSPENDED
+    // ═══════════════════════════════════════════
+    if (status === 403 && code === 'ACCOUNT_SUSPENDED') {
+      console.log('🚫 Account suspended');
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('auth-storage');
+      api.clearCache();
+      alert(message || 'Your account has been suspended. Please contact support for assistance.');
+      window.location.href = '/signin';
+      return Promise.reject(error);
+    }
+
+    // ═══════════════════════════════════════════
+    // 403: EMAIL_NOT_VERIFIED
+    // ═══════════════════════════════════════════
+    if (status === 403 && code === 'EMAIL_NOT_VERIFIED') {
+      console.log('📧 Email not verified');
+      alert(message || 'Please verify your email address before signing in.');
+      return Promise.reject(error);
+    }
+
+    // ═══════════════════════════════════════════
+    // 429: ACCOUNT_LOCKED (too many login attempts)
+    // ═══════════════════════════════════════════
+    if (status === 429 && code === 'ACCOUNT_LOCKED') {
+      console.log('🔒 Account locked');
+      alert(message || 'Account temporarily locked due to too many failed attempts. Please try again later.');
+      return Promise.reject(error);
+    }
+
+    // ═══════════════════════════════════════════
+    // 503: MAINTENANCE_MODE
+    // ═══════════════════════════════════════════
+    if (status === 503 && code === 'MAINTENANCE_MODE') {
+      console.log('🔧 Maintenance mode');
+      if (!window.__maintenanceAlertShown) {
+        window.__maintenanceAlertShown = true;
+        alert(message || 'Outbound Impact is currently undergoing maintenance. Please try again shortly.');
+        setTimeout(() => { window.__maintenanceAlertShown = false; }, 10000);
+      }
+      return Promise.reject(error);
+    }
+
+    // ═══════════════════════════════════════════
+    // 401: SESSION_EXPIRED or general unauthorized
+    // ═══════════════════════════════════════════
+    if (status === 401) {
+      const isSessionExpired = code === 'SESSION_EXPIRED';
+      console.log(isSessionExpired ? '⏰ Session expired' : '🚨 401 Unauthorized');
       
-      // ✅ CRITICAL: Check user role BEFORE clearing auth data
+      // Check user role BEFORE clearing auth data
       let wasAdminUser = false;
       try {
         const authStorage = localStorage.getItem('auth-storage');
@@ -147,45 +190,40 @@ api.interceptors.response.use(
           const parsed = JSON.parse(authStorage);
           const userRole = parsed?.state?.user?.role;
           wasAdminUser = userRole === 'ADMIN' || userRole === 'CUSTOMER_SUPPORT';
-          console.log('📋 User role before logout:', userRole, '| Was admin:', wasAdminUser);
         }
-      } catch (e) {
-        console.error('Error checking user role:', e);
-      }
+      } catch (e) { /* ignore */ }
       
-      // Clear all auth data AFTER checking role
+      // Clear all auth data
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('auth-storage');
-      
-      // Clear cache
       api.clearCache();
       
-      // ✅ FIXED: Smart redirect based on user role AND current path
+      // Show specific message for session expiry
+      if (isSessionExpired && !window.__sessionExpiredShown) {
+        window.__sessionExpiredShown = true;
+        alert(message || 'Your session has expired. Please sign in again.');
+        setTimeout(() => { window.__sessionExpiredShown = false; }, 5000);
+      }
+      
+      // Smart redirect
       const currentPath = window.location.pathname;
-      const isOnAdminPage = currentPath.includes('/admin');
       const isOnLoginPage = currentPath.includes('/signin') || currentPath.includes('/admin-login');
       
-      // Don't redirect if already on a login page
       if (!isOnLoginPage) {
-        // Redirect admin users to admin login
-        if (wasAdminUser || isOnAdminPage) {
-          console.log('🔐 Redirecting to /admin-login');
+        if (wasAdminUser || currentPath.includes('/admin')) {
           window.location.href = '/admin-login';
         } else {
-          console.log('🔐 Redirecting to /signin');
           window.location.href = '/signin';
         }
       }
     }
     
-    // Better error handling
     if (error.code === 'ECONNABORTED') {
-      console.error('⏱️ Request timeout - check your connection');
+      console.error('⏱️ Request timeout');
     }
-    
     if (error.code === 'ERR_NETWORK') {
-      console.error('🌐 Network error - check your internet connection');
+      console.error('🌐 Network error');
     }
     
     return Promise.reject(error);

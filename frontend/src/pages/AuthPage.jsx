@@ -300,7 +300,7 @@ const AuthPage = () => {
                 <div className="relative inline-block">
                   <div className="absolute -inset-6 rounded-full" style={{ background: 'radial-gradient(circle, rgba(128,0,128,0.06) 0%, transparent 70%)', animation: 'soft-pulse 4s ease-in-out infinite' }} />
                   <img src="/logo.webp" alt="Outbound Impact"
-                    className="relative w-30 h-28 sm:w-36 sm:h-36 mx-auto object-contain"
+                    className="relative w-28.5 h-28 sm:w-36 sm:h-36 mx-auto object-contain"
                     style={{ filter: 'drop-shadow(0 10px 30px rgba(128,0,128,0.1))' }}
                     onError={(e) => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex'; }} />
                   <div className="hidden w-28 h-28 sm:w-36 sm:h-36 mx-auto rounded-[1.75rem] items-center justify-center"

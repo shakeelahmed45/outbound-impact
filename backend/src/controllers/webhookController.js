@@ -1,5 +1,6 @@
 const prisma = require('../lib/prisma');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const { notifyAdminCancellation, notifyAdmins } = require('../services/adminNotificationService');
 
 /**
  * 🎯 STRIPE WEBHOOK HANDLER
@@ -356,6 +357,15 @@ const handleSubscriptionUpdated = async (subscription) => {
     if (subscription.cancel_at_period_end) {
       updateData.subscriptionStatus = 'canceling';
       console.log('⚠️ Subscription set to cancel at period end');
+
+      // ─── Notify admins: churn signal ───
+      await notifyAdmins({
+        type: 'warning',
+        category: 'churn',
+        title: 'Subscription Canceling',
+        message: `${user.name || user.email} (${planName}) set their subscription to cancel at period end.`,
+        metadata: { customerName: user.name, customerEmail: user.email, plan: planName },
+      });
     }
 
     await prisma.user.update({
@@ -405,6 +415,9 @@ const handleSubscriptionDeleted = async (subscription) => {
     } catch (emailError) {
       console.error('❌ Failed to send cancellation email:', emailError.message);
     }
+
+    // ─── Notify admins: subscription cancelled ───
+    await notifyAdminCancellation(user.name, user.email, user.role);
 
   } catch (error) {
     console.error('❌ Error handling subscription.deleted:', error);

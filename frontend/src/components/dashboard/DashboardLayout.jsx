@@ -4,6 +4,7 @@ import SidebarNav from './SidebarNav';
 import NotificationsPanel from '../NotificationsPanel';
 import SubscriptionBlockedModal from '../SubscriptionBlockedModal';
 import GlobalAiChatWidget from '../GlobalAiChatWidget';
+import PushNotificationPrompt from '../PushNotificationPrompt';
 import useAuthStore from '../../store/authStore';
 import { Menu, Search } from 'lucide-react';
 
@@ -169,6 +170,9 @@ const DashboardLayout = ({ children }) => {
 
       {/* AI Chat Widget */}
       <GlobalAiChatWidget showBlinkingPrompt={true} />
+
+      {/* Push Notification Prompt */}
+      <PushNotificationPrompt />
     </div>
   );
 };

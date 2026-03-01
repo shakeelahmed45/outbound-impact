@@ -1,8 +1,33 @@
 const prisma = require('../lib/prisma');
 
+// ═══════════════════════════════════════════════════════════
+// NOTIFICATION SERVICE
+// Creates in-app notifications AND sends push notifications
+//
+// ✅ PUSH INTEGRATION: After saving to DB, sends a Web Push
+//    to all subscribed devices for the user. This means EVERY
+//    notification type (admin, upload, milestone, team, etc.)
+//    automatically gets push — no extra wiring needed.
+// ═══════════════════════════════════════════════════════════
+
+// Lazy-loaded to avoid circular dependency with adminNotificationService
+let _pushService = null;
+const getPushService = () => {
+  if (!_pushService) {
+    try {
+      _pushService = require('./webPushService');
+    } catch (e) {
+      // Push service not yet installed — graceful fallback
+      _pushService = { sendPushToUser: () => {} };
+    }
+  }
+  return _pushService;
+};
+
 /**
  * Creates a notification for a user.
  * Called from various controllers when events happen.
+ * Also sends a push notification to the user's subscribed devices.
  */
 const createNotification = async (userId, { type = 'info', category = 'general', title, message, metadata = null }) => {
   try {
@@ -18,6 +43,18 @@ const createNotification = async (userId, { type = 'info', category = 'general',
         metadata: metadata || undefined,
       },
     });
+
+    // ─── Send push notification (fire-and-forget) ───
+    // Don't await — push should never slow down the response
+    const pushService = getPushService();
+    pushService.sendPushToUser(userId, {
+      title,
+      body: message,
+      category,
+      tag: category,
+      notificationId: notification.id,
+      url: '/dashboard',
+    }).catch(() => {}); // Silent failure
 
     return notification;
   } catch (error) {

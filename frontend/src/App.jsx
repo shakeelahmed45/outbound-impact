@@ -33,6 +33,15 @@ import AdminFeedbackPage from './pages/admin/AdminFeedbackPage';
 import AdminLiveChatPage from './pages/admin/AdminLiveChatPage';
 import UserDetailPage from './pages/admin/UserDetailPage';
 import TeamManagementPage from './pages/admin/TeamManagementPage';
+// ═══ NEW: Pablo Admin Pages ═══
+import GeographyPage from './pages/admin/GeographyPage';
+import RevenuePage from './pages/admin/RevenuePage';
+import OpportunitiesPage from './pages/admin/OpportunitiesPage';
+import AdminCampaignsPage from './pages/admin/CampaignsPage';
+import DiscountCodesPage from './pages/admin/DiscountCodesPage';
+import DataExportsPage from './pages/admin/DataExportsPage';
+import AdminSettingsPage from './pages/admin/AdminSettingsPage';
+// ═══ Enterprise Pages ═══
 import AdvancedAnalyticsPage from './pages/enterprise/AdvancedAnalyticsPage';
 import SecurityPage from './pages/enterprise/SecurityPage';
 import CohortsPage from './pages/enterprise/CohortsPage';
@@ -110,20 +119,24 @@ function App() {
         <Route path="/dashboard/audit" element={<ProtectedRoute><RequireFeature feature="audit"><AuditLogPage /></RequireFeature></ProtectedRoute>} />
         <Route path="/dashboard/compliance" element={<ProtectedRoute><RequireFeature feature="compliance"><CompliancePage /></RequireFeature></ProtectedRoute>} />
         
-        {/* Backwards compatibility: old API Access route */}
-        {/* Old Enterprise routes removed - API Access, White Label, Integrations no longer exist */}
-        
         {/* ═══════════════════════════════════
-            ADMIN ROUTES
+            ADMIN ROUTES — Pablo OI Admin Panel
            ═══════════════════════════════════ */}
         <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/admin-panel" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
         <Route path="/admin-panel/users" element={<ProtectedRoute><AdminUsers /></ProtectedRoute>} />
         <Route path="/admin-panel/users/:userId" element={<ProtectedRoute><UserDetailPage /></ProtectedRoute>} />
+        <Route path="/admin-panel/geography" element={<ProtectedRoute><GeographyPage /></ProtectedRoute>} />
+        <Route path="/admin-panel/revenue" element={<ProtectedRoute><RevenuePage /></ProtectedRoute>} />
+        <Route path="/admin-panel/opportunities" element={<ProtectedRoute><OpportunitiesPage /></ProtectedRoute>} />
+        <Route path="/admin-panel/campaigns" element={<ProtectedRoute><AdminCampaignsPage /></ProtectedRoute>} />
+        <Route path="/admin-panel/discounts" element={<ProtectedRoute><DiscountCodesPage /></ProtectedRoute>} />
+        <Route path="/admin-panel/exports" element={<ProtectedRoute><DataExportsPage /></ProtectedRoute>} />
         <Route path="/admin-panel/items" element={<ProtectedRoute><AdminItems /></ProtectedRoute>} />
         <Route path="/admin-panel/feedback" element={<ProtectedRoute><AdminFeedbackPage /></ProtectedRoute>} />
         <Route path="/admin-panel/live-chat" element={<ProtectedRoute><AdminLiveChatPage /></ProtectedRoute>} />
         <Route path="/admin-panel/team" element={<ProtectedRoute><TeamManagementPage /></ProtectedRoute>} />
+        <Route path="/admin-panel/settings" element={<ProtectedRoute><AdminSettingsPage /></ProtectedRoute>} />
       </Routes>
       
       {/* Global AI Chat Widget (appears on non-dashboard pages) */}

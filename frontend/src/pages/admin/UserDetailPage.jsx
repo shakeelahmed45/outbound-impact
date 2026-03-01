@@ -64,7 +64,7 @@ const UserDetailPage = () => {
       const response = await api.post(`/admin/users/${userId}/impersonate`);
       
       if (response.data.status === 'success') {
-        const impersonateUrl = `${window.location.origin}/admin/impersonate?token=${response.data.token}`;
+        const impersonateUrl = `${window.location.origin}/dashboard?impersonate_token=${response.data.token}`;
         window.open(impersonateUrl, '_blank');
       }
     } catch (error) {
@@ -144,13 +144,13 @@ const UserDetailPage = () => {
             Back to Users
           </button>
 
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{user.name}</h1>
-              <div className="flex items-center gap-4 text-gray-600">
+              <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">{user.name}</h1>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-gray-600">
                 <div className="flex items-center gap-2">
                   <Mail size={16} />
-                  {user.email}
+                  <span className="truncate">{user.email}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Calendar size={16} />
@@ -159,7 +159,7 @@ const UserDetailPage = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={handleImpersonate}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -228,8 +228,8 @@ const UserDetailPage = () => {
         </div>
 
         {/* Tabs */}
-        <div className="mb-6 border-b border-gray-200">
-          <div className="flex gap-6">
+        <div className="mb-6 border-b border-gray-200 overflow-x-auto">
+          <div className="flex gap-4 sm:gap-6 min-w-max">
             {['overview', 'activity', 'items', 'team'].map((tab) => (
               <button
                 key={tab}

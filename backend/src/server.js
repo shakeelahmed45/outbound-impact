@@ -4,6 +4,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const prisma = require('./lib/prisma');
 
+const pushRoutes = require('./routes/pushRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const authRoutes = require('./routes/authRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
@@ -17,6 +18,7 @@ const analyticsRoutes = require('./routes/analyticsRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const advancedAnalyticsRoutes = require('./routes/advancedAnalyticsRoutes');
 const chatAutoCloseService = require('./services/chatAutoCloseService');
+const { initializeEnforcementColumns } = require('./services/settingsHelper');
 
 // ✨ Enterprise feature routes
 const apiKeyRoutes = require('./routes/apiKeyRoutes');
@@ -205,6 +207,8 @@ app.use('/api/items', itemsRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/workflows', workflowRoutes);
 app.use('/api/organizations', organizationRoutes);
+app.use('/api/push', pushRoutes);
+
 
 
 // ✅ FIXED: teamInvitationRoutes MUST come BEFORE teamRoutes
@@ -270,6 +274,7 @@ if (process.env.VERCEL) {
 } else {
   // Start server for local development
   chatAutoCloseService.startAutoCloseJob();
+  initializeEnforcementColumns().catch(e => console.error('Column init error:', e));
   app.listen(PORT, () => {
     console.log('\n═══════════════════════════════════════════════');
     console.log('🚀 Outbound Impact Server');

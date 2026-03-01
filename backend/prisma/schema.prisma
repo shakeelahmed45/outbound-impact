@@ -24,6 +24,10 @@ model User {
   profilePicture     String?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
+  emailVerified        Boolean   @default(false)
+  failedLoginAttempts  Int       @default(0)
+  lockedUntil          DateTime?
+  emailVerificationToken String?
 
   resetToken         String?
   resetTokenExpiry   DateTime?
@@ -52,6 +56,7 @@ model User {
   feedback          Feedback[]
   organizations     Organization[]
   chatConversations ChatConversation[]
+  pushSubscriptions PushSubscription[]
 
   // 🆕 PHASE 3: Admin invitation relation
   adminInvitations  AdminInvitation[]
@@ -152,7 +157,7 @@ model Campaign {
 
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  
+
   passwordProtected Boolean  @default(false)
   passwordHash      String?
 
@@ -160,7 +165,7 @@ model Campaign {
   views       Int      @default(0)
   viewsQr     Int      @default(0)
   viewsNfc    Int      @default(0)
-  
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -250,14 +255,14 @@ model ChatConversation {
   userId        String
   status        ChatStatus @default(ACTIVE)
   lastMessageAt DateTime   @default(now())
-  
+
   isAiHandling        Boolean   @default(true)
   escalatedToHumanAt  DateTime?
   escalationReason    String?
-  
+
   feedbackRating      Int?
   feedbackComment     String?   @db.Text
-  
+
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
@@ -284,11 +289,11 @@ model ChatMessage {
   senderType     SenderType
   message        String     @db.Text
   isRead         Boolean    @default(false)
-  
+
   isAiGenerated  Boolean   @default(false)
   hasAttachments Boolean   @default(false)
   aiConfidence   Decimal?  @db.Decimal(3, 2)
-  
+
   createdAt      DateTime  @default(now())
 
   conversation ChatConversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -387,9 +392,9 @@ model AdminInvitation {
   status      String   @default("PENDING")
   expiresAt   DateTime
   createdAt   DateTime @default(now())
-  
+
   inviter     User @relation(fields: [invitedBy], references: [id], onDelete: Cascade)
-  
+
   @@unique([email, status])
   @@index([token])
   @@index([email])
@@ -409,7 +414,7 @@ model ApiKey {
   lastUsed    DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   @@index([userId])
   @@index([key])
 }
@@ -440,7 +445,7 @@ model Webhook {
   secret    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@index([userId])
 }
 
@@ -454,7 +459,7 @@ model Integration {
   active        Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  
+
   @@index([userId])
   @@index([type])
   @@unique([userId, type])
@@ -470,7 +475,7 @@ model AuditLog {
   device    String?
   metadata  Json?
   createdAt DateTime @default(now())
-  
+
   @@index([userId])
   @@index([createdAt])
 }
@@ -496,6 +501,31 @@ model Notification {
   @@index([userId, read])
   @@index([createdAt])
   @@index([category])
+}
+
+// ========================================
+// ⚙️ PLATFORM SETTINGS
+// ========================================
+
+model PlatformSetting {
+  id                       String   @id @default("default")
+  platformName             String   @default("Outbound Impact")
+  supportEmail             String   @default("support@outboundimpact.org")
+  currency                 String   @default("AUD")
+  maintenanceMode          Boolean  @default(false)
+  allowRegistrations       Boolean  @default(true)
+  requireEmailVerification Boolean  @default(false)
+  defaultUserRole          String   @default("INDIVIDUAL")
+  notifyNewCustomer        Boolean  @default(true)
+  notifyRevenueMilestone   Boolean  @default(true)
+  notifySystemAlerts       Boolean  @default(true)
+  notifyWeeklyReports      Boolean  @default(false)
+  webhookUrl               String?
+  twoFactorRequired        Boolean  @default(false)
+  loginAttemptLimit         Boolean  @default(true)
+  sessionTimeoutMinutes    Int      @default(30)
+  autoBackups              Boolean  @default(true)
+  updatedAt                DateTime @default(now())
 }
 
 // ========================================
@@ -584,6 +614,24 @@ model Workflow {
   @@index([userId])
   @@index([status])
   @@index([submittedById])
+}
+
+// ========================================
+// 📱 PWA PUSH NOTIFICATIONS
+// ========================================
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 // ════════════════════════════════════════

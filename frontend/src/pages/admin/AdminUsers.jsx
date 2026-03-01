@@ -215,7 +215,7 @@ const AdminUsers = () => {
       const response = await api.post(`/admin/users/${userId}/impersonate`);
       
       if (response.data.status === 'success') {
-        const impersonateUrl = `${window.location.origin}/admin/impersonate?token=${response.data.token}`;
+        const impersonateUrl = `${window.location.origin}/dashboard?impersonate_token=${response.data.token}`;
         window.open(impersonateUrl, '_blank');
         showToast('✅ Opened user session in new tab', 'success');
       }
@@ -652,7 +652,7 @@ const AdminUsers = () => {
         {/* Users Table */}
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[900px]">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-4 text-left">
@@ -1046,7 +1046,7 @@ const AdminUsers = () => {
 
               <div className="p-6">
                 {/* Quick Stats */}
-                <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
                   <div className="p-4 bg-blue-50 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <FileText className="text-blue-600" size={20} />

@@ -1,12 +1,28 @@
 const { verifyAccessToken } = require('../utils/jwt');
+const prisma = require('../lib/prisma');
+const { getSettings, clearCache } = require('../services/settingsHelper');
 
 // ═══════════════════════════════════════════════════════════
-// EXISTING: Auth Middleware (unchanged)
+// MAINTENANCE MODE CACHE — Uses settingsHelper's unified cache
+// so admin settings saves clear both caches at once.
+// The clearMaintenanceCache export is kept for backward compat.
 // ═══════════════════════════════════════════════════════════
-const authMiddleware = (req, res, next) => {
+const checkMaintenanceMode = async () => {
+  try {
+    const settings = await getSettings();
+    return settings.maintenanceMode === true;
+  } catch (e) {
+    return false;
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// AUTH MIDDLEWARE — Token + Suspended + Maintenance + Session Timeout
+// ═══════════════════════════════════════════════════════════
+const authMiddleware = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         status: 'error',
@@ -25,6 +41,69 @@ const authMiddleware = (req, res, next) => {
     }
 
     req.user = decoded;
+
+    // ─── Skip ALL enforcement checks for ADMIN users ───
+    if (decoded.role === 'ADMIN') {
+      return next();
+    }
+
+    // ─── CHECK 1: Session timeout enforcement ───
+    try {
+      const settings = await getSettings();
+      const timeoutMinutes = settings.sessionTimeoutMinutes;
+      if (timeoutMinutes && decoded.iat) {
+        const issuedAt = decoded.iat * 1000; // JWT iat is in seconds
+        const maxAge = timeoutMinutes * 60 * 1000; // Convert to ms
+        if (Date.now() - issuedAt > maxAge) {
+          return res.status(401).json({
+            status: 'error',
+            code: 'SESSION_EXPIRED',
+            message: `Your session has expired after ${timeoutMinutes} minutes of inactivity. Please sign in again.`
+          });
+        }
+      }
+    } catch (e) {
+      // Session timeout check failure should NOT block — graceful degradation
+      console.error('⚠️ Session timeout check failed (allowing through):', e.message);
+    }
+
+    // ─── CHECK 2: Is user suspended? (DB lookup) ───
+    // ✅ FIX: Use decoded.userId (matches JWT payload), not decoded.id
+    try {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: { status: true }
+      });
+
+      if (dbUser && dbUser.status === 'suspended') {
+        console.log(`🚫 Blocked suspended user: ${decoded.email || decoded.userId}`);
+        return res.status(403).json({
+          status: 'error',
+          code: 'ACCOUNT_SUSPENDED',
+          message: 'Your account has been suspended. Please contact support@outboundimpact.org for assistance.'
+        });
+      }
+    } catch (dbErr) {
+      // DB check failure should NOT block the user — graceful degradation
+      console.error('⚠️ Suspension check failed (allowing through):', dbErr.message);
+    }
+
+    // ─── CHECK 3: Is platform in maintenance mode? ───
+    try {
+      const isMaintenanceMode = await checkMaintenanceMode();
+      if (isMaintenanceMode) {
+        console.log(`🔧 Maintenance mode blocking user: ${decoded.email || decoded.userId}`);
+        return res.status(503).json({
+          status: 'error',
+          code: 'MAINTENANCE_MODE',
+          message: 'Outbound Impact is currently undergoing scheduled maintenance. Please try again shortly.'
+        });
+      }
+    } catch (maintErr) {
+      // Maintenance check failure should NOT block — graceful degradation
+      console.error('⚠️ Maintenance check failed (allowing through):', maintErr.message);
+    }
+
     next();
   } catch (error) {
     return res.status(401).json({
@@ -35,7 +114,7 @@ const authMiddleware = (req, res, next) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// EXISTING: Require Admin (unchanged)
+// Require Admin
 // ═══════════════════════════════════════════════════════════
 const requireAdmin = (req, res, next) => {
   if (!req.user || req.user.role !== 'ADMIN') {
@@ -48,7 +127,7 @@ const requireAdmin = (req, res, next) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// 🆕 NEW: Require FULL ADMIN (not customer support)
+// Require FULL ADMIN (not customer support)
 // ═══════════════════════════════════════════════════════════
 const requireFullAdmin = (req, res, next) => {
   if (!req.user || req.user.role !== 'ADMIN') {
@@ -61,7 +140,7 @@ const requireFullAdmin = (req, res, next) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// 🆕 NEW: Require CUSTOMER_SUPPORT or ADMIN (for Live Chat)
+// Require CUSTOMER_SUPPORT or ADMIN (for Live Chat)
 // ═══════════════════════════════════════════════════════════
 const requireSupportAccess = (req, res, next) => {
   if (!req.user || (req.user.role !== 'ADMIN' && req.user.role !== 'CUSTOMER_SUPPORT')) {
@@ -74,7 +153,7 @@ const requireSupportAccess = (req, res, next) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// 🆕 NEW: Check if user has specific permission
+// Check if user has specific permission
 // ═══════════════════════════════════════════════════════════
 const hasPermission = (permission) => {
   return (req, res, next) => {
@@ -117,7 +196,7 @@ const hasPermission = (permission) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// 🆕 NEW: Get user permissions helper
+// Get user permissions helper
 // ═══════════════════════════════════════════════════════════
 const getUserPermissions = (role) => {
   const permissions = {
@@ -152,11 +231,21 @@ const getUserPermissions = (role) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// EXPORTS (keeping your original export pattern)
+// Helper: Force-clear maintenance mode cache
+// Now delegates to settingsHelper.clearCache() for unified caching.
+// Kept as named export for backward compatibility with adminSettingsController.
+// ═══════════════════════════════════════════════════════════
+const clearMaintenanceCache = () => {
+  clearCache();
+};
+
+// ═══════════════════════════════════════════════════════════
+// EXPORTS — All original exports preserved
 // ═══════════════════════════════════════════════════════════
 module.exports = authMiddleware;
 module.exports.requireAdmin = requireAdmin;
-module.exports.requireFullAdmin = requireFullAdmin;        // 🆕 NEW
-module.exports.requireSupportAccess = requireSupportAccess; // 🆕 NEW
-module.exports.hasPermission = hasPermission;               // 🆕 NEW
-module.exports.getUserPermissions = getUserPermissions;     // 🆕 NEW
+module.exports.requireFullAdmin = requireFullAdmin;
+module.exports.requireSupportAccess = requireSupportAccess;
+module.exports.hasPermission = hasPermission;
+module.exports.getUserPermissions = getUserPermissions;
+module.exports.clearMaintenanceCache = clearMaintenanceCache;

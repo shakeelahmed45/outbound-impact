@@ -1,5 +1,6 @@
 const prisma = require('../lib/prisma');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const { notifyAdminCancellation, notifyAdmins } = require('../services/adminNotificationService');
 
 /**
  * ✅ HELPER: Sync subscription data from Stripe if missing
@@ -196,6 +197,17 @@ const toggleAutoRenewal = async (req, res) => {
 
     console.log('✅ User updated:', user.email, '- Status:', updatedUser.subscriptionStatus);
     console.log('   Is team member:', isTeamMember);
+
+    // ─── Notify admins: churn signal when auto-renewal turned OFF ───
+    if (!autoRenewal) {
+      await notifyAdmins({
+        type: 'warning',
+        category: 'churn',
+        title: 'Auto-Renewal Disabled',
+        message: `${updatedUser.name || user.email} turned off auto-renewal. Subscription ends at period end.`,
+        metadata: { customerName: updatedUser.name, customerEmail: user.email },
+      });
+    }
 
     res.json({
       status: 'success',
@@ -416,6 +428,9 @@ const cancelSubscription = async (req, res) => {
     } catch (emailError) {
       console.error('❌ Failed to send cancellation email:', emailError.message);
     }
+
+    // ─── Notify admins: subscription cancelled ───
+    await notifyAdminCancellation(user.name, user.email, user.role);
 
     // Get updated user data with memberOf relation
     const updatedUser = await prisma.user.findUnique({

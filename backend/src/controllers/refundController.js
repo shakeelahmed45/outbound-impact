@@ -7,6 +7,8 @@ console.log('✅ [REFUND] Prisma loaded');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 console.log('✅ [REFUND] Stripe loaded');
 
+const { notifyAdmins } = require('../services/adminNotificationService');
+
 /**
  * Check if user is eligible for refund
  */
@@ -256,6 +258,16 @@ const requestRefund = async (req, res) => {
     }
 
     console.log('🗑️ [REFUND] Deleting user account...');
+
+    // ─── Notify admins BEFORE deletion (FK constraint prevents after) ───
+    await notifyAdmins({
+      type: 'alert',
+      category: 'churn',
+      title: 'Refund & Account Deleted',
+      message: `${user.name || user.email} (${user.role}) requested a refund of $${(refund.amount / 100).toFixed(2)} and deleted their account.`,
+      metadata: { customerName: user.name, customerEmail: user.email, role: user.role, refundAmount: refund.amount / 100 },
+    });
+
     await prisma.user.delete({
       where: { id: user.id }
     });

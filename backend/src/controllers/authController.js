@@ -3,6 +3,8 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { generateAccessToken, generateRefreshToken } = require('../utils/jwt');
 const { createCheckoutSession, getCheckoutSession, upgradePlan } = require('../services/stripeService');
+const { getSettings, isNotificationEnabled, fireWebhook } = require('../services/settingsHelper');
+const { notifyAdminNewCustomer, notifyAdminPlanUpgrade } = require('../services/adminNotificationService');
 
 // Helper function to send 2FA login email
 const send2FALoginEmail = async (userEmail, userName, code) => {
@@ -77,6 +79,17 @@ const send2FALoginEmail = async (userEmail, userName, code) => {
 const createCheckout = async (req, res) => {
   try {
     const { email, name, password, plan, enterpriseConfig, couponCode } = req.body;
+
+    // ✅ Check if new registrations are allowed (via platform settings)
+    try {
+      const platformSettings = await getSettings();
+      if (platformSettings.allowRegistrations === false) {
+        return res.status(403).json({
+          status: 'error',
+          message: `New registrations are currently disabled. Please contact ${platformSettings.supportEmail || 'support@outboundimpact.org'}.`
+        });
+      }
+    } catch (e) { /* defaults allow registration */ }
 
     // ✅ Log coupon code if provided
     if (couponCode) {
@@ -335,16 +348,26 @@ const completeSignup = async (req, res) => {
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         try {
-          await emailService.sendAdminNotification({
-            userName: user.name,
-            userEmail: user.email,
-            userRole: user.role,
-            subscriptionId: session.subscription
-          });
-          console.log('✅ Admin notification sent');
+          if (await isNotificationEnabled('new_customer')) {
+            await emailService.sendAdminNotification({
+              userName: user.name,
+              userEmail: user.email,
+              userRole: user.role,
+              subscriptionId: session.subscription
+            });
+            console.log('✅ Admin notification sent');
+          } else {
+            console.log('ℹ️ Admin new-customer notification disabled in settings');
+          }
         } catch (emailError) {
           console.error('❌ Failed to send admin notification:', emailError.message);
         }
+
+        // Fire webhook for new user signup
+        fireWebhook('user.created', { userId: user.id, email: user.email, role: user.role, name: user.name });
+
+        // ─── Notify admins: new customer signed up ───
+        await notifyAdminNewCustomer(user.name, user.email, user.role);
       } catch (error) {
         console.error('❌ Email service error:', error.message);
       }
@@ -391,6 +414,7 @@ const signIn = async (req, res) => {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
+    const platformSettings = await getSettings();
 
     const user = await prisma.user.findUnique({
       where: { email: normalizedEmail }
@@ -403,32 +427,94 @@ const signIn = async (req, res) => {
       });
     }
 
+    // ═══ ENFORCEMENT: Login Attempt Limits ═══
+    if (platformSettings.loginAttemptLimit) {
+      try {
+        const lockedUntilRows = await prisma.$queryRaw`SELECT "lockedUntil", "failedLoginAttempts" FROM "User" WHERE "id" = ${user.id}`;
+        const lockedUntil = lockedUntilRows[0]?.lockedUntil;
+        if (lockedUntil && new Date(lockedUntil) > new Date()) {
+          const minutesLeft = Math.ceil((new Date(lockedUntil) - new Date()) / 60000);
+          return res.status(429).json({
+            status: 'error',
+            code: 'ACCOUNT_LOCKED',
+            message: `Account temporarily locked due to too many failed login attempts. Try again in ${minutesLeft} minute(s).`
+          });
+        }
+      } catch (e) { /* columns may not exist yet */ }
+    }
+
     const isValidPassword = await bcrypt.compare(password, user.password);
 
     if (!isValidPassword) {
+      // ═══ ENFORCEMENT: Track failed attempts ═══
+      if (platformSettings.loginAttemptLimit) {
+        try {
+          const currentAttempts = await prisma.$queryRaw`SELECT "failedLoginAttempts" FROM "User" WHERE "id" = ${user.id}`;
+          const attempts = (currentAttempts[0]?.failedLoginAttempts || 0) + 1;
+          if (attempts >= 5) {
+            // Lock for 15 minutes
+            await prisma.$executeRaw`UPDATE "User" SET "failedLoginAttempts" = ${attempts}, "lockedUntil" = ${new Date(Date.now() + 15 * 60 * 1000)} WHERE "id" = ${user.id}`;
+            console.log(`🔒 Account locked after ${attempts} failed attempts: ${user.email}`);
+            return res.status(429).json({
+              status: 'error',
+              code: 'ACCOUNT_LOCKED',
+              message: 'Account locked for 15 minutes due to too many failed login attempts.'
+            });
+          } else {
+            await prisma.$executeRaw`UPDATE "User" SET "failedLoginAttempts" = ${attempts} WHERE "id" = ${user.id}`;
+          }
+        } catch (e) { /* columns may not exist yet */ }
+      }
       return res.status(401).json({
         status: 'error',
         message: 'Invalid credentials'
       });
     }
 
-    // ✅ NEW: Check if user account is deleted or inactive
+    // ═══ Password correct — reset failed attempts ═══
+    if (platformSettings.loginAttemptLimit) {
+      try {
+        await prisma.$executeRaw`UPDATE "User" SET "failedLoginAttempts" = 0, "lockedUntil" = NULL WHERE "id" = ${user.id}`;
+      } catch (e) { /* columns may not exist yet */ }
+    }
+
+    // ═══ Check account status ═══
     if (user.status === 'deleted' || user.status === 'inactive') {
-      console.log(`❌ Login blocked: User ${user.email} has status: ${user.status}`);
       return res.status(401).json({
         status: 'error',
         message: 'This account has been deactivated. Please contact support.'
       });
     }
 
-    // ✅ CHECK IF 2FA IS ENABLED
-    if (user.twoFactorEnabled) {
-      // If no 2FA code provided, send one
+    if (user.status === 'suspended') {
+      return res.status(403).json({
+        status: 'error',
+        code: 'ACCOUNT_SUSPENDED',
+        message: `Your account has been suspended. Please contact ${platformSettings.supportEmail || 'support@outboundimpact.org'} for assistance.`
+      });
+    }
+
+    // ═══ ENFORCEMENT: Email Verification ═══
+    if (platformSettings.requireEmailVerification) {
+      try {
+        const verifiedRows = await prisma.$queryRaw`SELECT "emailVerified" FROM "User" WHERE "id" = ${user.id}`;
+        if (verifiedRows[0]?.emailVerified === false) {
+          return res.status(403).json({
+            status: 'error',
+            code: 'EMAIL_NOT_VERIFIED',
+            message: 'Please verify your email address before signing in. Check your inbox for the verification link.'
+          });
+        }
+      } catch (e) { /* column may not exist — allow through */ }
+    }
+
+    // ═══ ENFORCEMENT: 2FA Required for Admin Accounts ═══
+    const needs2FA = user.twoFactorEnabled ||
+      (platformSettings.twoFactorRequired && user.role === 'ADMIN');
+
+    if (needs2FA) {
       if (!twoFactorCode) {
-        // Generate 6-digit code
         const code = Math.floor(100000 + Math.random() * 900000).toString();
-        
-        // Save code to user (expires in 10 minutes)
         await prisma.user.update({
           where: { id: user.id },
           data: {
@@ -436,18 +522,14 @@ const signIn = async (req, res) => {
             resetTokenExpiry: new Date(Date.now() + 10 * 60 * 1000)
           }
         });
-
-        // Send email
         await send2FALoginEmail(user.email, user.name, code);
-
         return res.status(200).json({
           status: 'success',
-          message: '2FA code sent to your email',
+          message: '2FA verification code sent to your email',
           requires2FA: true
         });
       }
 
-      // If code provided, verify it
       if (user.twoFactorSecret !== twoFactorCode) {
         return res.status(401).json({
           status: 'error',
@@ -455,7 +537,6 @@ const signIn = async (req, res) => {
         });
       }
 
-      // Check if code expired
       if (user.resetTokenExpiry && new Date() > user.resetTokenExpiry) {
         return res.status(401).json({
           status: 'error',
@@ -463,17 +544,13 @@ const signIn = async (req, res) => {
         });
       }
 
-      // Clear 2FA code after successful verification
       await prisma.user.update({
         where: { id: user.id },
-        data: {
-          twoFactorSecret: null,
-          resetTokenExpiry: null
-        }
+        data: { twoFactorSecret: null, resetTokenExpiry: null }
       });
     }
 
-    // Continue with normal sign in (after 2FA verification if enabled)
+    // ═══ Continue with normal sign in ═══
     const teamMembership = await prisma.teamMember.findFirst({
       where: {
         memberUserId: user.id,
@@ -495,8 +572,18 @@ const signIn = async (req, res) => {
       },
     });
 
+    // Session timeout is enforced in auth.js middleware (checks token iat age)
     const accessToken = generateAccessToken(user.id, user.email, user.role);
     const refreshToken = generateRefreshToken(user.id);
+
+    // Update last login
+    try {
+      await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    } catch (e) { /* non-critical */ }
+
+    // ═══ ENFORCEMENT: Fire webhook ═══
+    fireWebhook('user.login', { userId: user.id, email: user.email, role: user.role });
+
 
     if (teamMembership) {
       console.log(`✅ Team member signed in: ${user.email} (${teamMembership.role}) of ${teamMembership.user.name}`);
@@ -750,15 +837,23 @@ const handleUpgradePlan = async (req, res) => {
       });
       console.log('📧 Upgrade receipt email sent to:', updatedUser.email);
 
-      // Send admin notification
-      await emailService.sendAdminNotification({
-        userName: updatedUser.name,
-        userEmail: updatedUser.email,
-        plan: newPlan,
-        amount: upgradeResult.proratedAmount,
-        subscriptionId: upgradeResult.subscriptionId,
-      });
-      console.log('📧 Admin upgrade notification sent');
+      // Send admin notification (if enabled in settings)
+      if (await isNotificationEnabled('new_customer')) {
+        await emailService.sendAdminNotification({
+          userName: updatedUser.name,
+          userEmail: updatedUser.email,
+          plan: newPlan,
+          amount: upgradeResult.proratedAmount,
+          subscriptionId: upgradeResult.subscriptionId,
+        });
+        console.log('📧 Admin upgrade notification sent');
+      }
+
+      // Fire webhook for plan upgrade
+      fireWebhook('user.upgraded', { userId: updatedUser.id, email: updatedUser.email, newPlan });
+
+      // ─── Notify admins: plan upgrade ───
+      await notifyAdminPlanUpgrade(updatedUser.name, updatedUser.email, planNames[user.role] || user.role, planNames[newPlan] || newPlan);
     } catch (emailError) {
       console.error('❌ Failed to send upgrade emails:', emailError.message);
       // Don't fail the upgrade just because email failed

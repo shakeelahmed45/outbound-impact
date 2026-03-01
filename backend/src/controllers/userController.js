@@ -1,5 +1,6 @@
 const prisma = require('../lib/prisma'); // ✅ Use shared Prisma instance
 const bcrypt = require('bcryptjs'); // ✅ NEW: Import bcrypt for password hashing
+const { notifyAdmins } = require('../services/adminNotificationService');
 
 const uploadProfilePhoto = async (req, res) => {
   try {
@@ -67,6 +68,23 @@ const updateProfile = async (req, res) => {
 const deleteAccount = async (req, res) => {
   try {
     const userId = req.user.userId;
+
+    // ─── Fetch user info BEFORE deletion (needed for notification) ───
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, email: true, role: true },
+    });
+
+    // ─── Notify admins BEFORE deleting (FK constraint prevents after) ───
+    if (user) {
+      await notifyAdmins({
+        type: 'alert',
+        category: 'churn',
+        title: 'Account Deleted',
+        message: `${user.name || user.email} (${user.role}) deleted their account.`,
+        metadata: { customerName: user.name, customerEmail: user.email, role: user.role },
+      });
+    }
 
     // Delete all user's items
     await prisma.item.deleteMany({

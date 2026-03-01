@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Send, Users, XCircle, Star, History, ThumbsUp, AlertCircle } from 'lucide-react';
+import { MessageSquare, Send, Users, XCircle, Star, History, ThumbsUp, AlertCircle, ArrowLeft } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import api from '../../services/api';
 
@@ -95,6 +95,13 @@ const AdminLiveChatPage = () => {
     await fetchConversationMessages(conversation.id);
   };
 
+  // Mobile back button — deselect conversation to show list
+  const handleBackToList = () => {
+    setSelectedConversation(null);
+    setMessages([]);
+    setShowHistory(false);
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
 
@@ -182,61 +189,69 @@ const AdminLiveChatPage = () => {
     <AdminLayout>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-primary mb-2 flex items-center gap-3">
-            <MessageSquare size={32} />
+        <div className="mb-6 lg:mb-8">
+          <h1 className="text-2xl lg:text-3xl font-bold text-primary mb-2 flex items-center gap-3">
+            <MessageSquare size={28} />
             Live Chat Management
           </h1>
           <p className="text-secondary">Manage user conversations in real-time</p>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-2xl shadow-lg p-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6 lg:mb-8">
+          <div className="bg-white rounded-2xl shadow-lg p-4 lg:p-6">
             <div className="flex items-center justify-between mb-2">
-              <Users size={24} className="text-gray-600" />
+              <Users size={20} className="text-gray-600 lg:w-6 lg:h-6" />
             </div>
-            <p className="text-3xl font-bold text-gray-800 mb-1">{stats.total}</p>
-            <p className="text-sm text-gray-600">Total Conversations</p>
+            <p className="text-2xl lg:text-3xl font-bold text-gray-800 mb-1">{stats.total}</p>
+            <p className="text-xs lg:text-sm text-gray-600">Total Conversations</p>
           </div>
 
-          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl shadow-lg p-6 text-white">
+          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl shadow-lg p-4 lg:p-6 text-white">
             <div className="flex items-center justify-between mb-2">
-              <MessageSquare size={24} />
+              <MessageSquare size={20} className="lg:w-6 lg:h-6" />
             </div>
-            <p className="text-3xl font-bold mb-1">{stats.active}</p>
-            <p className="text-sm opacity-90">Active Chats</p>
+            <p className="text-2xl lg:text-3xl font-bold mb-1">{stats.active}</p>
+            <p className="text-xs lg:text-sm opacity-90">Active Chats</p>
           </div>
 
-          <div className="bg-gradient-to-br from-gray-500 to-gray-600 rounded-2xl shadow-lg p-6 text-white">
+          <div className="bg-gradient-to-br from-gray-500 to-gray-600 rounded-2xl shadow-lg p-4 lg:p-6 text-white">
             <div className="flex items-center justify-between mb-2">
-              <XCircle size={24} />
+              <XCircle size={20} className="lg:w-6 lg:h-6" />
             </div>
-            <p className="text-3xl font-bold mb-1">{stats.closed}</p>
-            <p className="text-sm opacity-90">Closed</p>
+            <p className="text-2xl lg:text-3xl font-bold mb-1">{stats.closed}</p>
+            <p className="text-xs lg:text-sm opacity-90">Closed</p>
           </div>
 
           {/* 🆕 NEW: Feedback Stats Card */}
-          <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl shadow-lg p-6 text-white">
+          <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl shadow-lg p-4 lg:p-6 text-white">
             <div className="flex items-center justify-between mb-2">
-              <ThumbsUp size={24} />
+              <ThumbsUp size={20} className="lg:w-6 lg:h-6" />
             </div>
-            <p className="text-3xl font-bold mb-1">{stats.averageRating?.toFixed(1) || '0.0'}</p>
-            <p className="text-sm opacity-90">Avg Rating ({stats.withFeedback} reviews)</p>
+            <p className="text-2xl lg:text-3xl font-bold mb-1">{stats.averageRating?.toFixed(1) || '0.0'}</p>
+            <p className="text-xs lg:text-sm opacity-90">Avg Rating ({stats.withFeedback} reviews)</p>
           </div>
         </div>
 
         {/* Chat Interface */}
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden" style={{ height: '600px' }}>
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden" style={{ height: 'calc(100vh - 380px)', minHeight: '400px' }}>
           <div className="flex h-full">
-            {/* Conversations List */}
-            <div className="w-1/3 border-r border-gray-200 flex flex-col">
+
+            {/* ════════════════════════════════════════════════════
+                 Conversations List
+                 Mobile: full-width, hidden when a chat is selected
+                 Desktop: always visible, 1/3 width
+               ════════════════════════════════════════════════════ */}
+            <div className={`
+              w-full lg:w-1/3 border-r border-gray-200 flex flex-col
+              ${selectedConversation ? 'hidden lg:flex' : 'flex'}
+            `}>
               {/* Filter */}
-              <div className="p-4 border-b border-gray-200">
+              <div className="p-3 lg:p-4 border-b border-gray-200">
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full px-3 lg:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
                 >
                   <option value="">All Conversations</option>
                   <option value="ACTIVE">Active</option>
@@ -256,22 +271,22 @@ const AdminLiveChatPage = () => {
                     <div
                       key={conv.id}
                       onClick={() => handleSelectConversation(conv)}
-                      className={`p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-all ${
+                      className={`p-3 lg:p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-all ${
                         selectedConversation?.id === conv.id ? 'bg-blue-50' : ''
                       }`}
                     >
                       <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-semibold text-gray-800">{conv.user.name}</h4>
+                            <h4 className="font-semibold text-gray-800 truncate">{conv.user.name}</h4>
                             {/* 🆕 NEW: User chat count badge */}
                             {conv.userChatCount && conv.userChatCount.total > 1 && (
-                              <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded">
+                              <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded flex-shrink-0">
                                 {conv.userChatCount.total} chats
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-gray-500">{conv.user.email}</p>
+                          <p className="text-xs text-gray-500 truncate">{conv.user.email}</p>
                           
                           {/* 🆕 NEW: Feedback rating display */}
                           {conv.feedbackRating && (
@@ -286,7 +301,7 @@ const AdminLiveChatPage = () => {
                           )}
                         </div>
                         {conv._count?.messages > 0 && conv.status === 'ACTIVE' && (
-                          <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                          <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full flex-shrink-0">
                             {conv._count.messages}
                           </span>
                         )}
@@ -314,46 +329,64 @@ const AdminLiveChatPage = () => {
               </div>
             </div>
 
-            {/* Chat Area */}
-            <div className="flex-1 flex flex-col">
+            {/* ════════════════════════════════════════════════════
+                 Chat Area
+                 Mobile: full-width, hidden when NO chat is selected
+                 Desktop: always visible, flex-1
+               ════════════════════════════════════════════════════ */}
+            <div className={`
+              flex-1 flex flex-col
+              ${selectedConversation ? 'flex' : 'hidden lg:flex'}
+            `}>
               {selectedConversation ? (
                 <>
                   {/* Chat Header */}
-                  <div className="p-4 border-b border-gray-200 bg-gray-50">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold text-gray-800">{selectedConversation.user.name}</h3>
-                        <p className="text-xs text-gray-500">{selectedConversation.user.email}</p>
-                        
-                        {/* 🆕 NEW: Show feedback if exists */}
-                        {selectedConversation.feedbackRating && (
-                          <div className="flex items-center gap-2 mt-2">
-                            {renderStars(selectedConversation.feedbackRating)}
-                            {selectedConversation.feedbackComment && (
-                              <p className="text-xs text-gray-600 italic">
-                                "{selectedConversation.feedbackComment}"
-                              </p>
-                            )}
-                          </div>
-                        )}
+                  <div className="p-3 lg:p-4 border-b border-gray-200 bg-gray-50">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {/* Mobile back button */}
+                        <button
+                          onClick={handleBackToList}
+                          className="lg:hidden p-1.5 text-gray-600 hover:bg-gray-200 rounded-lg flex-shrink-0"
+                        >
+                          <ArrowLeft size={20} />
+                        </button>
+                        <div className="min-w-0">
+                          <h3 className="font-semibold text-gray-800 truncate">{selectedConversation.user.name}</h3>
+                          <p className="text-xs text-gray-500 truncate">{selectedConversation.user.email}</p>
+                          
+                          {/* 🆕 NEW: Show feedback if exists */}
+                          {selectedConversation.feedbackRating && (
+                            <div className="flex items-center gap-2 mt-1">
+                              {renderStars(selectedConversation.feedbackRating)}
+                              {selectedConversation.feedbackComment && (
+                                <p className="text-xs text-gray-600 italic hidden sm:block">
+                                  "{selectedConversation.feedbackComment}"
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-shrink-0">
                         {/* 🆕 NEW: View History Button */}
                         <button
                           onClick={() => fetchUserHistory(selectedConversation.userId)}
                           disabled={loadingHistory}
-                          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+                          className="flex items-center gap-1 lg:gap-2 px-2 lg:px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 text-xs lg:text-sm"
                         >
                           <History size={16} />
-                          {loadingHistory ? 'Loading...' : 'View History'}
+                          <span className="hidden sm:inline">{loadingHistory ? 'Loading...' : 'View History'}</span>
                         </button>
                         
                         {selectedConversation.status === 'ACTIVE' && (
                           <button
                             onClick={() => handleCloseConversation(selectedConversation.id)}
-                            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                            className="flex items-center gap-1 lg:gap-2 px-2 lg:px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-xs lg:text-sm"
                           >
-                            Close Chat
+                            <XCircle size={16} className="sm:hidden" />
+                            <span className="hidden sm:inline">Close Chat</span>
+                            <span className="sm:hidden">Close</span>
                           </button>
                         )}
                       </div>
@@ -362,11 +395,11 @@ const AdminLiveChatPage = () => {
 
                   {/* 🆕 NEW: User History Modal */}
                   {showHistory && userHistory && (
-                    <div className="p-4 bg-yellow-50 border-b border-yellow-200">
+                    <div className="p-3 lg:p-4 bg-yellow-50 border-b border-yellow-200">
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <AlertCircle size={20} className="text-yellow-600" />
-                          <h4 className="font-semibold text-gray-800">Chat History for {userHistory.user?.name}</h4>
+                          <AlertCircle size={20} className="text-yellow-600 flex-shrink-0" />
+                          <h4 className="font-semibold text-gray-800 text-sm lg:text-base">Chat History for {userHistory.user?.name}</h4>
                         </div>
                         <button
                           onClick={() => setShowHistory(false)}
@@ -375,21 +408,21 @@ const AdminLiveChatPage = () => {
                           ✕
                         </button>
                       </div>
-                      <div className="grid grid-cols-4 gap-4 text-sm">
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 text-sm">
                         <div>
-                          <p className="text-gray-600">Total Chats:</p>
+                          <p className="text-gray-600 text-xs">Total Chats:</p>
                           <p className="font-bold text-gray-800">{userHistory.stats.totalChats}</p>
                         </div>
                         <div>
-                          <p className="text-gray-600">Active:</p>
+                          <p className="text-gray-600 text-xs">Active:</p>
                           <p className="font-bold text-green-600">{userHistory.stats.activeChats}</p>
                         </div>
                         <div>
-                          <p className="text-gray-600">Closed:</p>
+                          <p className="text-gray-600 text-xs">Closed:</p>
                           <p className="font-bold text-gray-600">{userHistory.stats.closedChats}</p>
                         </div>
                         <div>
-                          <p className="text-gray-600">Avg Rating:</p>
+                          <p className="text-gray-600 text-xs">Avg Rating:</p>
                           <p className="font-bold text-yellow-600">{userHistory.stats.averageRating.toFixed(1)} ⭐</p>
                         </div>
                       </div>
@@ -406,14 +439,14 @@ const AdminLiveChatPage = () => {
                   )}
 
                   {/* Messages */}
-                  <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+                  <div className="flex-1 overflow-y-auto p-3 lg:p-4 bg-gray-50">
                     {messages.map((msg) => (
                       <div
                         key={msg.id}
                         className={`mb-4 flex ${msg.senderType === 'ADMIN' ? 'justify-end' : 'justify-start'}`}
                       >
                         <div
-                          className={`max-w-[70%] rounded-lg px-4 py-2 ${
+                          className={`max-w-[85%] lg:max-w-[70%] rounded-lg px-3 lg:px-4 py-2 ${
                             msg.senderType === 'ADMIN'
                               ? 'bg-primary text-white'
                               : 'bg-white border border-gray-200 text-gray-800'
@@ -431,22 +464,22 @@ const AdminLiveChatPage = () => {
 
                   {/* Message Input */}
                   {selectedConversation.status === 'ACTIVE' && (
-                    <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 bg-white">
+                    <form onSubmit={handleSendMessage} className="p-3 lg:p-4 border-t border-gray-200 bg-white">
                       <div className="flex gap-2">
                         <input
                           type="text"
                           value={newMessage}
                           onChange={(e) => setNewMessage(e.target.value)}
                           placeholder="Type your message..."
-                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                          className="flex-1 px-3 lg:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
                         />
                         <button
                           type="submit"
                           disabled={sending || !newMessage.trim()}
-                          className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center gap-2"
+                          className="px-4 lg:px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center gap-2"
                         >
                           <Send size={18} />
-                          {sending ? 'Sending...' : 'Send'}
+                          <span className="hidden sm:inline">{sending ? 'Sending...' : 'Send'}</span>
                         </button>
                       </div>
                     </form>

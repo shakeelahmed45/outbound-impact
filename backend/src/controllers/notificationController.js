@@ -1,9 +1,26 @@
 const prisma = require('../lib/prisma');
 
+/**
+ * ✅ FIX: Resolve the correct userId for notification queries.
+ *
+ * ROOT CAUSE: resolveEffectiveUserId middleware remaps ADMIN users
+ * to an org owner's ID when the admin is ALSO a TeamMember.
+ * Notifications are created for the admin's REAL userId, but
+ * GET /notifications was querying with the REMAPPED effectiveUserId.
+ * Result: query returns 0 notifications every time.
+ *
+ * FIX: ADMIN users always use req.user.userId (their real ID).
+ * Regular users and team members continue using effectiveUserId.
+ */
+const getNotifUserId = (req) => {
+  if (req.user.role === 'ADMIN') return req.user.userId;
+  return req.effectiveUserId || req.user.userId;
+};
+
 // GET /api/notifications - Get user's notifications
 const getNotifications = async (req, res) => {
   try {
-    const userId = req.effectiveUserId || req.user.userId;
+    const userId = getNotifUserId(req);
     const { limit = 20, unreadOnly = false } = req.query;
 
     const where = { userId };
@@ -34,7 +51,7 @@ const getNotifications = async (req, res) => {
 // PATCH /api/notifications/:id/read - Mark single notification as read
 const markAsRead = async (req, res) => {
   try {
-    const userId = req.effectiveUserId || req.user.userId;
+    const userId = getNotifUserId(req);
     const { id } = req.params;
 
     const notification = await prisma.notification.updateMany({
@@ -56,7 +73,7 @@ const markAsRead = async (req, res) => {
 // PATCH /api/notifications/read-all - Mark all notifications as read
 const markAllAsRead = async (req, res) => {
   try {
-    const userId = req.effectiveUserId || req.user.userId;
+    const userId = getNotifUserId(req);
 
     await prisma.notification.updateMany({
       where: { userId, read: false },
@@ -73,7 +90,7 @@ const markAllAsRead = async (req, res) => {
 // DELETE /api/notifications/:id - Delete a notification
 const deleteNotification = async (req, res) => {
   try {
-    const userId = req.effectiveUserId || req.user.userId;
+    const userId = getNotifUserId(req);
     const { id } = req.params;
 
     const result = await prisma.notification.deleteMany({
@@ -94,7 +111,7 @@ const deleteNotification = async (req, res) => {
 // DELETE /api/notifications - Clear all notifications
 const clearAll = async (req, res) => {
   try {
-    const userId = req.effectiveUserId || req.user.userId;
+    const userId = getNotifUserId(req);
 
     await prisma.notification.deleteMany({
       where: { userId },
@@ -110,7 +127,7 @@ const clearAll = async (req, res) => {
 // GET /api/notifications/unread-count - Quick unread count (for badge polling)
 const getUnreadCount = async (req, res) => {
   try {
-    const userId = req.effectiveUserId || req.user.userId;
+    const userId = getNotifUserId(req);
 
     const count = await prisma.notification.count({
       where: { userId, read: false },

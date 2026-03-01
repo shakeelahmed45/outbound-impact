@@ -2,96 +2,64 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/auth');
-
-// Import analytics controller
-const {
-  getAdminStats,
-  getAnalytics,
-  getRecentActivities
-} = require('../controllers/adminAnalyticsController');
-
-// Import user management from adminUserController
-const {
-  getAllUsers,
-  bulkUserActions,
-  suspendUser,
-  impersonateUser,
-  exportUsers,
-  getUserDetails,
-  updateUser,
-  deleteUser,
-  removeUserFromTeam,
-  sendPasswordReset
-} = require('../controllers/adminUserController');
-
-// Import item management from adminController
-const {
-  getAllItems,
-  deleteItem
-} = require('../controllers/adminController');
+const { getAdminStats, getAnalytics, getRecentActivities } = require('../controllers/adminAnalyticsController');
+const { getAllUsers, bulkUserActions, suspendUser, impersonateUser, exportUsers, exportSelectedUsers, getUserDetails, updateUser, deleteUser, removeUserFromTeam, sendPasswordReset } = require('../controllers/adminUserController');
+const { getAllItems, deleteItem } = require('../controllers/adminController');
+const { getOverview, getRevenue, getOpportunities, getGeography, sendCampaign, getCampaignHistory, getDiscountCodes, createDiscountCode, deleteDiscountCode, getRevenueHistory } = require('../controllers/adminOverviewController');
+const { getSettings, updateSettings, getPublicSettings } = require('../controllers/adminSettingsController');
 
 // ═══════════════════════════════════════════════════════════
-// MIDDLEWARE - All routes require authentication and admin role
+// PUBLIC (no auth) — Frontend needs currency/name without login
+// ═══════════════════════════════════════════════════════════
+router.get('/settings/public', getPublicSettings);
+
+// ═══════════════════════════════════════════════════════════
+// ALL ROUTES BELOW REQUIRE AUTH + ADMIN
 // ═══════════════════════════════════════════════════════════
 router.use(authMiddleware);
 router.use(requireAdmin);
 
-// ═══════════════════════════════════════════════════════════
-// DASHBOARD & ANALYTICS ROUTES
-// ═══════════════════════════════════════════════════════════
+// Dashboard & Analytics
 router.get('/stats', getAdminStats);
 router.get('/analytics', getAnalytics);
 router.get('/recent-activities', getRecentActivities);
 
-// ═══════════════════════════════════════════════════════════
-// USER MANAGEMENT ROUTES (Enhanced Phase 2)
-// ═══════════════════════════════════════════════════════════
+// Pablo Admin Panel
+router.get('/overview', getOverview);
+router.get('/revenue', getRevenue);
+router.get('/revenue/history', getRevenueHistory);
+router.get('/opportunities', getOpportunities);
+router.get('/geography', getGeography);
+router.post('/campaigns/send', sendCampaign);
+router.get('/campaigns/history', getCampaignHistory);
+router.get('/discount-codes', getDiscountCodes);
+router.post('/discount-codes', createDiscountCode);
+router.delete('/discount-codes/:codeId', deleteDiscountCode);
 
-// List & Filter Users
+// Settings (admin only)
+router.get('/settings', getSettings);
+router.put('/settings', updateSettings);
+
+// Users
 router.get('/users', getAllUsers);
-
-// Export Users
 router.get('/users/export', exportUsers);
-
-// Bulk Actions
+router.post('/users/export-selected', exportSelectedUsers);
 router.post('/users/bulk-action', bulkUserActions);
-
-// User Details
 router.get('/users/:userId', getUserDetails);
-
-// Get User Activity (alias for getUserDetails)
 router.get('/users/:userId/activity', getUserDetails);
-
-// Update User
 router.put('/users/:userId', updateUser);
-
-// Update Storage Limit
 router.put('/users/:userId/storage', updateUser);
-
-// Delete User
 router.delete('/users/:userId', deleteUser);
-
-// Suspend/Unsuspend User
 router.post('/users/:userId/suspend', suspendUser);
-
-// Ban User (alias for suspend)
 router.post('/users/:userId/ban', suspendUser);
-
-// Impersonate User
 router.post('/users/:userId/impersonate', impersonateUser);
-
-// Password Reset
 router.post('/users/:userId/password-reset', sendPasswordReset);
 
-// ═══════════════════════════════════════════════════════════
-// ITEM MANAGEMENT ROUTES
-// ═══════════════════════════════════════════════════════════
+// Items
 router.get('/items', getAllItems);
 router.delete('/items/:itemId', deleteItem);
 
-// ═══════════════════════════════════════════════════════════
-// TEAM MANAGEMENT ROUTES
-// ═══════════════════════════════════════════════════════════
+// Team
 router.delete('/team-members/:teamMemberId', removeUserFromTeam);
 
 module.exports = router;
