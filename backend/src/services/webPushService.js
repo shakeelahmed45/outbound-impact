@@ -5,6 +5,8 @@ const prisma = require('../lib/prisma');
 // WEB PUSH SERVICE
 // Sends real-time push notifications to user devices
 // Uses VAPID (Voluntary Application Server Identification)
+//
+// ✅ FIX: Added comprehensive 📱 logging for Railway debugging
 // ═══════════════════════════════════════════════════════════
 
 // Configure VAPID keys from environment
@@ -18,13 +20,16 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
   try {
     webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
     pushConfigured = true;
-    console.log('✅ Web Push configured with VAPID keys');
+    console.log('📱 ✅ Web Push configured with VAPID keys');
+    console.log(`📱    Public key starts with: ${VAPID_PUBLIC_KEY.slice(0, 20)}...`);
   } catch (err) {
-    console.error('❌ Web Push VAPID configuration failed:', err.message);
+    console.error('📱 ❌ Web Push VAPID configuration failed:', err.message);
   }
 } else {
-  console.log('⚠️ Web Push disabled (VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY not set)');
-  console.log('   Generate keys: npx web-push generate-vapid-keys');
+  console.log('📱 ⚠️ Web Push disabled — missing env vars:');
+  if (!VAPID_PUBLIC_KEY) console.log('📱    ❌ VAPID_PUBLIC_KEY not set');
+  if (!VAPID_PRIVATE_KEY) console.log('📱    ❌ VAPID_PRIVATE_KEY not set');
+  console.log('📱    Generate keys: npx web-push generate-vapid-keys');
 }
 
 /**
@@ -35,8 +40,14 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
  * @param {object} payload - { title, body, url, category, tag, notificationId }
  */
 const sendPushToUser = async (userId, payload) => {
-  if (!pushConfigured) return;
-  if (!userId) return;
+  if (!pushConfigured) {
+    console.log(`📱 ⏭️ Push skipped (VAPID not configured) for: "${payload?.title}"`);
+    return;
+  }
+  if (!userId) {
+    console.log('📱 ⏭️ Push skipped (no userId)');
+    return;
+  }
 
   try {
     // Get all push subscriptions for this user
@@ -44,7 +55,12 @@ const sendPushToUser = async (userId, payload) => {
       where: { userId },
     });
 
-    if (subscriptions.length === 0) return;
+    if (subscriptions.length === 0) {
+      console.log(`📱 ⏭️ Push skipped — no subscriptions found for user ${userId.slice(0, 8)}... | Title: "${payload?.title}"`);
+      return;
+    }
+
+    console.log(`📱 📤 Sending push to ${subscriptions.length} device(s) for user ${userId.slice(0, 8)}... | Title: "${payload?.title}"`);
 
     // Get unread count for badge
     const unreadCount = await prisma.notification.count({
@@ -80,8 +96,10 @@ const sendPushToUser = async (userId, payload) => {
         } catch (err) {
           // 410 Gone or 404 = subscription expired, remove it
           if (err.statusCode === 410 || err.statusCode === 404) {
-            console.log(`📱 Removing expired push subscription: ${sub.id}`);
+            console.log(`📱 🗑️ Removing expired push subscription: ${sub.id} (${err.statusCode})`);
             await prisma.pushSubscription.delete({ where: { id: sub.id } }).catch(() => {});
+          } else {
+            console.error(`📱 ❌ Push delivery failed: ${err.statusCode || err.message} | Endpoint: ${sub.endpoint.slice(0, 60)}...`);
           }
           return { success: false, id: sub.id, error: err.message };
         }
@@ -89,9 +107,8 @@ const sendPushToUser = async (userId, payload) => {
     );
 
     const sent = results.filter(r => r.value?.success).length;
-    if (sent > 0) {
-      console.log(`📱 Push sent: "${payload.title}" → ${sent}/${subscriptions.length} device(s) for user ${userId.slice(0, 8)}...`);
-    }
+    const failed = results.filter(r => !r.value?.success).length;
+    console.log(`📱 ${sent > 0 ? '✅' : '❌'} Push result: ${sent} sent, ${failed} failed | User: ${userId.slice(0, 8)}... | Badge: ${unreadCount}`);
   } catch (err) {
     // Never break the main flow
     console.error('📱 ❌ Push notification error:', err.message);
@@ -106,7 +123,7 @@ const saveSubscription = async (userId, subscription, userAgent) => {
     const { endpoint, keys } = subscription;
 
     if (!endpoint || !keys?.p256dh || !keys?.auth) {
-      throw new Error('Invalid subscription format');
+      throw new Error('Invalid subscription format — missing endpoint, p256dh, or auth');
     }
 
     // Upsert: update if endpoint exists, create if new
@@ -128,10 +145,15 @@ const saveSubscription = async (userId, subscription, userAgent) => {
       },
     });
 
-    console.log(`📱 Push subscription saved for user ${userId.slice(0, 8)}...`);
+    console.log(`📱 ✅ Push subscription saved | User: ${userId.slice(0, 8)}... | ID: ${saved.id} | Endpoint: ${endpoint.slice(0, 60)}...`);
+
+    // Log total subscriptions for this user
+    const total = await prisma.pushSubscription.count({ where: { userId } });
+    console.log(`📱    Total subscriptions for user: ${total}`);
+
     return saved;
   } catch (err) {
-    console.error('📱 ❌ Save subscription failed:', err.message);
+    console.error(`📱 ❌ Save subscription failed for user ${userId?.slice(0, 8)}...:`, err.message);
     throw err;
   }
 };
@@ -141,10 +163,10 @@ const saveSubscription = async (userId, subscription, userAgent) => {
  */
 const removeSubscription = async (endpoint) => {
   try {
-    await prisma.pushSubscription.deleteMany({
+    const result = await prisma.pushSubscription.deleteMany({
       where: { endpoint },
     });
-    console.log('📱 Push subscription removed');
+    console.log(`📱 🗑️ Push subscription removed (${result.count} deleted)`);
     return true;
   } catch (err) {
     console.error('📱 ❌ Remove subscription failed:', err.message);
@@ -157,9 +179,10 @@ const removeSubscription = async (endpoint) => {
  */
 const removeAllSubscriptions = async (userId) => {
   try {
-    await prisma.pushSubscription.deleteMany({
+    const result = await prisma.pushSubscription.deleteMany({
       where: { userId },
     });
+    console.log(`📱 🗑️ All subscriptions removed for user ${userId?.slice(0, 8)}... (${result.count} deleted)`);
     return true;
   } catch (err) {
     console.error('📱 ❌ Remove all subscriptions failed:', err.message);

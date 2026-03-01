@@ -8,44 +8,58 @@ import { isPushSupported, getPermissionStatus, subscribeToPush } from '../servic
  * Shows a one-time banner prompting users to enable push notifications.
  * Appears after 3 seconds on dashboard, dismissible, remembers choice.
  * 
- * Usage: Add <PushNotificationPrompt /> to DashboardLayout or App.jsx
+ * ✅ FIX: Added console logging for debugging
  */
 const PushNotificationPrompt = () => {
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Don't show if:
-    // 1. Push not supported
-    // 2. Already subscribed
-    // 3. Already dismissed
-    // 4. Permission already denied
-    if (!isPushSupported()) return;
-    if (localStorage.getItem('push_subscribed') === 'true') return;
-    if (localStorage.getItem('push_dismissed') === 'true') return;
-    if (getPermissionStatus() === 'denied') return;
-    if (getPermissionStatus() === 'granted' && localStorage.getItem('push_subscribed') === 'true') return;
+    // Debug: log all the conditions
+    const supported = isPushSupported();
+    const permission = getPermissionStatus();
+    const alreadySubscribed = localStorage.getItem('push_subscribed') === 'true';
+    const dismissed = localStorage.getItem('push_dismissed') === 'true';
 
-    // Show after 3 second delay
+    console.log('📱 [PushPrompt] Checking conditions:', {
+      supported,
+      permission,
+      alreadySubscribed,
+      dismissed,
+    });
+
+    if (!supported) { console.log('📱 [PushPrompt] Not showing — push not supported'); return; }
+    if (alreadySubscribed) { console.log('📱 [PushPrompt] Not showing — already subscribed'); return; }
+    if (dismissed) { console.log('📱 [PushPrompt] Not showing — previously dismissed'); return; }
+    if (permission === 'denied') { console.log('📱 [PushPrompt] Not showing — permission denied'); return; }
+
+    console.log('📱 [PushPrompt] Will show prompt in 3 seconds');
     const timer = setTimeout(() => setShow(true), 3000);
     return () => clearTimeout(timer);
   }, []);
 
   const handleEnable = async () => {
+    console.log('📱 [PushPrompt] User clicked Enable');
     setLoading(true);
     const result = await subscribeToPush();
+    console.log('📱 [PushPrompt] Subscribe result:', result);
     setLoading(false);
 
     if (result.success) {
+      console.log('📱 [PushPrompt] ✅ Subscription successful!');
       setShow(false);
     } else if (result.reason === 'denied') {
-      // User denied in browser prompt
+      console.log('📱 [PushPrompt] ❌ User denied permission in browser prompt');
       localStorage.setItem('push_dismissed', 'true');
       setShow(false);
+    } else {
+      console.error('📱 [PushPrompt] ❌ Subscribe failed:', result.reason);
+      // Don't dismiss — let user try again
     }
   };
 
   const handleDismiss = () => {
+    console.log('📱 [PushPrompt] User dismissed prompt');
     localStorage.setItem('push_dismissed', 'true');
     setShow(false);
   };

@@ -175,10 +175,15 @@ const sendCampaign = async (req, res) => {
     const { name, message, type, targetPlans } = req.body;
     if (!name || !message) return res.status(400).json({ status: 'error', message: 'Name and message are required' });
 
+    console.log(`📣 ═══ CAMPAIGN SEND START ═══`);
+    console.log(`📣 Name: "${name}" | Type: "${type}" | Plans: ${JSON.stringify(targetPlans)}`);
+
     // Map plan labels to role enums
     const planToRole = { 'Individual': 'INDIVIDUAL', 'Small Organization': 'ORG_SMALL', 'Medium Organization': 'ORG_MEDIUM', 'Enterprise': 'ORG_ENTERPRISE' };
     const roleFilter = (targetPlans || []).map(p => planToRole[p]).filter(Boolean);
     if (roleFilter.length === 0) roleFilter.push('INDIVIDUAL', 'ORG_SMALL', 'ORG_MEDIUM', 'ORG_ENTERPRISE');
+
+    console.log(`📣 Role filter: ${JSON.stringify(roleFilter)}`);
 
     // Get target users
     const users = await prisma.user.findMany({
@@ -186,12 +191,15 @@ const sendCampaign = async (req, res) => {
       select: { id: true, name: true, email: true }
     });
 
+    console.log(`📣 Found ${users.length} target user(s): ${users.map(u => u.email).join(', ')}`);
+
     let notificationsSent = 0;
     let emailsSent = 0;
     const errors = [];
 
-    // Send in-app notifications
+    // Send in-app notifications (+ push via createNotification)
     if (type === 'In-App Notification' || type === 'Both') {
+      console.log(`📣 🔔 Sending dashboard notifications + push...`);
       for (const user of users) {
         try {
           await createNotification(user.id, {
@@ -201,19 +209,30 @@ const sendCampaign = async (req, res) => {
             metadata: { campaignName: name }
           });
           notificationsSent++;
-        } catch (e) { errors.push(`Notification to ${user.email}: ${e.message}`); }
+          console.log(`📣 🔔 ✅ Notification sent → ${user.email} (${user.id.slice(0, 8)}...)`);
+        } catch (e) {
+          console.error(`📣 🔔 ❌ Notification FAILED → ${user.email}: ${e.message}`);
+          errors.push(`Notification to ${user.email}: ${e.message}`);
+        }
       }
+      console.log(`📣 🔔 Notifications complete: ${notificationsSent}/${users.length}`);
+    } else {
+      console.log(`📣 ⏭️ Skipping notifications (type="${type}")`);
     }
 
     // Send emails
     if (type === 'Email Alert' || type === 'Both') {
+      console.log(`📣 📧 Sending campaign emails...`);
+      console.log(`📣 📧 RESEND_API_KEY set: ${!!process.env.RESEND_API_KEY} | Key starts with: ${process.env.RESEND_API_KEY ? process.env.RESEND_API_KEY.slice(0, 8) + '...' : 'N/A'}`);
+
       try {
         const { Resend } = require('resend');
         const resend = new Resend(process.env.RESEND_API_KEY);
 
         for (const user of users) {
           try {
-            await resend.emails.send({
+            console.log(`📣 📧 Sending email to: ${user.email}...`);
+            const result = await resend.emails.send({
               from: 'Outbound Impact <noreply@outboundimpact.org>',
               to: [user.email],
               replyTo: 'support@outboundimpact.org',
@@ -237,12 +256,25 @@ const sendCampaign = async (req, res) => {
               `
             });
             emailsSent++;
-          } catch (e) { errors.push(`Email to ${user.email}: ${e.message}`); }
+            console.log(`📣 📧 ✅ Email sent → ${user.email} | Resend ID: ${result?.data?.id || 'unknown'}`);
+          } catch (e) {
+            console.error(`📣 📧 ❌ Email FAILED → ${user.email}: ${e.message}`);
+            if (e.response) console.error(`📣 📧    Resend response:`, JSON.stringify(e.response));
+            errors.push(`Email to ${user.email}: ${e.message}`);
+          }
         }
       } catch (e) {
+        console.error(`📣 📧 ❌ Email service initialization FAILED: ${e.message}`);
         errors.push(`Email service error: ${e.message}`);
       }
+      console.log(`📣 📧 Emails complete: ${emailsSent}/${users.length}`);
+    } else {
+      console.log(`📣 ⏭️ Skipping emails (type="${type}")`);
     }
+
+    console.log(`📣 ═══ CAMPAIGN SEND COMPLETE ═══`);
+    console.log(`📣 Summary: ${users.length} targeted | ${notificationsSent} notifications | ${emailsSent} emails | ${errors.length} errors`);
+    if (errors.length > 0) console.error(`📣 Errors:`, errors);
 
     // ─── Store campaign log for history ───
     const adminId = req.user.userId;

@@ -1,7 +1,8 @@
-const { saveSubscription, removeSubscription, VAPID_PUBLIC_KEY } = require('../services/webPushService');
+const { saveSubscription, removeSubscription, VAPID_PUBLIC_KEY, pushConfigured } = require('../services/webPushService');
 
 // ═══════════════════════════════════════════════════════════
 // PUSH NOTIFICATION CONTROLLER
+// ✅ FIX: Added comprehensive logging
 // ═══════════════════════════════════════════════════════════
 
 /**
@@ -9,10 +10,12 @@ const { saveSubscription, removeSubscription, VAPID_PUBLIC_KEY } = require('../s
  * Returns the VAPID public key for client-side push subscription
  */
 const getVapidPublicKey = (req, res) => {
+  console.log(`📱 VAPID key requested | Configured: ${pushConfigured} | Key exists: ${!!VAPID_PUBLIC_KEY}`);
+
   if (!VAPID_PUBLIC_KEY) {
     return res.status(503).json({
       status: 'error',
-      message: 'Push notifications not configured',
+      message: 'Push notifications not configured — VAPID_PUBLIC_KEY missing',
     });
   }
 
@@ -33,13 +36,17 @@ const subscribe = async (req, res) => {
     const { subscription } = req.body;
     const userAgent = req.headers['user-agent'];
 
+    console.log(`📱 Subscribe request | User: ${userId.slice(0, 8)}... | Role: ${req.user.role} | Has subscription data: ${!!subscription}`);
+
     if (!subscription || !subscription.endpoint) {
+      console.log('📱 ❌ Subscribe rejected — missing subscription.endpoint');
       return res.status(400).json({
         status: 'error',
         message: 'Invalid subscription data',
       });
     }
 
+    console.log(`📱 Saving subscription | Endpoint: ${subscription.endpoint.slice(0, 60)}...`);
     await saveSubscription(userId, subscription, userAgent);
 
     res.json({
@@ -47,7 +54,7 @@ const subscribe = async (req, res) => {
       message: 'Push subscription saved',
     });
   } catch (err) {
-    console.error('Push subscribe error:', err);
+    console.error('📱 ❌ Push subscribe error:', err.message);
     res.status(500).json({
       status: 'error',
       message: 'Failed to save subscription',
@@ -71,6 +78,7 @@ const unsubscribe = async (req, res) => {
       });
     }
 
+    console.log(`📱 Unsubscribe | Endpoint: ${endpoint.slice(0, 60)}...`);
     await removeSubscription(endpoint);
 
     res.json({
@@ -78,7 +86,7 @@ const unsubscribe = async (req, res) => {
       message: 'Push subscription removed',
     });
   } catch (err) {
-    console.error('Push unsubscribe error:', err);
+    console.error('📱 ❌ Push unsubscribe error:', err.message);
     res.status(500).json({
       status: 'error',
       message: 'Failed to remove subscription',
