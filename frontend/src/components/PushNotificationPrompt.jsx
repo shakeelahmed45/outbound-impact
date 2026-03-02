@@ -7,29 +7,15 @@ import useAuthStore from '../store/authStore';
  * PushNotificationPrompt
  * 
  * Shows a one-time banner prompting users to enable push notifications.
- * Appears after 3 seconds on dashboard, dismissible, remembers choice PER USER.
+ * Appears after 3 seconds on dashboard, dismissible, remembers choice.
  * 
- * ✅ FIX: User-specific localStorage keys so each account gets its own prompt.
- * ✅ FIX: Re-evaluates when user changes (login/switch account).
- * ✅ FIX: Also checks legacy global keys for backward compat.
+ * ✅ FIX: Added console logging for debugging
  */
 const PushNotificationPrompt = () => {
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
   const { user } = useAuthStore();
-
-  // ✅ User-specific key helpers — each account gets its own flags
   const userId = user?.id || user?.userId;
-
-  // ONLY check user-specific keys (not global) so new accounts always get a fresh prompt
-  const isSetForUser = (base) => {
-    if (!userId) return false;
-    return localStorage.getItem(`${base}_${userId}`) === 'true';
-  };
-
-  const setKeyForUser = (base) => {
-    if (userId) localStorage.setItem(`${base}_${userId}`, 'true');
-  };
 
   useEffect(() => {
     // Wait for user to be available
@@ -40,8 +26,9 @@ const PushNotificationPrompt = () => {
 
     const supported = isPushSupported();
     const permission = getPermissionStatus();
-    const alreadySubscribed = isSetForUser('push_subscribed');
-    const dismissed = isSetForUser('push_dismissed');
+    // ✅ FIX: Check user-specific keys so each account gets its own prompt
+    const alreadySubscribed = localStorage.getItem(`push_subscribed_${userId}`) === 'true';
+    const dismissed = localStorage.getItem(`push_dismissed_${userId}`) === 'true';
 
     console.log('📱 [PushPrompt] Checking conditions:', {
       userId: userId.slice(0, 8) + '...',
@@ -49,22 +36,14 @@ const PushNotificationPrompt = () => {
       permission,
       alreadySubscribed,
       dismissed,
-      userSpecificSubKey: `push_subscribed_${userId}`,
     });
 
-    if (!supported) {
-      console.log('📱 [PushPrompt] Not showing — push not supported on this browser/device');
-      console.log('📱 [PushPrompt] Details: SW=' + ('serviceWorker' in navigator) + 
-        ' PushManager=' + ('PushManager' in window) + 
-        ' Notification=' + ('Notification' in window) +
-        ' Standalone=' + window.matchMedia('(display-mode: standalone)').matches);
-      return;
-    }
+    if (!supported) { console.log('📱 [PushPrompt] Not showing — push not supported'); return; }
     if (alreadySubscribed) { console.log('📱 [PushPrompt] Not showing — already subscribed'); return; }
     if (dismissed) { console.log('📱 [PushPrompt] Not showing — previously dismissed'); return; }
-    if (permission === 'denied') { console.log('📱 [PushPrompt] Not showing — browser permission denied'); return; }
+    if (permission === 'denied') { console.log('📱 [PushPrompt] Not showing — permission denied'); return; }
 
-    console.log('📱 [PushPrompt] ✅ All conditions passed — showing prompt in 3 seconds');
+    console.log('📱 [PushPrompt] Will show prompt in 3 seconds');
     const timer = setTimeout(() => setShow(true), 3000);
     return () => clearTimeout(timer);
   }, [userId]); // ✅ FIX: Re-run when user changes
@@ -78,11 +57,11 @@ const PushNotificationPrompt = () => {
 
     if (result.success) {
       console.log('📱 [PushPrompt] ✅ Subscription successful!');
-      setKeyForUser('push_subscribed');
+      if (userId) localStorage.setItem(`push_subscribed_${userId}`, 'true');
       setShow(false);
     } else if (result.reason === 'denied') {
       console.log('📱 [PushPrompt] ❌ User denied permission in browser prompt');
-      setKeyForUser('push_dismissed');
+      if (userId) localStorage.setItem(`push_dismissed_${userId}`, 'true');
       setShow(false);
     } else {
       console.error('📱 [PushPrompt] ❌ Subscribe failed:', result.reason);
@@ -92,7 +71,7 @@ const PushNotificationPrompt = () => {
 
   const handleDismiss = () => {
     console.log('📱 [PushPrompt] User dismissed prompt');
-    setKeyForUser('push_dismissed');
+    if (userId) localStorage.setItem(`push_dismissed_${userId}`, 'true');
     setShow(false);
   };
 

@@ -40,7 +40,6 @@ const useAuthStore = create(
           localStorage.removeItem(`push_subscribed_${uid}`);
           localStorage.removeItem(`push_dismissed_${uid}`);
         }
-        // Also clear legacy global keys
         localStorage.removeItem('push_subscribed');
         localStorage.removeItem('push_dismissed');
 

@@ -131,7 +131,7 @@ export const subscribeToPush = async () => {
 
     if (res.data.status === 'success') {
       console.log('📱 [Push] ✅ Full subscription flow complete!');
-      // Note: push_subscribed flag is now set per-user by PushNotificationPrompt
+      // push_subscribed flag now set per-user by PushNotificationPrompt
       return { success: true };
     }
 
