@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Bell, X, CheckCircle, AlertCircle, Info, AlertTriangle, Trash2, Check } from 'lucide-react';
 import api from '../services/api';
+import { setBadge, clearBadge } from '../services/pushService';
 
 const POLL_INTERVAL = 30000; // Poll every 30 seconds for new notifications
 
@@ -11,6 +12,15 @@ const NotificationsPanel = () => {
   const [loading, setLoading] = useState(false);
   const panelRef = useRef(null);
   const pollRef = useRef(null);
+
+  // ✅ FIX: Sync PWA badge with unread count whenever it changes
+  useEffect(() => {
+    if (unreadCount > 0) {
+      setBadge(unreadCount);
+    } else {
+      clearBadge();
+    }
+  }, [unreadCount]);
 
   // Fetch notifications from API
   const fetchNotifications = useCallback(async () => {

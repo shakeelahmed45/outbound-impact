@@ -232,7 +232,7 @@ const sendCampaign = async (req, res) => {
         for (const user of users) {
           try {
             console.log(`📣 📧 Sending email to: ${user.email}...`);
-            const result = await resend.emails.send({
+            const { data: emailData, error: emailError } = await resend.emails.send({
               from: 'Outbound Impact <noreply@outboundimpact.org>',
               to: [user.email],
               replyTo: 'support@outboundimpact.org',
@@ -255,8 +255,15 @@ const sendCampaign = async (req, res) => {
                 </div>
               `
             });
-            emailsSent++;
-            console.log(`📣 📧 ✅ Email sent → ${user.email} | Resend ID: ${result?.data?.id || 'unknown'}`);
+
+            // ✅ FIX: Resend SDK returns { data, error } — check error properly
+            if (emailError) {
+              console.error(`📣 📧 ❌ Resend rejected → ${user.email}: ${emailError.message || JSON.stringify(emailError)}`);
+              errors.push(`Email to ${user.email}: ${emailError.message || 'Resend API error'}`);
+            } else {
+              emailsSent++;
+              console.log(`📣 📧 ✅ Email sent → ${user.email} | Resend ID: ${emailData?.id || 'accepted'}`);
+            }
           } catch (e) {
             console.error(`📣 📧 ❌ Email FAILED → ${user.email}: ${e.message}`);
             if (e.response) console.error(`📣 📧    Resend response:`, JSON.stringify(e.response));

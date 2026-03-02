@@ -6,6 +6,16 @@ const axios = require('axios');
 const { nanoid } = require('nanoid');
 const { notifyStreamPublished, notifyQrScan } = require('../services/notificationService');
 
+// ✅ FIX: Import push service to send push to actual team member
+let _sendPushToUser = null;
+const getSendPush = () => {
+  if (!_sendPushToUser) {
+    try { _sendPushToUser = require('../services/webPushService').sendPushToUser; }
+    catch { _sendPushToUser = () => {}; }
+  }
+  return _sendPushToUser;
+};
+
 // Helper function to sort items by custom order
 const applyCustomOrder = (items, itemOrder) => {
   if (!itemOrder || itemOrder.length === 0) {
@@ -225,6 +235,16 @@ const createCampaign = async (req, res) => {
 
     // 🔔 Notify: stream published
     await notifyStreamPublished(userId, name);
+
+    // 📱 FIX: Push to actual team member if they created the stream
+    if (req.isTeamMember && req.user.userId !== userId) {
+      getSendPush()(req.user.userId, {
+        title: 'Stream Published',
+        body: `Your stream "${name}" has been published and QR code generated successfully.`,
+        category: 'upload',
+        url: '/dashboard',
+      }).catch(() => {});
+    }
 
     res.status(201).json({
       status: 'success',

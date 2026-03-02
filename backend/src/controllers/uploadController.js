@@ -5,6 +5,18 @@ const QRCode = require('qrcode');
 const { notifyUpload, notifyStorageWarning, createNotification } = require('../services/notificationService');
 const { sendEditorUploadNotification } = require('../services/emailService');
 
+// ✅ FIX: Import push service to send push to actual uploader (team members)
+// When a team member uploads, notification goes to org owner (correct for in-app),
+// but push must ALSO go to the uploader since their push subscription is under their real ID.
+let _sendPushToUser = null;
+const getSendPush = () => {
+  if (!_sendPushToUser) {
+    try { _sendPushToUser = require('../services/webPushService').sendPushToUser; }
+    catch { _sendPushToUser = () => {}; }
+  }
+  return _sendPushToUser;
+};
+
 // ═══════════════════════════════════════════════════════════
 // CONTENT APPROVAL LOGIC
 // Enterprise + EDITOR → PENDING_APPROVAL (Workflow auto-created)
@@ -379,6 +391,18 @@ const uploadFile = async (req, res) => {
     // 🔔 In-app notification for uploader
     await notifyUpload(userId, title, type);
 
+    // 📱 FIX: Also push to actual uploader if they're a team member
+    // Notification goes to org owner (userId = effectiveUserId), but push subscription
+    // is stored under the team member's REAL userId → push lookup would find 0 for org owner
+    if (req.isTeamMember && req.user.userId !== userId) {
+      getSendPush()(req.user.userId, {
+        title: 'Content Uploaded Successfully',
+        body: `Your ${type || 'content'} "${title}" has been uploaded and is ready to share.`,
+        category: 'upload',
+        url: '/dashboard',
+      }).catch(() => {});
+    }
+
     // 🔔 Storage warning
     const storageLimit = Number(user.storageLimit || 2147483648);
     const storagePercent = storageLimit > 0 ? Math.round((newStorageUsed / storageLimit) * 100) : 0;
@@ -528,6 +552,16 @@ const createTextPost = async (req, res) => {
 
     await notifyUpload(userId, title, 'text');
 
+    // 📱 FIX: Push to actual uploader if team member
+    if (req.isTeamMember && req.user.userId !== userId) {
+      getSendPush()(req.user.userId, {
+        title: 'Content Uploaded Successfully',
+        body: `Your text "${title}" has been uploaded and is ready to share.`,
+        category: 'upload',
+        url: '/dashboard',
+      }).catch(() => {});
+    }
+
     if (approval.needsApproval) await autoCreateWorkflow(item, req);
     if (approval.sendEmail) notifyOwnerAndAdmins(userId, req.user.email, title, 'TEXT', approval.needsApproval);
 
@@ -649,6 +683,16 @@ const createEmbedPost = async (req, res) => {
     });
 
     await notifyUpload(userId, title, 'embed');
+
+    // 📱 FIX: Push to actual uploader if team member
+    if (req.isTeamMember && req.user.userId !== userId) {
+      getSendPush()(req.user.userId, {
+        title: 'Content Uploaded Successfully',
+        body: `Your embed "${title}" has been uploaded and is ready to share.`,
+        category: 'upload',
+        url: '/dashboard',
+      }).catch(() => {});
+    }
 
     if (approval.needsApproval) await autoCreateWorkflow(item, req);
     if (approval.sendEmail) notifyOwnerAndAdmins(userId, req.user.email, title, 'EMBED', approval.needsApproval);
