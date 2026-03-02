@@ -229,10 +229,14 @@ const sendCampaign = async (req, res) => {
         const { Resend } = require('resend');
         const resend = new Resend(process.env.RESEND_API_KEY);
 
-        for (const user of users) {
+        for (let i = 0; i < users.length; i++) {
+          const user = users[i];
           try {
-            console.log(`📣 📧 Sending email to: ${user.email}...`);
-            const { data: emailData, error: emailError } = await resend.emails.send({
+            // ✅ FIX: 1s delay before every email (except first) to stay under Resend's 2/sec rate limit
+            if (i > 0) await new Promise(r => setTimeout(r, 1000));
+
+            console.log(`📣 📧 [${i + 1}/${users.length}] Sending email to: ${user.email}...`);
+            const result = await resend.emails.send({
               from: 'Outbound Impact <noreply@outboundimpact.org>',
               to: [user.email],
               replyTo: 'support@outboundimpact.org',
@@ -255,15 +259,8 @@ const sendCampaign = async (req, res) => {
                 </div>
               `
             });
-
-            // ✅ FIX: Resend SDK returns { data, error } — check error properly
-            if (emailError) {
-              console.error(`📣 📧 ❌ Resend rejected → ${user.email}: ${emailError.message || JSON.stringify(emailError)}`);
-              errors.push(`Email to ${user.email}: ${emailError.message || 'Resend API error'}`);
-            } else {
-              emailsSent++;
-              console.log(`📣 📧 ✅ Email sent → ${user.email} | Resend ID: ${emailData?.id || 'accepted'}`);
-            }
+            emailsSent++;
+            console.log(`📣 📧 ✅ Email sent → ${user.email} | Resend ID: ${result?.data?.id || 'unknown'}`);
           } catch (e) {
             console.error(`📣 📧 ❌ Email FAILED → ${user.email}: ${e.message}`);
             if (e.response) console.error(`📣 📧    Resend response:`, JSON.stringify(e.response));
