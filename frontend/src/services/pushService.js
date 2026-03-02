@@ -131,7 +131,7 @@ export const subscribeToPush = async () => {
 
     if (res.data.status === 'success') {
       console.log('📱 [Push] ✅ Full subscription flow complete!');
-      localStorage.setItem('push_subscribed', 'true');
+      // Note: push_subscribed flag is now set per-user by PushNotificationPrompt
       return { success: true };
     }
 

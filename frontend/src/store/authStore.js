@@ -32,16 +32,24 @@ const useAuthStore = create(
       
       logout: () => {
         console.log('🔵 authStore.logout called');
+
+        // ✅ FIX: Clear user-specific push flags BEFORE clearing user state
+        const currentUser = get().user;
+        const uid = currentUser?.id || currentUser?.userId;
+        if (uid) {
+          localStorage.removeItem(`push_subscribed_${uid}`);
+          localStorage.removeItem(`push_dismissed_${uid}`);
+        }
+        // Also clear legacy global keys
+        localStorage.removeItem('push_subscribed');
+        localStorage.removeItem('push_dismissed');
+
         set({ 
           user: null, 
           token: null, 
           isAuthenticated: false,
-          permissions: null  // 🆕 NEW: Clear permissions
+          permissions: null
         });
-
-        // ✅ FIX: Clear push notification flags so next user gets a fresh prompt
-        localStorage.removeItem('push_subscribed');
-        localStorage.removeItem('push_dismissed');
       },
       
       // ✅ Called after rehydration completes
