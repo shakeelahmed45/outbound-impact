@@ -38,6 +38,10 @@ const useAuthStore = create(
           isAuthenticated: false,
           permissions: null  // 🆕 NEW: Clear permissions
         });
+
+        // ✅ FIX: Clear push notification flags so next user gets a fresh prompt
+        localStorage.removeItem('push_subscribed');
+        localStorage.removeItem('push_dismissed');
       },
       
       // ✅ Called after rehydration completes
