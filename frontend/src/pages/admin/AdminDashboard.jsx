@@ -125,7 +125,7 @@ const AdminDashboard = () => {
                 {recentCustomers.map((c, idx) => (
                   <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <div className="flex-1 min-w-0"><p className="font-medium text-slate-900 truncate">{c.name}</p><p className="text-xs text-slate-500">{c.plan}</p></div>
-                    <div className="text-right"><p className="text-sm font-semibold text-slate-900">{c.items} items</p><p className="text-xs text-slate-500">{c.campaigns} streams</p></div>
+                    <div className="text-right"><p className="text-sm font-semibold text-slate-900">{c.items} items</p><p className="text-xs text-slate-500">{c.campaigns} {c.plan === 'Individual' ? 'streams' : 'campaigns'}</p></div>
                   </div>
                 ))}
               </div>

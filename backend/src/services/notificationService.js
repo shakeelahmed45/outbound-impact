@@ -142,12 +142,14 @@ const notifyStorageWarning = async (userId, percentUsed) => {
   });
 };
 
-const notifyStreamPublished = async (userId, streamName) => {
+const notifyStreamPublished = async (userId, streamName, role) => {
+  const label = role === 'INDIVIDUAL' ? 'Stream' : 'Campaign';
+  const labelLower = role === 'INDIVIDUAL' ? 'stream' : 'campaign';
   return createNotification(userId, {
     type: 'success',
     category: 'upload',
-    title: 'Stream Published',
-    message: `Your stream "${streamName}" has been published and QR code generated successfully.`,
+    title: `${label} Published`,
+    message: `Your ${labelLower} "${streamName}" has been published and QR code generated successfully.`,
     metadata: { streamName },
   });
 };

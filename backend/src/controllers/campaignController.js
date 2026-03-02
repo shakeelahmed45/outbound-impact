@@ -6,7 +6,7 @@ const axios = require('axios');
 const { nanoid } = require('nanoid');
 const { notifyStreamPublished, notifyQrScan } = require('../services/notificationService');
 
-// ✅ FIX: Import push service to send push to actual team member
+// ✅ Push to actual team member (their subscription is under their real ID)
 let _sendPushToUser = null;
 const getSendPush = () => {
   if (!_sendPushToUser) {
@@ -233,14 +233,15 @@ const createCampaign = async (req, res) => {
 
     console.log(`âœ… Campaign created: ${campaign.name}${logoUrl ? ' (with logo)' : ''}${passwordProtected ? ' [PROTECTED]' : ''}`);
 
-    // 🔔 Notify: stream published
-    await notifyStreamPublished(userId, name);
+    // 🔔 Notify: stream/campaign published
+    await notifyStreamPublished(userId, name, owner?.role);
 
-    // 📱 FIX: Push to actual team member if they created the stream
+    // 📱 Push to actual team member if they created it
     if (req.isTeamMember && req.user.userId !== userId) {
+      const lbl = owner?.role === 'INDIVIDUAL' ? 'stream' : 'campaign';
       getSendPush()(req.user.userId, {
-        title: 'Stream Published',
-        body: `Your stream "${name}" has been published and QR code generated successfully.`,
+        title: `${lbl.charAt(0).toUpperCase() + lbl.slice(1)} Published`,
+        body: `Your ${lbl} "${name}" has been published and QR code generated successfully.`,
         category: 'upload',
         url: '/dashboard',
       }).catch(() => {});

@@ -1057,7 +1057,7 @@ const AdminUsers = () => {
                   <div className="p-4 bg-purple-50 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <Folder className="text-purple-600" size={20} />
-                      <span className="text-sm text-gray-600">Campaigns</span>
+                      <span className="text-sm text-gray-600">{selectedUser.role === 'INDIVIDUAL' ? 'Streams' : 'Campaigns'}</span>
                     </div>
                     <p className="text-2xl font-bold text-purple-600">{selectedUser._count?.campaigns || 0}</p>
                   </div>

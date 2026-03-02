@@ -201,7 +201,7 @@ const UserDetailPage = () => {
 
           <div className="bg-white rounded-xl shadow-md p-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600">Campaigns</span>
+              <span className="text-sm text-gray-600">{user.role === 'INDIVIDUAL' ? 'Streams' : 'Campaigns'}</span>
               <Folder className="text-purple-500" size={20} />
             </div>
             <p className="text-3xl font-bold text-gray-900">{user._count.campaigns}</p>
