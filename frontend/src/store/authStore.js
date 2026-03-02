@@ -32,22 +32,11 @@ const useAuthStore = create(
       
       logout: () => {
         console.log('🔵 authStore.logout called');
-
-        // ✅ FIX: Clear user-specific push flags BEFORE clearing user state
-        const currentUser = get().user;
-        const uid = currentUser?.id || currentUser?.userId;
-        if (uid) {
-          localStorage.removeItem(`push_subscribed_${uid}`);
-          localStorage.removeItem(`push_dismissed_${uid}`);
-        }
-        localStorage.removeItem('push_subscribed');
-        localStorage.removeItem('push_dismissed');
-
         set({ 
           user: null, 
           token: null, 
           isAuthenticated: false,
-          permissions: null
+          permissions: null  // 🆕 NEW: Clear permissions
         });
       },
       
