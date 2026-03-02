@@ -16,6 +16,16 @@ const getSendPush = () => {
   return _sendPushToUser;
 };
 
+// 📱 Campaign push for public viewers (lazy-loaded)
+let _sendPushToCampaignSubs = null;
+const getCampaignPush = () => {
+  if (!_sendPushToCampaignSubs) {
+    try { _sendPushToCampaignSubs = require('../services/campaignPushService').sendPushToCampaignSubscribers; }
+    catch { _sendPushToCampaignSubs = () => Promise.resolve({ sent: 0, failed: 0 }); }
+  }
+  return _sendPushToCampaignSubs;
+};
+
 // Helper function to sort items by custom order
 const applyCustomOrder = (items, itemOrder) => {
   if (!itemOrder || itemOrder.length === 0) {
@@ -428,6 +438,29 @@ const assignItemToCampaign = async (req, res) => {
       data: { campaignId: campaignId || null },
     });
 
+    // 📱 Send push to public campaign subscribers when content is added
+    if (campaignId) {
+      try {
+        const campaign = await prisma.campaign.findUnique({
+          where: { id: campaignId },
+          select: { id: true, name: true, slug: true },
+        });
+        if (campaign) {
+          const itemCount = await prisma.item.count({ where: { campaignId } });
+          const baseUrl = process.env.FRONTEND_URL || 'https://outboundimpact.net';
+          getCampaignPush()(campaignId, {
+            title: `${campaign.name}`,
+            body: `New content added: "${item.title}". ${itemCount} item${itemCount !== 1 ? 's' : ''} now available.`,
+            url: `${baseUrl}/c/${campaign.slug}`,
+            badge: itemCount,
+            campaignName: campaign.name,
+          }).catch(err => console.error('📱 Campaign push fire-and-forget error:', err.message));
+        }
+      } catch (pushErr) {
+        console.error('📱 Campaign push lookup error:', pushErr.message);
+      }
+    }
+
     res.json({
       status: 'success',
       message: campaignId ? 'Item assigned to campaign' : 'Item removed from campaign',
@@ -835,4 +868,64 @@ module.exports = {
   updateCampaignOrder,
   regenerateCampaignQR,
   trackCampaignView,
+  subscribeToCampaignPush,
+  unsubscribeFromCampaignPush,
 };
+
+// ═══════════════════════════════════════════════════════════
+// 📱 PUBLIC CAMPAIGN PUSH — Subscribe / Unsubscribe
+// No auth required — these are for public viewers
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * POST /api/campaigns/public/:slug/push/subscribe
+ */
+async function subscribeToCampaignPush(req, res) {
+  try {
+    const { slug } = req.params;
+    const { subscription } = req.body;
+    const userAgent = req.headers['user-agent'];
+
+    if (!subscription || !subscription.endpoint) {
+      return res.status(400).json({ status: 'error', message: 'Invalid subscription data' });
+    }
+
+    const campaign = await prisma.campaign.findUnique({
+      where: { slug },
+      select: { id: true, name: true },
+    });
+    if (!campaign) {
+      return res.status(404).json({ status: 'error', message: 'Campaign not found' });
+    }
+
+    console.log(`📱 🔔 Campaign push subscribe | "${campaign.name}" (${slug})`);
+
+    const { saveCampaignSubscription } = require('../services/campaignPushService');
+    await saveCampaignSubscription(campaign.id, subscription, userAgent);
+
+    res.json({ status: 'success', message: 'Subscribed to campaign notifications' });
+  } catch (err) {
+    console.error('📱 ❌ Campaign push subscribe error:', err.message);
+    res.status(500).json({ status: 'error', message: 'Failed to subscribe' });
+  }
+}
+
+/**
+ * POST /api/campaigns/public/:slug/push/unsubscribe
+ */
+async function unsubscribeFromCampaignPush(req, res) {
+  try {
+    const { endpoint } = req.body;
+    if (!endpoint) {
+      return res.status(400).json({ status: 'error', message: 'Missing endpoint' });
+    }
+
+    const { removeCampaignSubscription } = require('../services/campaignPushService');
+    await removeCampaignSubscription(endpoint);
+
+    res.json({ status: 'success', message: 'Unsubscribed from campaign notifications' });
+  } catch (err) {
+    console.error('📱 ❌ Campaign push unsubscribe error:', err.message);
+    res.status(500).json({ status: 'error', message: 'Failed to unsubscribe' });
+  }
+}

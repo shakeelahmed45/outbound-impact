@@ -3,7 +3,7 @@
 // Handles: Push notifications, badge count, click-to-open
 // ═══════════════════════════════════════════════════════════
 
-const SW_VERSION = '1.0.0';
+const SW_VERSION = '1.1.0';
 
 // ─── INSTALL: Activate immediately ───
 self.addEventListener('install', (event) => {
@@ -43,12 +43,16 @@ self.addEventListener('push', (event) => {
   }
 
   // Update the badge count on the app icon
-  if (navigator.setAppBadge && data.unreadCount > 0) {
-    navigator.setAppBadge(data.unreadCount).catch(() => {});
+  // For campaign pushes: use badge (item count)
+  // For dashboard pushes: use unreadCount
+  const badgeCount = data.badge || data.unreadCount || 0;
+  if (navigator.setAppBadge && badgeCount > 0) {
+    navigator.setAppBadge(badgeCount).catch(() => {});
   }
 
   // Choose icon based on category
   const categoryIcons = {
+    campaign_update: '📢',
     new_customer: '👤',
     revenue: '💰',
     churn: '⚠️',

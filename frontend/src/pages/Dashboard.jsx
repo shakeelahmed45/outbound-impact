@@ -419,9 +419,9 @@ const Dashboard = () => {
                 <Folder size={20} className="text-white" />
               </div>
             </div>
-            <span className="text-sm text-gray-500 mb-1 block">Active Streams</span>
+            <span className="text-sm text-gray-500 mb-1 block">{isOrganization ? 'Active Campaigns' : 'Active Streams'}</span>
             <p className="text-3xl font-bold text-gray-900">{stats?.totalCampaigns || 0}</p>
-            <p className="text-xs text-gray-400 mt-1">Content streams</p>
+            <p className="text-xs text-gray-400 mt-1">{isOrganization ? 'Campaigns' : 'Content streams'}</p>
             {hasFeature('streams') && (
             <button onClick={() => navigate('/dashboard/campaigns')} className="text-primary text-sm font-medium mt-3 flex items-center gap-1 hover:gap-2 transition-all">
               View details <ChevronRight size={16} />

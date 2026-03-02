@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, Folder, Play, FileText, Music, Image as ImageIcon, Eye, Mic, ArrowLeft, Share2, Copy, Check, X, Lock, Loader2, Key, Shield, ExternalLink, Link } from 'lucide-react';
 import axios from 'axios';
 import useAuthStore, { getEffectiveUserId } from '../store/authStore';
+import CampaignPushPrompt from '../components/CampaignPushPrompt';
 import {
   copyToClipboard,
   shareToTwitter,
@@ -1346,6 +1347,11 @@ const PublicCampaignViewer = () => {
                 <span className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full font-medium">
                   Created by {campaign.user.name}
                 </span>
+
+                {/* 📱 Push notification bell — only for public viewers (not preview mode) */}
+                {!isPreviewMode && (
+                  <CampaignPushPrompt campaignSlug={slug} campaignName={campaign.name} />
+                )}
               </div>
             </div>
           </div>

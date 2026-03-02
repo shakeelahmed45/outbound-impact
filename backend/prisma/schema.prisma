@@ -172,6 +172,7 @@ model Campaign {
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   items         Item[]
   cohortStreams  CohortStream[]
+  campaignPushSubs CampaignPushSubscription[]
 
   @@index([userId])
   @@index([slug])
@@ -632,6 +633,24 @@ model PushSubscription {
   updatedAt DateTime @default(now())
 
   @@index([userId])
+}
+
+// ════════════════════════════════════════
+// 📱 CAMPAIGN PUSH SUBSCRIPTIONS
+// Public viewers who saved a campaign to home screen
+// ════════════════════════════════════════
+model CampaignPushSubscription {
+  id         String   @id @default(uuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now())
+
+  @@index([campaignId])
 }
 
 // ════════════════════════════════════════

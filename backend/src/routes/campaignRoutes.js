@@ -17,6 +17,10 @@ router.post('/public/:slug/verify', campaignController.verifyCampaignPassword);
 // ✅ NEW: Track campaign page view (public, no auth needed)
 router.post('/public/:slug/track', campaignController.trackCampaignView);
 
+// 📱 NEW: Public campaign push notifications (no auth needed)
+router.post('/public/:slug/push/subscribe', campaignController.subscribeToCampaignPush);
+router.post('/public/:slug/push/unsubscribe', campaignController.unsubscribeFromCampaignPush);
+
 // ═══════════════════════════════════════════════════════════════════
 // 🔒 PROTECTED ROUTES (Authentication required)
 // ═══════════════════════════════════════════════════════════════════
