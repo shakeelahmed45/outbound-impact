@@ -87,7 +87,7 @@ const TeamPage = () => {
     const base = [
       { key: 'uploads', label: 'Uploads', desc: 'Upload new content' },
       { key: 'items', label: 'My Items', desc: 'View and manage items' },
-      { key: 'streams', label: 'Streams', desc: 'Manage streams/campaigns' },
+      { key: 'streams', label: isIndividual ? 'Streams' : 'Campaigns', desc: isIndividual ? 'Manage streams' : 'Manage campaigns' },
     ];
     if (isIndividual) {
       return [...base, { key: 'analytics', label: 'Analytics', desc: 'View analytics data' }];

@@ -4,12 +4,16 @@ import {
   Eye, QrCode, Wifi, Globe, FileText, TrendingUp, BarChart3, Folder
 } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
+import useAuthStore from '../store/authStore';
 import api from '../services/api';
 
 const ActivityPage = () => {
   const [analyticsRecords, setAnalyticsRecords] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuthStore();
+  const effectiveUser = user?.isTeamMember ? user?.organization : user;
+  const isIndividual = effectiveUser?.role === 'INDIVIDUAL';
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [activeTab, setActiveTab] = useState('items');
@@ -139,9 +143,9 @@ const ActivityPage = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
           {[
             { icon: FileText, color: 'text-blue-600', label: 'Assets', value: analyticsRecords.length },
-            { icon: Folder, color: 'text-indigo-600', label: 'Streams', value: campaigns.length },
+            { icon: Folder, color: 'text-indigo-600', label: isIndividual ? 'Streams' : 'Campaigns', value: campaigns.length },
             { icon: Eye, color: 'text-green-600', label: 'Content Views', value: totalContentViews },
-            { icon: BarChart3, color: 'text-indigo-600', label: 'Stream Views', value: totalStreamViews },
+            { icon: BarChart3, color: 'text-indigo-600', label: isIndividual ? 'Stream Views' : 'Campaign Views', value: totalStreamViews },
             { icon: QrCode, color: 'text-purple-600', label: 'QR Scans', value: totalQrScans },
             { icon: Wifi, color: 'text-orange-600', label: 'NFC Taps', value: totalNfcTaps },
             { icon: TrendingUp, color: 'text-pink-600', label: 'Avg/Asset', value: avgViews },

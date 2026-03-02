@@ -209,7 +209,7 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
             {(isIndividual || isSmallOrAbove) && hasFeature('streams') && (
               <SubNavItem
                 icon={Rocket}
-                label="Streams"
+                label={isIndividual ? 'Streams' : 'Campaigns'}
                 active={isActive('/dashboard/campaigns')}
                 onClick={() => handleNavigate('/dashboard/campaigns')}
               />

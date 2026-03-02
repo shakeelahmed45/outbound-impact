@@ -81,6 +81,12 @@ const DashboardLayout = ({ children }) => {
   const currentPath = location.pathname;
   const pageMeta = PAGE_META[currentPath] || { title: 'Dashboard', subtitle: 'Overview and management' };
 
+  // ✅ Dynamic label: Individual = "Streams", Org plans = "Campaigns"
+  if (currentPath === '/dashboard/campaigns') {
+    pageMeta.title = isIndividual ? 'Streams' : 'Campaigns';
+    pageMeta.subtitle = isIndividual ? 'Manage your content streams' : 'Manage your campaigns';
+  }
+
   return (
     <div className="h-screen flex bg-gray-50 overflow-hidden">
       {/* Sidebar Navigation */}

@@ -78,10 +78,16 @@ const CampaignsPage = () => {
   const streamLimit = STREAM_LIMITS[planRole];
   const isIndividual = planRole === 'INDIVIDUAL';
   const isUnlimited = streamLimit === null;
+
+  // ✅ Dynamic label: Individual = "Streams", Org plans = "Campaigns"
+  const label = isIndividual ? 'Streams' : 'Campaigns';
+  const labelLower = isIndividual ? 'streams' : 'campaigns';
+  const labelSingle = isIndividual ? 'stream' : 'campaign';
+  const Label1 = isIndividual ? 'Stream' : 'Campaign'; // Capitalized singular
   const limitReached = !isUnlimited && campaigns.length >= streamLimit;
 
   useEffect(() => {
-    document.title = 'Streams | Outbound Impact';
+    document.title = `${label} | Outbound Impact`;
     fetchData();
   }, []);
 
@@ -185,7 +191,7 @@ const CampaignsPage = () => {
     
     // ✅ NEW: Validate password if protection is enabled
     if (formData.passwordProtected && !formData.password) {
-      showToast('Please enter a password for protected stream', 'error');
+      showToast(`Please enter a password for protected ${labelSingle}`, 'error');
       return;
     }
 
@@ -219,11 +225,11 @@ const CampaignsPage = () => {
         setShowCreateModal(false);
         setFormData({ name: '', description: '', category: '', logoUrl: '', passwordProtected: false, password: '' });
         clearLogo();
-        showToast('Stream created successfully!', 'success');
+        showToast(`${Label1} created successfully!`, 'success');
       }
     } catch (error) {
       console.error('Failed to create stream:', error);
-      showToast('Failed to create stream', 'error');
+      showToast(`Failed to create ${labelSingle}`, 'error');
     }
   };
 
@@ -232,7 +238,7 @@ const CampaignsPage = () => {
     
     // ✅ NEW: Validate password if protection is enabled
     if (formData.passwordProtected && !formData.password && !selectedCampaign.passwordProtected) {
-      showToast('Please enter a password for protected stream', 'error');
+      showToast(`Please enter a password for protected ${labelSingle}`, 'error');
       return;
     }
 
@@ -267,24 +273,24 @@ const CampaignsPage = () => {
         setSelectedCampaign(null);
         setFormData({ name: '', description: '', category: '', logoUrl: '', passwordProtected: false, password: '' });
         clearLogo();
-        showToast('Stream updated successfully!', 'success');
+        showToast(`${Label1} updated successfully!`, 'success');
       }
     } catch (error) {
       console.error('Failed to update stream:', error);
-      showToast('Failed to update stream', 'error');
+      showToast(`Failed to update ${labelSingle}`, 'error');
     }
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this stream? Items will not be deleted.')) return;
+    if (!confirm(`Are you sure you want to delete this ${labelSingle}? Items will not be deleted.`)) return;
 
     try {
       await api.delete('/campaigns/' + id);
       setCampaigns(campaigns.filter(c => c.id !== id));
-      showToast('Stream deleted successfully!', 'success');
+      showToast(`${Label1} deleted successfully!`, 'success');
     } catch (error) {
       console.error('Failed to delete stream:', error);
-      showToast('Failed to delete stream', 'error');
+      showToast(`Failed to delete ${labelSingle}`, 'error');
     }
   };
 
@@ -301,7 +307,7 @@ const CampaignsPage = () => {
   };
 
   const handleRemoveItemFromCampaign = async (itemId) => {
-    if (!confirm('Remove this item from the stream?')) return;
+    if (!confirm(`Remove this item from the ${labelSingle}?`)) return;
 
     try {
       await api.post('/campaigns/assign', {
@@ -314,7 +320,7 @@ const CampaignsPage = () => {
       ));
       
       fetchData();
-      showToast('Item removed from stream', 'success');
+      showToast(`Item removed from ${labelSingle}`, 'success');
     } catch (error) {
       console.error('Failed to remove item:', error);
       showToast('Failed to remove item', 'error');
@@ -408,13 +414,13 @@ const CampaignsPage = () => {
       setSelectedCampaign(null);
       setSelectedItems([]);
 
-      let message = 'Stream items updated!';
+      let message = `${Label1} items updated!`;
       if (addedCount > 0 && removedCount > 0) {
         message = `Added ${addedCount} item(s) and removed ${removedCount} item(s)`;
       } else if (addedCount > 0) {
-        message = `Added ${addedCount} item(s) to stream`;
+        message = `Added ${addedCount} item(s) to ${labelSingle}`;
       } else if (removedCount > 0) {
-        message = `Removed ${removedCount} item(s) from stream`;
+        message = `Removed ${removedCount} item(s) from ${labelSingle}`;
       }
       
       showToast(message, 'success');
@@ -551,15 +557,15 @@ const CampaignsPage = () => {
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-primary mb-2">Streams</h1>
-            <p className="text-secondary">Organize your content into streams with QR codes</p>
+            <h1 className="text-3xl font-bold text-primary mb-2">{label}</h1>
+            <p className="text-secondary">Organize your content into {labelLower} with QR codes</p>
           </div>
           {/* ✅ Create — hidden for VIEWER, limit-checked for all plans */}
           {canEdit() && (
           <button
             onClick={() => {
               if (limitReached) {
-                showToast(`Stream limit reached (${campaigns.length}/${streamLimit}). Upgrade to create more!`, 'error');
+                showToast(`${Label1} limit reached (${campaigns.length}/${streamLimit}). Upgrade to create more!`, 'error');
                 return;
               }
               setShowCreateModal(true);
@@ -569,7 +575,7 @@ const CampaignsPage = () => {
             }`}
           >
             <Plus size={20} />
-            {limitReached ? 'Upgrade to Add More' : 'Create Stream'}
+            {limitReached ? 'Upgrade to Add More' : `Create ${Label1}`}
           </button>
           )}
         </div>
@@ -578,7 +584,7 @@ const CampaignsPage = () => {
         {!isUnlimited && (
           <div className={`mb-6 flex items-center justify-between ${limitReached ? 'bg-orange-50 border-orange-200' : 'bg-purple-50 border-purple-200'} border rounded-xl px-5 py-3`}>
             <p className={`text-sm ${limitReached ? 'text-orange-700' : 'text-purple-700'}`}>
-              <strong>{campaigns.length}/{streamLimit}</strong> streams used
+              <strong>{campaigns.length}/{streamLimit}</strong> {labelLower} used
               {limitReached && <span className="ml-2 text-orange-600 font-medium">• Limit reached</span>}
             </p>
             {limitReached && (
@@ -592,14 +598,14 @@ const CampaignsPage = () => {
         {campaigns.length === 0 ? (
           <div className="text-center py-12">
             <Folder size={64} className="mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-500 mb-4">No streams yet. Create your first stream!</p>
+            <p className="text-gray-500 mb-4">No {labelLower} yet. Create your first {labelSingle}!</p>
             {canEdit() && (
             <button
               onClick={() => setShowCreateModal(true)}
               className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all inline-flex items-center gap-2"
             >
               <Plus size={20} />
-              Create Stream
+              Create {Label1}
             </button>
             )}
           </div>
@@ -622,7 +628,7 @@ const CampaignsPage = () => {
                     <div className="mb-3 inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-yellow-100 to-amber-100 border border-yellow-300 rounded-full">
                       <Lock size={14} className="text-yellow-700" />
                       <span className="text-xs font-bold text-yellow-800">Password Protected</span>
-                      <Tooltip content="This stream requires a password to view" />
+                      <Tooltip content={`This ${labelSingle} requires a password to view`} />
                     </div>
                   )}
 
@@ -665,8 +671,8 @@ const CampaignsPage = () => {
                     <div className="bg-indigo-50 p-2.5 rounded-lg">
                       <div className="flex items-center gap-1 text-indigo-600 mb-1">
                         <Eye size={13} />
-                        <span className="text-xs font-medium">Stream Views</span>
-                        <Tooltip content="Times the stream page was viewed" iconSize={10} />
+                        <span className="text-xs font-medium">{Label1} Views</span>
+                        <Tooltip content={`Times the ${labelSingle} page was viewed`} iconSize={10} />
                       </div>
                       <p className="text-lg font-bold text-indigo-700">{streamViews.toLocaleString()}</p>
                     </div>
@@ -749,7 +755,7 @@ const CampaignsPage = () => {
                       </div>
                       
                       <div className="mt-3 p-2 bg-gray-50 rounded-lg">
-                        <p className="text-xs text-gray-600 mb-1">Stream URL:</p>
+                        <p className="text-xs text-gray-600 mb-1">{Label1} URL:</p>
                         <code className="text-xs text-primary font-mono">
                           {window.location.origin}/c/{campaign.slug}
                         </code>
@@ -803,15 +809,15 @@ const CampaignsPage = () => {
             <div className="bg-white rounded-2xl max-w-md w-full max-h-[75vh] flex flex-col overflow-hidden">
               {/* Header - Fixed at Top */}
               <div className="flex-shrink-0 p-4 border-b border-gray-200">
-                <h2 className="text-2xl font-bold text-primary">Create Stream</h2>
+                <h2 className="text-2xl font-bold text-primary">Create {Label1}</h2>
               </div>
               
               {/* Form Content - Scrollable */}
               <form onSubmit={handleCreate} className="flex-1 overflow-y-auto p-4 space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                    Stream Logo (Optional)
-                    <Tooltip content="Upload a logo to display on your stream page" />
+                    {Label1} Logo (Optional)
+                    <Tooltip content={`Upload a logo to display on your ${labelSingle} page`} />
                   </label>
                   
                   {logoPreview ? (
@@ -846,8 +852,8 @@ const CampaignsPage = () => {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                    Stream Name *
-                    <Tooltip content="Give your stream a clear, descriptive name that helps you identify it easily" />
+                    {Label1} Name *
+                    <Tooltip content={`Give your ${labelSingle} a clear, descriptive name that helps you identify it easily`} />
                   </label>
                   <input
                     type="text"
@@ -862,7 +868,7 @@ const CampaignsPage = () => {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Category
-                    <Tooltip content="Choose a category to organize your streams and make them easier to find" />
+                    <Tooltip content={`Choose a category to organize your ${labelLower} and make them easier to find`} />
                   </label>
                   <select
                     value={formData.category}
@@ -881,7 +887,7 @@ const CampaignsPage = () => {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Description
-                    <Tooltip content="Add optional details about this stream to help team members understand its purpose" />
+                    <Tooltip content={`Add optional details about this ${labelSingle} to help team members understand its purpose`} />
                   </label>
                   <textarea
                     value={formData.description}
@@ -905,7 +911,7 @@ const CampaignsPage = () => {
                           🔒 Password Protection (Optional)
                         </h4>
                         <p className="text-xs text-gray-600">
-                          Require a password to view this stream's content. Perfect for keeping content private to your community.
+                          Require a password to view this 's content. Perfect for keeping content private to your community.
                         </p>
                       </div>
                     </div>
@@ -926,7 +932,7 @@ const CampaignsPage = () => {
                       <div className="space-y-3">
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Stream Password *
+                            {Label1} Password *
                           </label>
                           <input
                             type="text"
@@ -1002,7 +1008,7 @@ const CampaignsPage = () => {
                 <div className="flex items-center justify-between gap-1.5">
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
                     <Folder size={14} />
-                    <h2 className="text-xs font-bold truncate">Edit Stream</h2>
+                    <h2 className="text-xs font-bold truncate">Edit {Label1}</h2>
                   </div>
                   <button
                     onClick={() => {
@@ -1179,7 +1185,7 @@ const CampaignsPage = () => {
               {getCampaignItems(selectedCampaign.id).length === 0 ? (
                 <div className="text-center py-12">
                   <FileText size={64} className="mx-auto text-gray-300 mb-4" />
-                  <p className="text-gray-500 mb-4">No items in this stream yet</p>
+                  <p className="text-gray-500 mb-4">No items in this  yet</p>
                   <button
                     onClick={() => {
                       setShowViewItemsModal(false);
@@ -1270,7 +1276,7 @@ const CampaignsPage = () => {
         {showAddItemsModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-              <h2 className="text-2xl font-bold text-primary mb-2">Manage Stream Items</h2>
+              <h2 className="text-2xl font-bold text-primary mb-2">Manage {Label1} Items</h2>
               <p className="text-gray-600 mb-6">
                 Select items to add to <strong>{selectedCampaign?.name}</strong>
                 {selectedCampaign?.category && ` (${selectedCampaign.category})`}
@@ -1342,7 +1348,7 @@ const CampaignsPage = () => {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <h3 className="font-bold text-xl mb-1">Ready to grow?</h3>
-                <p className="text-blue-100 text-sm">Upgrade your plan for more streams, storage, contributors, and advanced features!</p>
+                <p className="text-blue-100 text-sm">Upgrade your plan for more {labelLower}, storage, contributors, and advanced features!</p>
               </div>
               <button onClick={() => window.location.href = '/dashboard/settings'} className="px-6 py-3 bg-white text-purple-600 rounded-lg font-bold hover:bg-slate-100 transition-colors flex-shrink-0">Upgrade Now</button>
             </div>
@@ -1354,7 +1360,7 @@ const CampaignsPage = () => {
               <div className="bg-white rounded-lg p-4 text-center shadow-sm">
                 <Folder size={20} className="mx-auto text-primary mb-2" />
                 <p className="text-2xl font-bold text-primary">{campaigns.length}</p>
-                <p className="text-xs text-gray-500 mt-1">Total Streams</p>
+                <p className="text-xs text-gray-500 mt-1">Total {label}</p>
               </div>
               <div className="bg-white rounded-lg p-4 text-center shadow-sm">
                 <Download size={20} className="mx-auto text-purple-600 mb-2" />
@@ -1370,7 +1376,7 @@ const CampaignsPage = () => {
                 <p className="text-2xl font-bold text-indigo-600">
                   {campaigns.reduce((total, c) => total + (c.views || 0), 0).toLocaleString()}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">Total Stream Views</p>
+                <p className="text-xs text-gray-500 mt-1">Total {Label1} Views</p>
               </div>
             </div>
           </div>
