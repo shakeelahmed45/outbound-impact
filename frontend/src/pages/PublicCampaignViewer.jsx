@@ -264,6 +264,57 @@ const linkifyText = (text) => {
 const PublicCampaignViewer = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
+
+  // FIX: Override manifest start_url for "Add to Home Screen"
+  // Without this, Chrome uses site.webmanifest start_url (/dashboard) which
+  // redirects to sign-in since the public viewer is not authenticated.
+  useEffect(() => {
+    const campaignUrl = `/c/${slug}`;
+    const dynamicManifest = {
+      name: 'Outbound Impact',
+      short_name: 'Outbound Impact',
+      description: 'Comprehensive SaaS media sharing platform',
+      id: campaignUrl,
+      start_url: campaignUrl,
+      scope: '/',
+      display: 'standalone',
+      orientation: 'any',
+      theme_color: '#7c3aed',
+      background_color: '#ffffff',
+      icons: [
+        { src: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png' },
+        { src: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png' },
+        { src: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+        { src: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      ],
+    };
+
+    const blob = new Blob([JSON.stringify(dynamicManifest)], { type: 'application/json' });
+    const manifestUrl = URL.createObjectURL(blob);
+
+    // Replace the existing manifest link
+    const existingLink = document.querySelector('link[rel="manifest"]');
+    const originalHref = existingLink ? existingLink.href : null;
+    if (existingLink) {
+      existingLink.href = manifestUrl;
+    } else {
+      const link = document.createElement('link');
+      link.rel = 'manifest';
+      link.href = manifestUrl;
+      document.head.appendChild(link);
+    }
+
+    console.log('[CampaignViewer] Manifest overridden: start_url =', campaignUrl);
+
+    // Cleanup: restore original manifest when leaving campaign page
+    return () => {
+      URL.revokeObjectURL(manifestUrl);
+      const link = document.querySelector('link[rel="manifest"]');
+      if (link && originalHref) {
+        link.href = originalHref;
+      }
+    };
+  }, [slug]);
   const [campaign, setCampaign] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

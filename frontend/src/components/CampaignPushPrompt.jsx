@@ -10,16 +10,22 @@ import axios from 'axios';
  * 
  * Works for non-authenticated users who "Add to Home Screen".
  * Uses campaign-specific localStorage keys so each campaign is tracked independently.
+ *
+ * FIX: VITE_API_URL already includes /api (e.g. https://backend.railway.app/api)
+ *      so we must NOT add /api again in our URLs.
  */
 const CampaignPushPrompt = ({ campaignSlug, campaignName }) => {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
   const [loading, setLoading] = useState(false);
   const [supported, setSupported] = useState(false);
+  const [error, setError] = useState(null);
 
   const storageKey = `campaign_push_${campaignSlug}`;
   const dismissKey = `campaign_push_dismissed_${campaignSlug}`;
-  const API_URL = import.meta.env.VITE_API_URL || '';
+
+  // VITE_API_URL already includes /api — e.g. https://backend.railway.app/api
+  const API_BASE = import.meta.env.VITE_API_URL || '';
 
   useEffect(() => {
     // Check if push is supported
@@ -46,48 +52,61 @@ const CampaignPushPrompt = ({ campaignSlug, campaignName }) => {
 
   const handleSubscribe = async () => {
     setLoading(true);
+    setError(null);
     try {
       // Step 1: Register service worker
+      console.log('[CampaignPush] Step 1: Registering SW...');
       const reg = await navigator.serviceWorker.register('/sw.js');
       await navigator.serviceWorker.ready;
-      console.log('📱 [CampaignPush] SW registered');
+      console.log('[CampaignPush] SW registered');
 
       // Step 2: Request notification permission
+      console.log('[CampaignPush] Step 2: Requesting permission...');
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
-        console.log('📱 [CampaignPush] Permission denied');
+        console.log('[CampaignPush] Permission denied');
         localStorage.setItem(dismissKey, 'true');
         setShowBanner(false);
         setLoading(false);
         return;
       }
+      console.log('[CampaignPush] Permission granted');
 
       // Step 3: Get VAPID public key
-      const vapidRes = await axios.get(`${API_URL}/api/push/vapid-public-key`);
+      // NOTE: API_BASE already has /api, so path is /push/vapid-public-key (NOT /api/push/...)
+      console.log('[CampaignPush] Step 3: Fetching VAPID key from', API_BASE + '/push/vapid-public-key');
+      const vapidRes = await axios.get(`${API_BASE}/push/vapid-public-key`);
       const vapidKey = vapidRes.data.publicKey;
       if (!vapidKey) {
-        console.error('📱 [CampaignPush] No VAPID key');
+        console.error('[CampaignPush] No VAPID key returned');
+        setError('Push not configured on server');
         setLoading(false);
         return;
       }
+      console.log('[CampaignPush] VAPID key received');
 
-      // Step 4: Subscribe to push
+      // Step 4: Subscribe to push via PushManager
+      console.log('[CampaignPush] Step 4: Subscribing via PushManager...');
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidKey),
       });
+      console.log('[CampaignPush] PushManager subscription created');
 
       // Step 5: Send subscription to backend
-      await axios.post(`${API_URL}/api/campaigns/public/${campaignSlug}/push/subscribe`, {
+      // NOTE: API_BASE already has /api, so path is /campaigns/public/... (NOT /api/campaigns/...)
+      console.log('[CampaignPush] Step 5: Saving to backend...');
+      await axios.post(`${API_BASE}/campaigns/public/${campaignSlug}/push/subscribe`, {
         subscription: sub.toJSON(),
       });
 
-      console.log('📱 [CampaignPush] ✅ Subscribed!');
+      console.log('[CampaignPush] Subscribed successfully!');
       localStorage.setItem(storageKey, 'true');
       setIsSubscribed(true);
       setShowBanner(false);
     } catch (err) {
-      console.error('📱 [CampaignPush] Subscribe failed:', err);
+      console.error('[CampaignPush] Subscribe failed:', err?.response?.status, err?.response?.data || err.message);
+      setError('Failed to enable. Try again.');
     } finally {
       setLoading(false);
     }
@@ -98,7 +117,7 @@ const CampaignPushPrompt = ({ campaignSlug, campaignName }) => {
     setShowBanner(false);
   };
 
-  // Helper: Convert VAPID key
+  // Helper: Convert VAPID key from base64 to Uint8Array
   function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
     const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -113,7 +132,7 @@ const CampaignPushPrompt = ({ campaignSlug, campaignName }) => {
   // Don't render anything if push not supported
   if (!supported) return null;
 
-  // Already subscribed — show a small green bell indicator
+  // Already subscribed - show a small green bell indicator
   if (isSubscribed) {
     return (
       <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-3 py-2 rounded-full" title="Notifications enabled for this campaign">
@@ -152,6 +171,11 @@ const CampaignPushPrompt = ({ campaignSlug, campaignName }) => {
                 <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                   Get notified when new content is added to <strong>{campaignName}</strong>.
                 </p>
+
+                {error && (
+                  <p className="text-xs text-red-500 mt-1">{error}</p>
+                )}
+
                 <div className="flex items-center gap-2 mt-3">
                   <button
                     onClick={handleSubscribe}
