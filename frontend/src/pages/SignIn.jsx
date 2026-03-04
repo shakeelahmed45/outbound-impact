@@ -26,13 +26,21 @@ const SignIn = () => {
   const [showSuspendedModal, setShowSuspendedModal] = useState(false);
   const [suspendedMessage, setSuspendedMessage] = useState('');
 
-  // Session expired reason (from SessionGuard auto-logout)
+  // Session expired reason
   const [logoutReason, setLogoutReason] = useState('');
 
   useEffect(() => {
     document.title = 'Sign In | Outbound Impact';
 
-    // Check if user was auto-logged out with a reason
+    // Check if user was redirected here due to suspension (from api.js interceptor)
+    const suspendedMsg = sessionStorage.getItem('suspended_message');
+    if (suspendedMsg) {
+      setSuspendedMessage(suspendedMsg);
+      setShowSuspendedModal(true);
+      sessionStorage.removeItem('suspended_message');
+    }
+
+    // Check if user was auto-logged out due to session expiry
     const reason = sessionStorage.getItem('logout_reason');
     if (reason) {
       setLogoutReason(reason);
@@ -96,7 +104,7 @@ const SignIn = () => {
       const code = err.response?.data?.code;
       const msg = err.response?.data?.message;
 
-      // Show professional suspended modal instead of plain error
+      // Show professional suspended modal instead of plain error text
       if (code === 'ACCOUNT_SUSPENDED') {
         setSuspendedMessage(msg || 'Your account has been suspended. Please contact support@outboundimpact.org for assistance.');
         setShowSuspendedModal(true);

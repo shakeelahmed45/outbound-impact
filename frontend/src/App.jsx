@@ -8,7 +8,6 @@ import RequireFeature from './components/common/RequireFeature';
 import RootRedirect from './components/common/RootRedirect';
 import GlobalAiChatWidget from './components/GlobalAiChatWidget';
 import SessionGuard from './components/SessionGuard';
-import SuspendedModal from './components/SuspendedModal';
 import AuthPage from './pages/AuthPage';
 import Plans from './pages/Plans';
 import AuthSuccess from './pages/AuthSuccess';
@@ -144,11 +143,8 @@ function App() {
       {/* Global AI Chat Widget (appears on non-dashboard pages) */}
       <GlobalAiChatWidget showBlinkingPrompt={false} />
       
-      {/* Session Monitor — auto-logout on expiry + heartbeat for suspension */}
+      {/* Session Monitor — shows expiry warning + heartbeat for suspension detection */}
       <SessionGuard />
-      
-      {/* Global Suspended Modal — triggered by api.js interceptor event */}
-      <SuspendedModal />
     </BrowserRouter>
   );
 }

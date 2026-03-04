@@ -1,57 +1,24 @@
-import { useState, useEffect } from 'react';
-import { ShieldAlert, Mail, X, LogOut } from 'lucide-react';
-import useAuthStore from '../store/authStore';
+import { ShieldAlert, Mail, LogOut, X } from 'lucide-react';
 
 /**
  * SuspendedModal
  * 
- * Professional full-screen modal shown when a user's account is suspended.
- * Triggered via custom event 'account-suspended' from api.js interceptor
- * OR via prop from SignIn page.
+ * Professional modal shown when a suspended user tries to sign in,
+ * or when an active user gets suspended mid-session.
  * 
- * Shows reason (if provided), contact support button, and logout action.
+ * Triggered via props from SignIn.jsx (which reads from sessionStorage).
+ * No global event listeners — keeps it simple and crash-proof.
  */
-const SuspendedModal = ({ isOpen: propIsOpen, message: propMessage, onClose }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [message, setMessage] = useState('');
-  const logout = useAuthStore((state) => state.logout);
+const SuspendedModal = ({ isOpen, message, onClose }) => {
+  if (!isOpen) return null;
 
-  // Listen for global 'account-suspended' event (from api.js interceptor)
-  useEffect(() => {
-    const handleSuspended = (e) => {
-      const msg = e.detail?.message || 'Your account has been suspended.';
-      setMessage(msg);
-      setIsOpen(true);
-    };
-
-    window.addEventListener('account-suspended', handleSuspended);
-    return () => window.removeEventListener('account-suspended', handleSuspended);
-  }, []);
-
-  // Also respond to prop-driven open (from SignIn page)
-  useEffect(() => {
-    if (propIsOpen) {
-      setMessage(propMessage || 'Your account has been suspended.');
-      setIsOpen(true);
-    }
-  }, [propIsOpen, propMessage]);
-
-  const handleLogout = () => {
-    logout();
+  const handleSignOut = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('auth-storage');
-    setIsOpen(false);
-    if (onClose) onClose();
-    window.location.href = '/signin';
-  };
-
-  const handleClose = () => {
-    setIsOpen(false);
+    sessionStorage.removeItem('suspended_message');
     if (onClose) onClose();
   };
-
-  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
@@ -59,8 +26,8 @@ const SuspendedModal = ({ isOpen: propIsOpen, message: propMessage, onClose }) =
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-fade-in">
-        {/* Red header strip */}
+      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+        {/* Red header */}
         <div className="bg-gradient-to-r from-red-600 to-red-500 px-6 py-8 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-white/20 rounded-full mb-4">
             <ShieldAlert className="text-white" size={32} />
@@ -73,7 +40,7 @@ const SuspendedModal = ({ isOpen: propIsOpen, message: propMessage, onClose }) =
         <div className="px-6 py-6">
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-5">
             <p className="text-sm text-red-800 leading-relaxed">
-              {message}
+              {message || 'Your account has been suspended. Please contact support for assistance.'}
             </p>
           </div>
 
@@ -110,18 +77,18 @@ const SuspendedModal = ({ isOpen: propIsOpen, message: propMessage, onClose }) =
             </a>
 
             <button
-              onClick={handleLogout}
+              onClick={handleSignOut}
               className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition-colors"
             >
               <LogOut size={18} />
-              Sign Out
+              Close
             </button>
           </div>
         </div>
 
         {/* Close button */}
         <button
-          onClick={handleClose}
+          onClick={handleSignOut}
           className="absolute top-4 right-4 p-1.5 text-white/70 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
         >
           <X size={18} />

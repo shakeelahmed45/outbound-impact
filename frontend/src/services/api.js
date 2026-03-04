@@ -134,17 +134,20 @@ api.interceptors.response.use(
     // 403: ACCOUNT_SUSPENDED
     // ═══════════════════════════════════════════
     if (status === 403 && code === 'ACCOUNT_SUSPENDED') {
-      console.log('🚫 Account suspended — showing SuspendedModal');
+      console.log('🚫 Account suspended');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('auth-storage');
       api.clearCache();
 
-      // Dispatch custom event for SuspendedModal to catch
-      // (replaces ugly browser alert + redirect)
-      window.dispatchEvent(new CustomEvent('account-suspended', {
-        detail: { message: message || 'Your account has been suspended. Please contact support@outboundimpact.org for assistance.' }
-      }));
+      // Store message for SignIn page to show professional SuspendedModal
+      // (replaces ugly browser alert)
+      sessionStorage.setItem('suspended_message', message || 'Your account has been suspended. Please contact support@outboundimpact.org for assistance.');
+
+      const currentPath = window.location.pathname;
+      if (!currentPath.includes('/signin')) {
+        window.location.href = '/signin';
+      }
       return Promise.reject(error);
     }
 
@@ -203,11 +206,9 @@ api.interceptors.response.use(
       localStorage.removeItem('auth-storage');
       api.clearCache();
       
-      // Show specific message for session expiry
-      if (isSessionExpired && !window.__sessionExpiredShown) {
-        window.__sessionExpiredShown = true;
-        alert(message || 'Your session has expired. Please sign in again.');
-        setTimeout(() => { window.__sessionExpiredShown = false; }, 5000);
+      // Store reason for SignIn page to show (replaces ugly browser alert)
+      if (isSessionExpired) {
+        sessionStorage.setItem('logout_reason', message || 'Your session has expired. Please sign in again.');
       }
       
       // Smart redirect
