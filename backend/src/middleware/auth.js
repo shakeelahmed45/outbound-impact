@@ -17,6 +17,24 @@ const checkMaintenanceMode = async () => {
 };
 
 // ═══════════════════════════════════════════════════════════
+// IN-MEMORY ACTIVITY TRACKER
+// Tracks the last time each user made an API request.
+// Used for INACTIVITY-based session timeout (not token-age-based).
+// Lightweight — no DB writes on every request.
+// ═══════════════════════════════════════════════════════════
+const userLastActivity = new Map();
+
+// Clean up stale entries every 30 minutes to prevent memory leak
+setInterval(() => {
+  const cutoff = Date.now() - (24 * 60 * 60 * 1000); // Remove entries older than 24h
+  for (const [userId, timestamp] of userLastActivity) {
+    if (timestamp < cutoff) {
+      userLastActivity.delete(userId);
+    }
+  }
+}, 30 * 60 * 1000);
+
+// ═══════════════════════════════════════════════════════════
 // AUTH MIDDLEWARE — Token + Suspended + Maintenance + Session Timeout
 // ═══════════════════════════════════════════════════════════
 const authMiddleware = async (req, res, next) => {
@@ -44,27 +62,47 @@ const authMiddleware = async (req, res, next) => {
 
     // ─── Skip ALL enforcement checks for ADMIN users ───
     if (decoded.role === 'ADMIN') {
+      // Still track activity for admins (in case we need it later)
+      userLastActivity.set(decoded.userId, Date.now());
       return next();
     }
 
-    // ─── CHECK 1: Session timeout enforcement ───
+    // ─── CHECK 1: Session timeout enforcement (INACTIVITY-based) ───
+    // Instead of checking JWT iat (time since login), we check the
+    // last time this user made ANY API request. If they've been idle
+    // for longer than sessionTimeoutMinutes, expire the session.
+    // Active users who keep making requests will never be timed out.
     try {
       const settings = await getSettings();
       const timeoutMinutes = settings.sessionTimeoutMinutes;
-      if (timeoutMinutes && decoded.iat) {
-        const issuedAt = decoded.iat * 1000; // JWT iat is in seconds
-        const maxAge = timeoutMinutes * 60 * 1000; // Convert to ms
-        if (Date.now() - issuedAt > maxAge) {
-          return res.status(401).json({
-            status: 'error',
-            code: 'SESSION_EXPIRED',
-            message: `Your session has expired after ${timeoutMinutes} minutes of inactivity. Please sign in again.`
-          });
+
+      if (timeoutMinutes && timeoutMinutes > 0) {
+        const lastActivity = userLastActivity.get(decoded.userId);
+        const maxIdleMs = timeoutMinutes * 60 * 1000;
+
+        if (lastActivity) {
+          const idleTime = Date.now() - lastActivity;
+          if (idleTime > maxIdleMs) {
+            // User has been idle for too long — expire session
+            userLastActivity.delete(decoded.userId);
+            return res.status(401).json({
+              status: 'error',
+              code: 'SESSION_EXPIRED',
+              message: `Your session has expired after ${timeoutMinutes} minutes of inactivity. Please sign in again.`
+            });
+          }
         }
+        // No record yet (first request after login or server restart) — just record it
       }
+
+      // ✅ Update last activity timestamp for this user
+      userLastActivity.set(decoded.userId, Date.now());
+
     } catch (e) {
       // Session timeout check failure should NOT block — graceful degradation
       console.error('⚠️ Session timeout check failed (allowing through):', e.message);
+      // Still update activity on failure
+      userLastActivity.set(decoded.userId, Date.now());
     }
 
     // ─── CHECK 2: Is user suspended? (DB lookup) ───

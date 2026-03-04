@@ -4,15 +4,14 @@ import useAuthStore from '../store/authStore';
 import api from '../services/api';
 
 /**
- * SessionGuard — SAFE version
+ * SessionGuard — INACTIVITY-based session timeout warning
  * 
- * Only shows a WARNING BANNER before session expiry.
- * NEVER forces logout or redirects — that's handled by api.js interceptor.
+ * Tracks real user activity (mouse, keyboard, touch, scroll).
+ * Only shows a warning when the user has been IDLE for close to
+ * the admin-configured sessionTimeoutMinutes.
  * 
- * Two functions:
- * 1. Client-side timer: shows "session expiring" warning 5 min before timeout
- * 2. Heartbeat: periodically pings server to detect suspension early
- *    (api.js interceptor handles the actual 401/403 response)
+ * NEVER forces logout or redirects — the backend auth middleware
+ * and api.js interceptor handle the actual session expiry.
  */
 const SessionGuard = () => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -22,43 +21,28 @@ const SessionGuard = () => {
   const [showWarning, setShowWarning] = useState(false);
   const [minutesLeft, setMinutesLeft] = useState(0);
 
-  const warningTimerRef = useRef(null);
-  const countdownRef = useRef(null);
+  const lastActivityRef = useRef(Date.now());
+  const timeoutMinutesRef = useRef(null);
+  const checkIntervalRef = useRef(null);
   const heartbeatRef = useRef(null);
 
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'CUSTOMER_SUPPORT';
 
-  // Decode JWT to get iat
-  const getTokenIat = useCallback(() => {
-    if (!token) return null;
-    try {
-      const base64Url = token.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const payload = JSON.parse(
-        decodeURIComponent(
-          atob(base64)
-            .split('')
-            .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-            .join('')
-        )
-      );
-      return payload?.iat || null;
-    } catch {
-      return null;
-    }
-  }, [token]);
+  // Reset activity timestamp on any user interaction
+  const handleUserActivity = useCallback(() => {
+    lastActivityRef.current = Date.now();
+    // Hide warning if it's showing (user became active)
+    setShowWarning(false);
+  }, []);
 
   const clearTimers = useCallback(() => {
-    if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
-    if (countdownRef.current) clearInterval(countdownRef.current);
+    if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
     if (heartbeatRef.current) clearInterval(heartbeatRef.current);
-    warningTimerRef.current = null;
-    countdownRef.current = null;
+    checkIntervalRef.current = null;
     heartbeatRef.current = null;
   }, []);
 
   useEffect(() => {
-    // Skip for non-authenticated users and admins
     if (!isAuthenticated || !token || isAdmin) {
       clearTimers();
       setShowWarning(false);
@@ -67,91 +51,70 @@ const SessionGuard = () => {
 
     let isCancelled = false;
 
-    // === 1. Setup session expiry warning timer ===
-    const setupWarningTimer = async () => {
-      const iat = getTokenIat();
-      if (!iat) return;
-
-      // Fetch session timeout from server
-      let timeoutMinutes = null;
+    // === 1. Fetch the timeout setting from server ===
+    const init = async () => {
       try {
         const res = await api.get('/auth/session-status');
         if (isCancelled) return;
-        timeoutMinutes = res.data?.sessionTimeoutMinutes;
-      } catch {
-        // Server might not have the endpoint yet, or network issue — skip silently
-        return;
-      }
-
-      if (!timeoutMinutes || timeoutMinutes <= 0) return;
-
-      const issuedAtMs = iat * 1000;
-      const expiryMs = issuedAtMs + (timeoutMinutes * 60 * 1000);
-      const now = Date.now();
-      const timeUntilExpiry = expiryMs - now;
-
-      // Already expired — DON'T force logout here
-      // The next API call will trigger a 401 and api.js interceptor handles it
-      if (timeUntilExpiry <= 0) return;
-
-      console.log(`[SessionGuard] Session expires in ${Math.round(timeUntilExpiry / 60000)} min`);
-
-      // Show warning 5 minutes before expiry
-      const warningTime = timeUntilExpiry - (5 * 60 * 1000);
-
-      if (warningTime > 0) {
-        warningTimerRef.current = setTimeout(() => {
-          if (isCancelled) return;
-          setShowWarning(true);
-          setMinutesLeft(5);
-          countdownRef.current = setInterval(() => {
-            setMinutesLeft((prev) => {
-              if (prev <= 1) {
-                clearInterval(countdownRef.current);
-                return 0;
-              }
-              return prev - 1;
-            });
-          }, 60000);
-        }, warningTime);
-      } else if (timeUntilExpiry <= 5 * 60 * 1000 && timeUntilExpiry > 0) {
-        // Less than 5 min left — show warning immediately
-        setShowWarning(true);
-        setMinutesLeft(Math.max(1, Math.ceil(timeUntilExpiry / 60000)));
-      }
-    };
-
-    // === 2. Setup heartbeat (just pings server — api.js interceptor handles errors) ===
-    const setupHeartbeat = () => {
-      // Ping every 3 minutes — if user is suspended, server returns 403,
-      // which api.js interceptor catches and dispatches 'account-suspended' event
-      heartbeatRef.current = setInterval(async () => {
-        if (isCancelled) return;
-        try {
-          await api.get('/auth/session-status');
-          // Success = session still valid, do nothing
-        } catch {
-          // api.js interceptor already handles 401/403 responses
-          // We intentionally do NOT force logout here
+        const minutes = res.data?.sessionTimeoutMinutes;
+        if (minutes && minutes > 0) {
+          timeoutMinutesRef.current = minutes;
+          console.log(`[SessionGuard] Inactivity timeout: ${minutes} min`);
         }
-      }, 3 * 60 * 1000); // Every 3 minutes
+      } catch {
+        // Endpoint might not exist yet, or network error — silently skip
+      }
     };
 
-    // Small delay to let auth state fully settle after login
-    const initTimer = setTimeout(() => {
+    // === 2. Listen for user activity on the page ===
+    const activityEvents = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+    activityEvents.forEach((evt) => {
+      window.addEventListener(evt, handleUserActivity, { passive: true });
+    });
+
+    // === 3. Periodically check idle time ===
+    checkIntervalRef.current = setInterval(() => {
+      const timeout = timeoutMinutesRef.current;
+      if (!timeout) return; // No timeout configured
+
+      const idleMs = Date.now() - lastActivityRef.current;
+      const idleMinutes = idleMs / (60 * 1000);
+      const warningThreshold = timeout - 5; // Show warning 5 min before expiry
+
+      if (idleMinutes >= warningThreshold && idleMinutes < timeout) {
+        const remaining = Math.max(1, Math.ceil(timeout - idleMinutes));
+        setMinutesLeft(remaining);
+        setShowWarning(true);
+      } else if (idleMinutes < warningThreshold) {
+        // User is active — hide warning if shown
+        setShowWarning(false);
+      }
+      // If idleMinutes >= timeout, the next API call will get 401 from backend
+    }, 30 * 1000); // Check every 30 seconds
+
+    // === 4. Heartbeat to detect suspension (api.js interceptor handles errors) ===
+    heartbeatRef.current = setInterval(async () => {
       if (isCancelled) return;
-      setupWarningTimer();
-      setupHeartbeat();
-    }, 5000); // Wait 5 seconds before first check
+      try {
+        await api.get('/auth/session-status');
+      } catch {
+        // api.js interceptor handles 401/403 — we don't do anything here
+      }
+    }, 3 * 60 * 1000); // Every 3 minutes
+
+    // Initialize after a brief delay
+    const initTimer = setTimeout(init, 3000);
 
     return () => {
       isCancelled = true;
       clearTimeout(initTimer);
       clearTimers();
+      activityEvents.forEach((evt) => {
+        window.removeEventListener(evt, handleUserActivity);
+      });
     };
-  }, [isAuthenticated, token, isAdmin, getTokenIat, clearTimers]);
+  }, [isAuthenticated, token, isAdmin, handleUserActivity, clearTimers]);
 
-  // Don't render anything if no warning needed
   if (!isAuthenticated || !showWarning) return null;
 
   return (
@@ -166,8 +129,8 @@ const SessionGuard = () => {
           </p>
           <p className="text-xs text-amber-600">
             {minutesLeft <= 1
-              ? 'Your session will expire shortly. Please save your work and sign in again.'
-              : `Your session will expire in approximately ${minutesLeft} minutes.`
+              ? 'You\'ve been inactive. Your session will expire shortly — move your mouse or press a key to stay signed in.'
+              : `You've been inactive for a while. Session expires in ~${minutesLeft} minutes. Any activity will reset the timer.`
             }
           </p>
         </div>
