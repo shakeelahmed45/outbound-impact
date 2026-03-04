@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Clock } from 'lucide-react';
 import api from '../services/api';
 import useAuthStore from '../store/authStore';
+import SuspendedModal from '../components/SuspendedModal';
 
 const SignIn = () => {
   const navigate = useNavigate();
@@ -21,8 +22,22 @@ const SignIn = () => {
   const [requires2FA, setRequires2FA] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState('');
 
+  // Suspended modal state
+  const [showSuspendedModal, setShowSuspendedModal] = useState(false);
+  const [suspendedMessage, setSuspendedMessage] = useState('');
+
+  // Session expired reason (from SessionGuard auto-logout)
+  const [logoutReason, setLogoutReason] = useState('');
+
   useEffect(() => {
     document.title = 'Sign In | Outbound Impact';
+
+    // Check if user was auto-logged out with a reason
+    const reason = sessionStorage.getItem('logout_reason');
+    if (reason) {
+      setLogoutReason(reason);
+      sessionStorage.removeItem('logout_reason');
+    }
   }, []);
 
   const handleChange = (e) => {
@@ -78,9 +93,20 @@ const SignIn = () => {
         }
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Sign in failed');
+      const code = err.response?.data?.code;
+      const msg = err.response?.data?.message;
+
+      // Show professional suspended modal instead of plain error
+      if (code === 'ACCOUNT_SUSPENDED') {
+        setSuspendedMessage(msg || 'Your account has been suspended. Please contact support@outboundimpact.org for assistance.');
+        setShowSuspendedModal(true);
+        setLoading(false);
+        return;
+      }
+
+      setError(msg || 'Sign in failed');
       // If 2FA code was wrong, clear it
-      if (err.response?.data?.message?.includes('2FA')) {
+      if (msg?.includes('2FA')) {
         setTwoFactorCode('');
       }
     } finally {
@@ -109,6 +135,14 @@ const SignIn = () => {
 
         {/* Form */}
         <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
+          {/* Session expired banner */}
+          {logoutReason && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+              <Clock size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
+              <p className="text-amber-700 text-sm">{logoutReason}</p>
+            </div>
+          )}
+
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-red-600 text-sm">{error}</p>
@@ -242,6 +276,13 @@ const SignIn = () => {
           )}
         </div>
       </div>
+
+      {/* Suspended Account Modal */}
+      <SuspendedModal
+        isOpen={showSuspendedModal}
+        message={suspendedMessage}
+        onClose={() => setShowSuspendedModal(false)}
+      />
     </div>
   );
 };

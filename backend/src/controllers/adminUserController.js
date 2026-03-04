@@ -264,6 +264,7 @@ const suspendUser = async (req, res) => {
               <body>
                 <div class="container">
                   <div class="header">
+                    <img src="https://outboundimpact.net/android-chrome-192x192.png" alt="Outbound Impact" width="60" height="60" style="display: block; margin: 0 auto 15px; border-radius: 12px;" />
                     <h1 style="margin: 0; font-size: 24px;">⚠️ Account Suspended</h1>
                   </div>
                   <div class="content">
@@ -309,6 +310,7 @@ const suspendUser = async (req, res) => {
               <body>
                 <div class="container">
                   <div class="header">
+                    <img src="https://outboundimpact.net/android-chrome-192x192.png" alt="Outbound Impact" width="60" height="60" style="display: block; margin: 0 auto 15px; border-radius: 12px;" />
                     <h1 style="margin: 0; font-size: 24px;">✅ Account Restored</h1>
                   </div>
                   <div class="content">

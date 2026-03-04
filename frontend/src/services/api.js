@@ -134,13 +134,17 @@ api.interceptors.response.use(
     // 403: ACCOUNT_SUSPENDED
     // ═══════════════════════════════════════════
     if (status === 403 && code === 'ACCOUNT_SUSPENDED') {
-      console.log('🚫 Account suspended');
+      console.log('🚫 Account suspended — showing SuspendedModal');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('auth-storage');
       api.clearCache();
-      alert(message || 'Your account has been suspended. Please contact support for assistance.');
-      window.location.href = '/signin';
+
+      // Dispatch custom event for SuspendedModal to catch
+      // (replaces ugly browser alert + redirect)
+      window.dispatchEvent(new CustomEvent('account-suspended', {
+        detail: { message: message || 'Your account has been suspended. Please contact support@outboundimpact.org for assistance.' }
+      }));
       return Promise.reject(error);
     }
 

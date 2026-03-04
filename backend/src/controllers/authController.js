@@ -585,6 +585,13 @@ const signIn = async (req, res) => {
     fireWebhook('user.login', { userId: user.id, email: user.email, role: user.role });
 
 
+    // Fetch session timeout for frontend SessionGuard
+    let sessionTimeoutMinutes = null;
+    try {
+      const platformSettingsForTimeout = await getSettings();
+      sessionTimeoutMinutes = platformSettingsForTimeout.sessionTimeoutMinutes || null;
+    } catch (e) { /* non-critical */ }
+
     if (teamMembership) {
       console.log(`✅ Team member signed in: ${user.email} (${teamMembership.role}) of ${teamMembership.user.name}`);
 
@@ -593,6 +600,7 @@ const signIn = async (req, res) => {
         message: 'Sign in successful',
         accessToken,
         refreshToken,
+        sessionTimeoutMinutes,
         user: {
           id: user.id,
           email: user.email,
@@ -625,6 +633,7 @@ const signIn = async (req, res) => {
       message: 'Sign in successful',
       accessToken,
       refreshToken,
+      sessionTimeoutMinutes,
       user: {
         id: user.id,
         email: user.email,
@@ -1068,6 +1077,23 @@ const resetPassword = async (req, res) => {
   }
 };
 
+// ═══════════════════════════════════════════════════════════
+// SESSION STATUS — Lightweight endpoint for frontend SessionGuard
+// Protected by authMiddleware → returns 401 if expired, 403 if suspended
+// ═══════════════════════════════════════════════════════════
+const getSessionStatus = async (req, res) => {
+  try {
+    const platformSettings = await getSettings();
+    res.json({
+      status: 'active',
+      sessionTimeoutMinutes: platformSettings.sessionTimeoutMinutes || null,
+    });
+  } catch (error) {
+    console.error('Session status error:', error);
+    res.json({ status: 'active', sessionTimeoutMinutes: null });
+  }
+};
+
 module.exports = {
   createCheckout,
   completeSignup,
@@ -1077,4 +1103,5 @@ module.exports = {
   forgotPassword,
   verifyResetToken,
   resetPassword,
+  getSessionStatus,
 };

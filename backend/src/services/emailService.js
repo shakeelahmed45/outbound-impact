@@ -64,6 +64,7 @@ const sendWelcomeEmail = async (userEmail, userName, userRole) => {
         <body>
           <div class="container">
             <div class="header">
+              <img src="https://outboundimpact.net/android-chrome-192x192.png" alt="Outbound Impact" width="60" height="60" style="display: block; margin: 0 auto 15px; border-radius: 12px;" />
               <h1 style="margin: 0; font-size: 32px; color: white;">Welcome to Outbound Impact!</h1>
               <p style="margin: 10px 0 0 0; font-size: 18px; color: white;">Your account is ready to go 🚀</p>
             </div>
@@ -180,6 +181,7 @@ const sendAdminNotification = async (userData) => {
         <body>
           <div class="container">
             <div class="header">
+              <img src="https://outboundimpact.net/android-chrome-192x192.png" alt="Outbound Impact" width="60" height="60" style="display: block; margin: 0 auto 15px; border-radius: 12px;" />
               <h2 style="margin: 0; color: white;">🎉 New User Signed Up!</h2>
             </div>
             
@@ -265,6 +267,7 @@ const sendPaymentReceiptEmail = async (email, name, amount, currency, plan) => {
         <body>
           <div class="container">
             <div class="header">
+              <img src="https://outboundimpact.net/android-chrome-192x192.png" alt="Outbound Impact" width="60" height="60" style="display: block; margin: 0 auto 15px; border-radius: 12px;" />
               <h1 style="margin: 0; font-size: 32px; color: white;">✅ Payment Received!</h1>
               <p style="margin: 10px 0 0 0; font-size: 16px; color: white;">Thank you for your payment</p>
             </div>
@@ -356,6 +359,7 @@ const sendPaymentFailedEmail = async (email, name, amount, currency, reason) => 
         <body>
           <div class="container">
             <div class="header">
+              <img src="https://outboundimpact.net/android-chrome-192x192.png" alt="Outbound Impact" width="60" height="60" style="display: block; margin: 0 auto 15px; border-radius: 12px;" />
               <h1 style="margin: 0; font-size: 32px; color: white;">⚠️ Payment Failed</h1>
               <p style="margin: 10px 0 0 0; font-size: 16px; color: white;">We couldn't process your payment</p>
             </div>
@@ -450,6 +454,7 @@ const sendCancellationEmail = async (email, name) => {
         <body>
           <div class="container">
             <div class="header">
+              <img src="https://outboundimpact.net/android-chrome-192x192.png" alt="Outbound Impact" width="60" height="60" style="display: block; margin: 0 auto 15px; border-radius: 12px;" />
               <h1 style="margin: 0; font-size: 32px; color: white;">Subscription Canceled</h1>
               <p style="margin: 10px 0 0 0; font-size: 16px; color: white;">We're sorry to see you go</p>
             </div>
@@ -556,6 +561,7 @@ const sendTeamInvitationEmail = async (invitationData) => {
                   <!-- Header with Purple Gradient -->
                   <tr>
                     <td style="background: linear-gradient(135deg, #800080 0%, #9333EA 100%); padding: 40px 40px 30px; text-align: center;">
+                      <img src="https://outboundimpact.net/android-chrome-192x192.png" alt="Outbound Impact" width="60" height="60" style="display: block; margin: 0 auto 15px; border-radius: 12px;" />
                       <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">You're Invited! 🎉</h1>
                       <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Join the Outbound Impact team</p>
                     </td>
@@ -687,6 +693,7 @@ const sendInvitationReminderEmail = async (reminderData) => {
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                   <tr>
                     <td style="background: linear-gradient(135deg, #800080 0%, #9333EA 100%); padding: 40px; text-align: center; border-radius: 16px 16px 0 0;">
+                      <img src="https://outboundimpact.net/android-chrome-192x192.png" alt="Outbound Impact" width="60" height="60" style="display: block; margin: 0 auto 15px; border-radius: 12px;" />
                       <h1 style="color: #ffffff; margin: 0; font-size: 24px;">⏰ Invitation Expiring Soon</h1>
                     </td>
                   </tr>
@@ -772,6 +779,7 @@ const sendPasswordResetEmail = async (resetData) => {
                   <!-- Header -->
                   <tr>
                     <td style="background: linear-gradient(135deg, #800080 0%, #9333EA 100%); padding: 40px; text-align: center; border-radius: 16px 16px 0 0;">
+                      <img src="https://outboundimpact.net/android-chrome-192x192.png" alt="Outbound Impact" width="60" height="60" style="display: block; margin: 0 auto 15px; border-radius: 12px;" />
                       <h1 style="color: #ffffff; margin: 0; font-size: 28px;">🔒 Password Reset</h1>
                       <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Reset your Outbound Impact password</p>
                     </td>
@@ -938,6 +946,7 @@ const sendRefundAccountDeletionEmail = async ({ userEmail, userName, refundAmoun
         <body>
           <div class="container">
             <div class="header">
+              <img src="https://outboundimpact.net/android-chrome-192x192.png" alt="Outbound Impact" width="60" height="60" style="display: block; margin: 0 auto 15px; border-radius: 12px;" />
               <h1 style="margin: 0; color: white;">✅ Refund Processed</h1>
             </div>
             
@@ -1094,6 +1103,7 @@ const sendAdminRefundNotification = async ({ userName, userEmail, refundAmount, 
         <body>
           <div class="container">
             <div class="header">
+              <img src="https://outboundimpact.net/android-chrome-192x192.png" alt="Outbound Impact" width="60" height="60" style="display: block; margin: 0 auto 15px; border-radius: 12px;" />
               <h1 style="margin: 0; color: white;">💸 Refund Processed</h1>
               <p style="margin: 10px 0 0; color: white;">Account Permanently Deleted</p>
             </div>
@@ -1213,6 +1223,7 @@ const sendAdminTeamInvitationEmail = async ({ email, role, inviterName, invitati
         <body>
           <div class="container">
             <div class="header">
+              <img src="https://outboundimpact.net/android-chrome-192x192.png" alt="Outbound Impact" width="60" height="60" style="display: block; margin: 0 auto 15px; border-radius: 12px;" />
               <h1 style="margin: 0; font-size: 32px; color: white;">🎉 Admin Team Invitation</h1>
               <p style="margin: 10px 0 0 0; font-size: 16px; color: white;">Join the Outbound Impact team</p>
             </div>
@@ -1318,6 +1329,7 @@ const sendChatNotificationToAdmin = async (userData, message) => {
         <body>
           <div class="container">
             <div class="header">
+              <img src="https://outboundimpact.net/android-chrome-192x192.png" alt="Outbound Impact" width="60" height="60" style="display: block; margin: 0 auto 15px; border-radius: 12px;" />
               <h2 style="margin: 0; color: white;">💬 New Live Chat Message!</h2>
             </div>
             
@@ -1400,6 +1412,7 @@ const sendChatReplyToUser = async (userEmail, userName, adminReply) => {
         <body>
           <div class="container">
             <div class="header">
+              <img src="https://outboundimpact.net/android-chrome-192x192.png" alt="Outbound Impact" width="60" height="60" style="display: block; margin: 0 auto 15px; border-radius: 12px;" />
               <h2 style="margin: 0; color: white;">💬 Support Team Replied!</h2>
             </div>
             
@@ -1476,6 +1489,7 @@ const sendCohortMemberEmail = async ({ memberEmail, memberName, cohortName, orga
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); overflow: hidden;">
                   <tr>
                     <td style="background: linear-gradient(135deg, #800080 0%, #9333EA 100%); padding: 40px 40px 30px; text-align: center;">
+                      <img src="https://outboundimpact.net/android-chrome-192x192.png" alt="Outbound Impact" width="60" height="60" style="display: block; margin: 0 auto 15px; border-radius: 12px;" />
                       <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">You've Been Added! 🎉</h1>
                       <p style="color: #e9d5ff; margin: 10px 0 0 0; font-size: 16px;">${organizationName}</p>
                     </td>
@@ -1594,6 +1608,7 @@ const sendUpgradeReceiptEmail = async ({ email, name, oldPlan, newPlan, amountCh
         <body>
           <div class="container">
             <div class="header">
+              <img src="https://outboundimpact.net/android-chrome-192x192.png" alt="Outbound Impact" width="60" height="60" style="display: block; margin: 0 auto 15px; border-radius: 12px;" />
               <h1 style="margin: 0; font-size: 32px; color: white;">🎉 Plan Upgraded!</h1>
               <p style="margin: 10px 0 0 0; font-size: 16px; color: white;">${oldPlan} → ${newPlan}</p>
             </div>
@@ -1705,6 +1720,7 @@ const sendEditorUploadNotification = async ({ recipientEmail, recipientName, edi
 <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:40px 20px;"><tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;box-shadow:0 4px 6px rgba(0,0,0,0.1);overflow:hidden;">
 <tr><td style="background:linear-gradient(135deg,#800080 0%,#9333EA 100%);padding:40px 40px 30px;text-align:center;">
+  <img src="https://outboundimpact.net/android-chrome-192x192.png" alt="Outbound Impact" width="60" height="60" style="display:block;margin:0 auto 15px;border-radius:12px;" />
   <h1 style="color:#ffffff;margin:0;font-size:26px;">${needsApproval ? '⏳ Content Needs Review' : '📤 New Content Uploaded'}</h1>
   <p style="color:#e9d5ff;margin:10px 0 0;font-size:15px;">A team member has uploaded new content</p>
 </td></tr>

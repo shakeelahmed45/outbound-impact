@@ -17,4 +17,8 @@ router.post('/reset-password', authController.resetPassword);
 router.get('/me', authMiddleware, authController.getCurrentUser);
 router.post('/upgrade-plan', authMiddleware, authController.handleUpgradePlan);
 
+// ✅ Session status — lightweight heartbeat for SessionGuard
+// Auth middleware checks: token validity, session timeout, suspension, maintenance
+router.get('/session-status', authMiddleware, authController.getSessionStatus);
+
 module.exports = router;
