@@ -1,4 +1,5 @@
 import axios from 'axios';
+import safariFriendlyStorage from '../utils/safariFriendlyStorage';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -53,6 +54,15 @@ api.clearCache = (pattern) => {
   } else {
     cache.clear();
   }
+};
+
+// ✅ CRITICAL: Clear ALL auth data from BOTH localStorage AND cookies
+// safariFriendlyStorage saves to cookies as backup — must clear both!
+const clearAllAuth = () => {
+  safariFriendlyStorage.removeItem('token');
+  safariFriendlyStorage.removeItem('user');
+  safariFriendlyStorage.removeItem('auth-storage');
+  api.clearCache();
 };
 
 // ✅ Request interceptor with token handling
@@ -135,17 +145,13 @@ api.interceptors.response.use(
     // ═══════════════════════════════════════════
     if (status === 403 && code === 'ACCOUNT_SUSPENDED') {
       console.log('🚫 Account suspended');
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      localStorage.removeItem('auth-storage');
-      api.clearCache();
+      clearAllAuth();
 
       // Store message for SignIn page to show professional SuspendedModal
-      // (replaces ugly browser alert)
       sessionStorage.setItem('suspended_message', message || 'Your account has been suspended. Please contact support@outboundimpact.org for assistance.');
 
       const currentPath = window.location.pathname;
-      if (!currentPath.includes('/signin')) {
+      if (!currentPath.includes('/signin') && !currentPath.includes('/signup')) {
         window.location.href = '/signin';
       }
       return Promise.reject(error);
@@ -156,7 +162,7 @@ api.interceptors.response.use(
     // ═══════════════════════════════════════════
     if (status === 403 && code === 'EMAIL_NOT_VERIFIED') {
       console.log('📧 Email not verified');
-      alert(message || 'Please verify your email address before signing in.');
+      // Don't alert — AuthPage handles this with verification UI
       return Promise.reject(error);
     }
 
@@ -200,11 +206,8 @@ api.interceptors.response.use(
         }
       } catch (e) { /* ignore */ }
       
-      // Clear all auth data
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      localStorage.removeItem('auth-storage');
-      api.clearCache();
+      // Clear all auth data (localStorage + cookies)
+      clearAllAuth();
       
       // Store reason for SignIn page to show (replaces ugly browser alert)
       if (isSessionExpired) {
@@ -213,9 +216,10 @@ api.interceptors.response.use(
       
       // Smart redirect
       const currentPath = window.location.pathname;
-      const isOnLoginPage = currentPath.includes('/signin') || currentPath.includes('/admin-login');
+      const isOnPublicPage = currentPath.includes('/signin') || currentPath.includes('/signup') 
+        || currentPath.includes('/admin-login') || currentPath === '/';
       
-      if (!isOnLoginPage) {
+      if (!isOnPublicPage) {
         if (wasAdminUser || currentPath.includes('/admin')) {
           window.location.href = '/admin-login';
         } else {

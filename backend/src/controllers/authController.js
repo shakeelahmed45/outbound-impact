@@ -241,6 +241,11 @@ const completeSignup = async (req, res) => {
     if (user) {
       console.log('✅ User already created by webhook, logging in:', user.email);
 
+      // ✅ Mark email as verified (they completed payment = valid email)
+      try {
+        await prisma.$executeRaw`UPDATE "User" SET "emailVerified" = true WHERE "id" = ${user.id}`;
+      } catch (e) { /* column may not exist */ }
+
       const accessToken = generateAccessToken(user.id, user.email, user.role);
       const refreshToken = generateRefreshToken(user.id);
 
@@ -295,6 +300,7 @@ const completeSignup = async (req, res) => {
         stripeCustomerId: session.customer,
         subscriptionId: session.subscription || null,
         subscriptionStatus: 'active',
+        emailVerified: true,  // ✅ Verified — they completed Stripe payment
         ...subscriptionData,
       }
     });
@@ -1094,6 +1100,144 @@ const getSessionStatus = async (req, res) => {
   }
 };
 
+// ═══════════════════════════════════════════════════════════
+// ✅ SEND EMAIL VERIFICATION CODE
+// Called when user tries to sign in but emailVerified is false
+// Sends a 6-digit code to their email, stores it in twoFactorSecret
+// ═══════════════════════════════════════════════════════════
+const sendVerificationCode = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ status: 'error', message: 'Email is required' });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+
+    if (!user) {
+      // Don't reveal if email exists
+      return res.json({ status: 'success', message: 'If an account exists, a verification code has been sent.' });
+    }
+
+    // Generate 6-digit code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Store code + expiry (reuse twoFactorSecret and resetTokenExpiry fields)
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        twoFactorSecret: code,
+        resetTokenExpiry: new Date(Date.now() + 15 * 60 * 1000), // 15 min expiry
+      }
+    });
+
+    // Send verification email
+    try {
+      if (!process.env.RESEND_API_KEY) {
+        console.log('⚠️ Resend not configured - skipping verification email');
+        return res.json({ status: 'success', message: 'Verification code sent to your email.' });
+      }
+
+      const { Resend } = require('resend');
+      const resend = new Resend(process.env.RESEND_API_KEY);
+
+      await resend.emails.send({
+        from: 'Outbound Impact <noreply@outboundimpact.org>',
+        to: [normalizedEmail],
+        subject: '✉️ Verify Your Email Address',
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; }
+              .header { background: linear-gradient(135deg, #800080 0%, #EE82EE 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 10px 10px 0 0; }
+              .content { background: #ffffff; padding: 40px 30px; border: 1px solid #e0e0e0; }
+              .code-box { background: #f0f0ff; border: 3px dashed #800080; border-radius: 12px; padding: 30px; text-align: center; margin: 30px 0; }
+              .code { font-size: 48px; font-weight: bold; letter-spacing: 8px; color: #800080; font-family: 'Courier New', monospace; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <img src="https://outboundimpact.net/android-chrome-192x192.png" alt="Outbound Impact" style="width:60px;height:60px;display:block;margin:0 auto 15px;border-radius:12px;" />
+                <h1 style="margin: 0;">✉️ Email Verification</h1>
+              </div>
+              <div class="content">
+                <h2 style="color: #800080;">Hi ${user.name}! 👋</h2>
+                <p>Please verify your email address by entering the code below:</p>
+                <div class="code-box">
+                  <div class="code">${code}</div>
+                  <p style="margin: 10px 0 0 0; color: #666;">This code expires in 15 minutes</p>
+                </div>
+                <p style="color: #666; font-size: 14px;">If you didn't request this, you can safely ignore this email.</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `
+      });
+
+      console.log('✅ Verification email sent to:', normalizedEmail);
+    } catch (emailErr) {
+      console.error('❌ Failed to send verification email:', emailErr.message);
+    }
+
+    res.json({ status: 'success', message: 'Verification code sent to your email.' });
+  } catch (error) {
+    console.error('Send verification code error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to send verification code' });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// ✅ VERIFY EMAIL CODE
+// User enters the 6-digit code → sets emailVerified = true
+// ═══════════════════════════════════════════════════════════
+const verifyEmailCode = async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    if (!email || !code) {
+      return res.status(400).json({ status: 'error', message: 'Email and verification code are required' });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+
+    if (!user) {
+      return res.status(400).json({ status: 'error', message: 'Invalid email or code' });
+    }
+
+    // Check code matches
+    if (user.twoFactorSecret !== code) {
+      return res.status(400).json({ status: 'error', message: 'Invalid verification code' });
+    }
+
+    // Check expiry
+    if (user.resetTokenExpiry && new Date() > user.resetTokenExpiry) {
+      return res.status(400).json({ status: 'error', message: 'Verification code has expired. Please request a new one.' });
+    }
+
+    // ✅ Mark email as verified and clear the code
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        twoFactorSecret: null,
+        resetTokenExpiry: null,
+      }
+    });
+
+    console.log('✅ Email verified for:', normalizedEmail);
+    res.json({ status: 'success', message: 'Email verified successfully! You can now sign in.' });
+  } catch (error) {
+    console.error('Verify email code error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to verify email' });
+  }
+};
+
 module.exports = {
   createCheckout,
   completeSignup,
@@ -1104,4 +1248,6 @@ module.exports = {
   verifyResetToken,
   resetPassword,
   getSessionStatus,
+  sendVerificationCode,
+  verifyEmailCode,
 };

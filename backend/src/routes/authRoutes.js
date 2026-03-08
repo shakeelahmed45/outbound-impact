@@ -13,6 +13,10 @@ router.post('/forgot-password', authController.forgotPassword);
 router.get('/verify-reset-token', authController.verifyResetToken);
 router.post('/reset-password', authController.resetPassword);
 
+// ✅ Email verification routes (public - user can't sign in if not verified)
+router.post('/send-verification', authController.sendVerificationCode);
+router.post('/verify-email', authController.verifyEmailCode);
+
 // Protected routes
 router.get('/me', authMiddleware, authController.getCurrentUser);
 router.post('/upgrade-plan', authMiddleware, authController.handleUpgradePlan);

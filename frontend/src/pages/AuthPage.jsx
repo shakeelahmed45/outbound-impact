@@ -34,6 +34,13 @@ const AuthPage = () => {
   const [requires2FA, setRequires2FA] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState('');
 
+  // Email verification state (when requireEmailVerification is enabled)
+  const [emailNotVerified, setEmailNotVerified] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [verificationLoading, setVerificationLoading] = useState(false);
+  const [verificationSuccess, setVerificationSuccess] = useState('');
+
   // Sign Up State
   const [signUpData, setSignUpData] = useState({ name: '', email: '', password: '', confirmPassword: '' });
   const [signUpError, setSignUpError] = useState('');
@@ -64,6 +71,7 @@ const AuthPage = () => {
       setView(newView);
       setSignInError(''); setSignUpError('');
       setRequires2FA(false); setTwoFactorCode('');
+      setEmailNotVerified(false); setVerificationCode(''); setVerificationSent(false); setVerificationSuccess('');
       setTimeout(() => { setFormVisible(true); setAnimating(false); }, 60);
     }, 280);
   };
@@ -108,8 +116,23 @@ const AuthPage = () => {
         }
       }
     } catch (err) {
-      setSignInError(err.response?.data?.message || 'Sign in failed');
-      if (err.response?.data?.message?.includes('2FA')) setTwoFactorCode('');
+      const code = err.response?.data?.code;
+      const msg = err.response?.data?.message;
+
+      if (code === 'EMAIL_NOT_VERIFIED') {
+        // Show email verification UI instead of error
+        setEmailNotVerified(true);
+        setSignInError('');
+        return;
+      }
+
+      if (code === 'ACCOUNT_SUSPENDED') {
+        // api.js interceptor handles this with redirect + modal
+        return;
+      }
+
+      setSignInError(msg || 'Sign in failed');
+      if (msg?.includes('2FA')) setTwoFactorCode('');
     } finally { setSignInLoading(false); }
   };
 
@@ -366,10 +389,12 @@ const AuthPage = () => {
                   style={{ filter: 'drop-shadow(0 4px 12px rgba(128,0,128,0.08))' }}
                   onError={(e) => e.target.style.display = 'none'} />
                 <h1 className="auth-display text-[1.85rem] sm:text-[2.1rem] mb-2" style={{ color: '#1a0e24' }}>
-                  {requires2FA ? 'Verification' : 'Welcome back'}
+                  {emailNotVerified ? 'Verify Your Email' : requires2FA ? 'Verification' : 'Welcome back'}
                 </h1>
                 <p className="text-[0.85rem]" style={{ color: '#8f7e9c' }}>
-                  {requires2FA ? 'Enter the code sent to your email' : 'Sign in to continue to your dashboard'}
+                  {emailNotVerified ? 'Please verify your email address to continue'
+                    : requires2FA ? 'Enter the code sent to your email'
+                    : 'Sign in to continue to your dashboard'}
                 </p>
               </div>
 
@@ -379,58 +404,163 @@ const AuthPage = () => {
                     <p className="text-red-600 text-sm font-semibold">{signInError}</p>
                   </div>
                 )}
-                <form onSubmit={handleSignIn} className="space-y-5">
-                  {!requires2FA && (
-                    <>
-                      <div>
-                        <label className="lbl block mb-2">Email</label>
-                        <input type="email" value={signInData.email}
-                          onChange={(e) => { setSignInData({ ...signInData, email: e.target.value }); setSignInError(''); }}
-                          className="field w-full px-4 py-3.5 rounded-xl" placeholder="you@example.com" required />
-                      </div>
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="lbl">Password</label>
-                          <Link to="/forgot-password" className="lnk text-xs">Forgot?</Link>
+                {verificationSuccess && (
+                  <div className="mb-5 p-3.5 rounded-xl bg-green-50/80 border border-green-100">
+                    <p className="text-green-600 text-sm font-semibold">{verificationSuccess}</p>
+                  </div>
+                )}
+
+                {/* ═══ EMAIL VERIFICATION UI ═══ */}
+                {emailNotVerified ? (
+                  <div className="space-y-5">
+                    {!verificationSent ? (
+                      <>
+                        <div className="p-4 rounded-xl" style={{ background: 'rgba(128,0,128,0.04)', border: '1px solid rgba(128,0,128,0.1)' }}>
+                          <p className="text-sm" style={{ color: '#574568' }}>
+                            Your email <strong>{signInData.email}</strong> needs to be verified before you can sign in.
+                          </p>
                         </div>
-                        <div className="relative">
-                          <input type={showSignInPassword ? 'text' : 'password'} value={signInData.password}
-                            onChange={(e) => { setSignInData({ ...signInData, password: e.target.value }); setSignInError(''); }}
-                            className="field w-full px-4 py-3.5 pr-12 rounded-xl" placeholder="••••••••" required />
-                          <button type="button" onClick={() => setShowSignInPassword(!showSignInPassword)}
-                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
-                            {showSignInPassword ? <EyeOff size={17} /> : <Eye size={17} />}
-                          </button>
+                        <button
+                          type="button"
+                          disabled={verificationLoading}
+                          onClick={async () => {
+                            setVerificationLoading(true);
+                            setSignInError('');
+                            try {
+                              await api.post('/auth/send-verification', { email: signInData.email });
+                              setVerificationSent(true);
+                            } catch (err) {
+                              setSignInError(err.response?.data?.message || 'Failed to send verification code');
+                            } finally {
+                              setVerificationLoading(false);
+                            }
+                          }}
+                          className="cta-fill w-full py-3.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-40"
+                        >
+                          {verificationLoading ? <><Loader2 className="animate-spin" size={17} />Sending...</> : 'Send Verification Code'}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <label className="lbl block mb-2">Verification Code</label>
+                          <input type="text" value={verificationCode}
+                            onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                            className="field w-full px-4 py-4 rounded-xl text-center text-2xl tracking-[0.3em] font-mono"
+                            placeholder="000000" maxLength={6} autoFocus />
+                          <p className="mt-2.5 text-xs" style={{ color: '#8f7e9c' }}>Check your inbox and spam folder for the 6-digit code</p>
                         </div>
-                      </div>
-                    </>
-                  )}
-                  {requires2FA && (
-                    <div>
-                      <label className="lbl block mb-2">6-digit code</label>
-                      <input type="text" value={twoFactorCode}
-                        onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        className="field w-full px-4 py-4 rounded-xl text-center text-2xl tracking-[0.3em] font-mono"
-                        placeholder="000000" maxLength={6} autoFocus required />
-                      <p className="mt-2.5 text-xs" style={{ color: '#8f7e9c' }}>Check your inbox and spam folder</p>
-                    </div>
-                  )}
-                  <button type="submit" disabled={signInLoading || (requires2FA && twoFactorCode.length !== 6)}
-                    className="cta-fill w-full py-3.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
-                    {signInLoading ? <><Loader2 className="animate-spin" size={17} />{requires2FA ? 'Verifying...' : 'Signing in...'}</> : requires2FA ? 'Verify & Sign In' : 'Sign In'}
-                  </button>
-                  {requires2FA && (
-                    <button type="button" onClick={() => { setRequires2FA(false); setTwoFactorCode(''); setSignInError(''); }}
-                      className="w-full text-sm font-semibold py-2" style={{ color: '#8f7e9c' }}>← Back to credentials</button>
-                  )}
-                </form>
-                {!requires2FA && (
+                        <button
+                          type="button"
+                          disabled={verificationLoading || verificationCode.length !== 6}
+                          onClick={async () => {
+                            setVerificationLoading(true);
+                            setSignInError('');
+                            setVerificationSuccess('');
+                            try {
+                              const res = await api.post('/auth/verify-email', { email: signInData.email, code: verificationCode });
+                              setVerificationSuccess(res.data?.message || 'Email verified! You can now sign in.');
+                              // Reset to normal sign-in after short delay
+                              setTimeout(() => {
+                                setEmailNotVerified(false);
+                                setVerificationSent(false);
+                                setVerificationCode('');
+                                setVerificationSuccess('');
+                              }, 2000);
+                            } catch (err) {
+                              setSignInError(err.response?.data?.message || 'Invalid verification code');
+                            } finally {
+                              setVerificationLoading(false);
+                            }
+                          }}
+                          className="cta-fill w-full py-3.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {verificationLoading ? <><Loader2 className="animate-spin" size={17} />Verifying...</> : 'Verify Email'}
+                        </button>
+                        <button type="button"
+                          onClick={async () => {
+                            setVerificationLoading(true);
+                            setSignInError('');
+                            try {
+                              await api.post('/auth/send-verification', { email: signInData.email });
+                              setSignInError('');
+                              setVerificationSuccess('New code sent! Check your email.');
+                              setVerificationCode('');
+                            } catch (err) {
+                              setSignInError('Failed to resend code');
+                            } finally {
+                              setVerificationLoading(false);
+                            }
+                          }}
+                          className="w-full text-sm font-semibold py-2" style={{ color: '#8f7e9c' }}>
+                          Resend Code
+                        </button>
+                      </>
+                    )}
+                    <div className="sep my-2" />
+                    <button type="button"
+                      onClick={() => { setEmailNotVerified(false); setVerificationSent(false); setVerificationCode(''); setSignInError(''); setVerificationSuccess(''); }}
+                      className="w-full text-sm font-semibold py-2" style={{ color: '#8f7e9c' }}>
+                      ← Back to sign in
+                    </button>
+                  </div>
+                ) : (
+                  /* ═══ NORMAL SIGN IN + 2FA FORM ═══ */
                   <>
-                    <div className="sep my-6" />
-                    <p className="text-center text-sm" style={{ color: '#8f7e9c' }}>
-                      Don&apos;t have an account?{' '}
-                      <button onClick={() => { switchView('signup'); navigate('/signup', { replace: true }); }} className="lnk">Create one</button>
-                    </p>
+                    <form onSubmit={handleSignIn} className="space-y-5">
+                      {!requires2FA && (
+                        <>
+                          <div>
+                            <label className="lbl block mb-2">Email</label>
+                            <input type="email" value={signInData.email}
+                              onChange={(e) => { setSignInData({ ...signInData, email: e.target.value }); setSignInError(''); }}
+                              className="field w-full px-4 py-3.5 rounded-xl" placeholder="you@example.com" required />
+                          </div>
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <label className="lbl">Password</label>
+                              <Link to="/forgot-password" className="lnk text-xs">Forgot?</Link>
+                            </div>
+                            <div className="relative">
+                              <input type={showSignInPassword ? 'text' : 'password'} value={signInData.password}
+                                onChange={(e) => { setSignInData({ ...signInData, password: e.target.value }); setSignInError(''); }}
+                                className="field w-full px-4 py-3.5 pr-12 rounded-xl" placeholder="••••••••" required />
+                              <button type="button" onClick={() => setShowSignInPassword(!showSignInPassword)}
+                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+                                {showSignInPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                      {requires2FA && (
+                        <div>
+                          <label className="lbl block mb-2">6-digit code</label>
+                          <input type="text" value={twoFactorCode}
+                            onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                            className="field w-full px-4 py-4 rounded-xl text-center text-2xl tracking-[0.3em] font-mono"
+                            placeholder="000000" maxLength={6} autoFocus required />
+                          <p className="mt-2.5 text-xs" style={{ color: '#8f7e9c' }}>Check your inbox and spam folder</p>
+                        </div>
+                      )}
+                      <button type="submit" disabled={signInLoading || (requires2FA && twoFactorCode.length !== 6)}
+                        className="cta-fill w-full py-3.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
+                        {signInLoading ? <><Loader2 className="animate-spin" size={17} />{requires2FA ? 'Verifying...' : 'Signing in...'}</> : requires2FA ? 'Verify & Sign In' : 'Sign In'}
+                      </button>
+                      {requires2FA && (
+                        <button type="button" onClick={() => { setRequires2FA(false); setTwoFactorCode(''); setSignInError(''); }}
+                          className="w-full text-sm font-semibold py-2" style={{ color: '#8f7e9c' }}>← Back to credentials</button>
+                      )}
+                    </form>
+                    {!requires2FA && (
+                      <>
+                        <div className="sep my-6" />
+                        <p className="text-center text-sm" style={{ color: '#8f7e9c' }}>
+                          Don&apos;t have an account?{' '}
+                          <button onClick={() => { switchView('signup'); navigate('/signup', { replace: true }); }} className="lnk">Create one</button>
+                        </p>
+                      </>
+                    )}
                   </>
                 )}
               </div>

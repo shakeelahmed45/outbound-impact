@@ -123,6 +123,17 @@ const updateSettings = async (req, res) => {
     // Clear settings cache so changes take effect immediately
     clearCache();
 
+    // ✅ When email verification is ENABLED, mark all existing users as verified
+    // so they don't get locked out of their accounts
+    if (data.requireEmailVerification === true) {
+      try {
+        const result = await prisma.$executeRaw`UPDATE "User" SET "emailVerified" = true WHERE "emailVerified" = false`;
+        console.log(`✅ Marked existing users as email-verified (${result} updated)`);
+      } catch (e) {
+        console.error('⚠️ Failed to mark existing users as verified:', e.message);
+      }
+    }
+
     const rows = await prisma.$queryRaw`SELECT * FROM "PlatformSetting" WHERE "id" = 'default' LIMIT 1`;
     res.json({ status: 'success', message: 'Settings saved successfully', settings: rows[0] });
   } catch (error) {

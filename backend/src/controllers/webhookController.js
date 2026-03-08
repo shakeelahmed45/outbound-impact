@@ -137,6 +137,7 @@ const handleCheckoutCompleted = async (session) => {
           stripeCustomerId: customerId,
           subscriptionId: subscriptionId || null,
           subscriptionStatus: 'active',
+          emailVerified: true,  // ✅ Verified — completed Stripe payment
           ...subscriptionData,
         }
       });
