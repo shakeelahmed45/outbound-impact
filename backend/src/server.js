@@ -19,7 +19,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const advancedAnalyticsRoutes = require('./routes/advancedAnalyticsRoutes');
 const chatAutoCloseService = require('./services/chatAutoCloseService');
 const { initializeEnforcementColumns } = require('./services/settingsHelper');
-const { getPublicStats } = require('./controllers/publicStatsController');
+const { getPublicStats, getPublicStatsJS } = require('./controllers/publicStatsController');
 
 
 // ✨ Enterprise feature routes
@@ -129,6 +129,9 @@ app.get('/api/public/stats', (req, res, next) => {
   res.setHeader('Cache-Control', 'public, max-age=300');
   next();
 }, getPublicStats);
+
+// JSONP version — <script> tag, zero CORS issues
+app.get('/api/public/stats.js', getPublicStatsJS);
 
 // ✅ FIXED: CORS configuration - Allow web app AND mobile app
 const allowedOrigins = [
