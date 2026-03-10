@@ -1,10 +1,3 @@
-// ═══════════════════════════════════════════════════════════
-// PUBLIC STATS ENDPOINT — FIXED FOR REAL SCHEMA
-// Serves aggregate platform stats for outboundimpact.org
-// No authentication required — returns only aggregate counts
-// Route: GET /api/public/stats
-// ═══════════════════════════════════════════════════════════
-
 const prisma = require('../lib/prisma');
 
 const getPublicStats = async (req, res) => {
