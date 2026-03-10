@@ -114,6 +114,22 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 // 📡 EXPRESS CONFIGURATION
 // ═══════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════
+// 🌐 PUBLIC STATS — BEFORE CORS middleware so .org site can access it
+// ═══════════════════════════════════════════════
+app.options('/api/public/stats', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.status(204).end();
+});
+app.get('/api/public/stats', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET');
+  res.setHeader('Cache-Control', 'public, max-age=300');
+  next();
+}, getPublicStats);
+
 // ✅ FIXED: CORS configuration - Allow web app AND mobile app
 const allowedOrigins = [
   'https://outboundimpact.net',           // Main domain
@@ -175,7 +191,6 @@ app.use((req, res, next) => {
 // ═══════════════════════════════════════════════
 // 🏥 HEALTH CHECK ENDPOINT
 // ═══════════════════════════════════════════════
-app.get('/api/public/stats', getPublicStats);
 app.get('/api/health', (req, res) => {
   const mem = process.memoryUsage();
   const heapTotalMB = Math.round(mem.heapTotal / 1024 / 1024);
