@@ -19,6 +19,8 @@ const adminRoutes = require('./routes/adminRoutes');
 const advancedAnalyticsRoutes = require('./routes/advancedAnalyticsRoutes');
 const chatAutoCloseService = require('./services/chatAutoCloseService');
 const { initializeEnforcementColumns } = require('./services/settingsHelper');
+const { getPublicStats } = require('./controllers/publicStatsController');
+
 
 // ✨ Enterprise feature routes
 const apiKeyRoutes = require('./routes/apiKeyRoutes');
@@ -171,7 +173,7 @@ app.use((req, res, next) => {
 // ═══════════════════════════════════════════════
 // 🏥 HEALTH CHECK ENDPOINT
 // ═══════════════════════════════════════════════
-
+app.get('/api/public/stats', getPublicStats);
 app.get('/api/health', (req, res) => {
   const mem = process.memoryUsage();
   const heapTotalMB = Math.round(mem.heapTotal / 1024 / 1024);
