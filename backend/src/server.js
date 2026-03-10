@@ -300,7 +300,3 @@ if (process.env.VERCEL) {
     console.log('🔄 Refund system enabled! (7-day policy)');
     console.log('🛍️ Multi-platform e-commerce integration ready!');
     console.log('🔍 Debug routes active at /api/debug');
-    console.log('👥 Admin team management enabled!');  // 🆕 NEW
-    console.log('═══════════════════════════════════════════════\n');
-  });
-}
