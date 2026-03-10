@@ -118,6 +118,8 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 const allowedOrigins = [
   'https://outboundimpact.net',           // Main domain
   'https://www.outboundimpact.net',       // WWW subdomain
+  'https://outboundimpact.org',           // WordPress marketing site
+  'https://www.outboundimpact.org',       // WordPress WWW
   process.env.FRONTEND_URL,               // Environment variable (backup)
   'https://localhost',                    // Capacitor Android
   'capacitor://localhost',                // Capacitor alternative format
