@@ -3,7 +3,7 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/auth');
 const { getAdminStats, getAnalytics, getRecentActivities } = require('../controllers/adminAnalyticsController');
-const { getAllUsers, bulkUserActions, suspendUser, impersonateUser, exportUsers, exportSelectedUsers, getUserDetails, updateUser, deleteUser, removeUserFromTeam, sendPasswordReset } = require('../controllers/adminUserController');
+const { getAllUsers, bulkUserActions, suspendUser, impersonateUser, exportUsers, exportSelectedUsers, exportGeography, exportRevenue, exportUsage, getUserDetails, updateUser, deleteUser, removeUserFromTeam, sendPasswordReset } = require('../controllers/adminUserController');
 const { getAllItems, deleteItem } = require('../controllers/adminController');
 const { getOverview, getRevenue, getOpportunities, getGeography, sendCampaign, getCampaignHistory, getDiscountCodes, createDiscountCode, deleteDiscountCode, getRevenueHistory } = require('../controllers/adminOverviewController');
 const { getSettings, updateSettings, getPublicSettings } = require('../controllers/adminSettingsController');
@@ -43,6 +43,9 @@ router.put('/settings', updateSettings);
 // Users
 router.get('/users', getAllUsers);
 router.get('/users/export', exportUsers);
+router.get('/users/export-geography', exportGeography);
+router.get('/users/export-revenue', exportRevenue);
+router.get('/users/export-usage', exportUsage);
 router.post('/users/export-selected', exportSelectedUsers);
 router.post('/users/bulk-action', bulkUserActions);
 router.get('/users/:userId', getUserDetails);

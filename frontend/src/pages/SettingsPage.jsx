@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CreditCard, Check, AlertTriangle, TrendingUp, ToggleRight, Trash2, BookOpen, UserCheck, Users, QrCode, HardDrive, ShieldAlert } from 'lucide-react';
+import { CreditCard, Check, AlertTriangle, TrendingUp, ToggleRight, Trash2, BookOpen, UserCheck, Users, QrCode, HardDrive, ShieldAlert, CalendarClock, RefreshCw } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import useAuthStore from '../store/authStore';
 import api from '../services/api';
@@ -47,7 +47,8 @@ const SettingsPage = () => {
   const effectiveUser = user?.isTeamMember ? user.organization : user;
   const userIsTeamMember = user?.isTeamMember === true;
   const effectiveRole = effectiveUser?.role;
-  const isIndividual = effectiveRole === 'INDIVIDUAL';
+  const isIndividual = effectiveRole === 'INDIVIDUAL' || effectiveRole === 'PERSONAL_LIFE';
+  const isOneTime = effectiveRole === 'INDIVIDUAL' || effectiveRole === 'ORG_EVENTS'; // One-time plans — no subscription management
 
   // Individual settings — profile fields
   const [profileName, setProfileName] = useState(user?.name || '');
@@ -82,13 +83,19 @@ const SettingsPage = () => {
   const getPlanLimits = () => {
     switch (effectiveRole) {
       case 'INDIVIDUAL':
-        return { name: 'Individual', price: '$85', period: 'one-time (12 months)', contributors: 2, storage: '250 GB', qrCodes: '2', qrNote: '2 streams allowed', analytics: 'Basic', uploads: 5 };
+        return { name: 'Personal Single Use', price: '$69', period: 'one-time (12 months)', contributors: 2, storage: '25 GB', qrCodes: '1', qrNote: '1 stream allowed', analytics: 'Basic' };
+      case 'PERSONAL_LIFE':
+        return { name: 'Personal Life Events', price: '$15', period: '/month', contributors: 0, storage: '100 GB', qrCodes: '10', qrNote: 'Up to 10 streams', analytics: 'Full' };
+      case 'ORG_EVENTS':
+        return { name: 'Org Events', price: '$199', period: 'one-time', contributors: 5, storage: '250 GB', qrCodes: '80', qrNote: '80 campaigns', analytics: 'Advanced' };
       case 'ORG_SMALL':
-        return { name: 'Small Organization', price: '$35', period: '/month', contributors: 3, storage: '250 GB', qrCodes: '5', qrNote: 'QR codes for streams', analytics: 'Standard' };
+        return { name: 'Starter', price: '$49', period: '/month', contributors: 3, storage: '100 GB', qrCodes: '20', qrNote: '20 campaigns', analytics: 'Activity Feed' };
       case 'ORG_MEDIUM':
-        return { name: 'Medium Organization', price: '$60', period: '/month', contributors: 20, storage: '500 GB', qrCodes: '20', qrNote: 'QR codes for streams', analytics: 'Advanced' };
+        return { name: 'Growth', price: '$69', period: '/month', contributors: 'Unlimited', storage: '250 GB', qrCodes: '30', qrNote: '30 campaigns', analytics: 'Advanced' };
+      case 'ORG_SCALE':
+        return { name: 'Pro', price: '$99', period: '/month', contributors: 'Unlimited', storage: '500 GB', qrCodes: '50', qrNote: '50 campaigns', analytics: 'Advanced + Workflows' };
       case 'ORG_ENTERPRISE':
-        return { name: 'Enterprise', price: '$99+', period: '/month', contributors: '50+', storage: '1.5 TB+', qrCodes: 'Unlimited', qrNote: 'Unlimited QR codes', analytics: 'Advanced + Compliance' };
+        return { name: 'Enterprise', price: '$99+', period: '/month', contributors: 'Unlimited', storage: '1.5 TB+', qrCodes: 'Unlimited', qrNote: 'Unlimited QR codes', analytics: 'Advanced + Compliance' };
       default:
         return { name: 'Free', price: '$0', period: '', contributors: 0, storage: '0', qrCodes: '0', qrNote: '', analytics: 'None' };
     }
@@ -247,9 +254,9 @@ const SettingsPage = () => {
               <div className="bg-slate-50 rounded-xl p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-bold text-slate-900">Personal</p>
+                    <p className="font-bold text-slate-900">{planLimits.name}</p>
                     <p className="text-sm text-slate-600">
-                      {effectiveUser?.totalUploads || 0}/5 uploads · {formatStorage(storageUsed)}/{formatStorage(storageLimit)} storage
+                      {planLimits.price} {planLimits.period} · {formatStorage(storageUsed)}/{formatStorage(storageLimit)} storage
                     </p>
                   </div>
                   <button
@@ -312,7 +319,7 @@ const SettingsPage = () => {
         </div>
 
         {/* Upgrade Banner */}
-        {!userIsTeamMember && effectiveRole !== 'ORG_ENTERPRISE' && (
+        {!userIsTeamMember && effectiveRole !== 'ORG_ENTERPRISE' && effectiveRole !== 'ORG_SCALE' && (
           <div className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-2xl p-6 border-2 border-purple-200 mb-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
@@ -343,6 +350,78 @@ const SettingsPage = () => {
             </div>
           </div>
         )}
+
+        {/* ── ORG_EVENTS: Annual expiry card ── */}
+        {effectiveRole === 'ORG_EVENTS' && effectiveUser?.orgEventsExpiresAt && (() => {
+          const expiresAt  = new Date(effectiveUser.orgEventsExpiresAt);
+          const now        = new Date();
+          const daysLeft   = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));
+          const isExpired  = daysLeft <= 0;
+          const isUrgent   = daysLeft <= 30;
+          const isSuspended = effectiveUser?.subscriptionStatus === 'suspended';
+
+          return (
+            <div className={`border-2 rounded-2xl p-6 mb-6 ${
+              isExpired || isSuspended ? 'bg-red-50 border-red-400'
+              : isUrgent ? 'bg-amber-50 border-amber-400'
+              : 'bg-teal-50 border-teal-300'
+            }`}>
+              <div className="flex items-start gap-3">
+                <CalendarClock size={22} className={`flex-shrink-0 mt-1 ${
+                  isExpired || isSuspended ? 'text-red-600' : isUrgent ? 'text-amber-600' : 'text-teal-600'
+                }`}/>
+                <div className="flex-1">
+                  <h4 className={`font-bold mb-1 ${
+                    isExpired || isSuspended ? 'text-red-900' : isUrgent ? 'text-amber-900' : 'text-teal-900'
+                  }`}>
+                    {isSuspended ? 'Account Suspended — Renewal Required'
+                    : isExpired  ? 'Annual Plan Expired'
+                    : isUrgent   ? `Annual Renewal Due in ${daysLeft} Day${daysLeft === 1 ? '' : 's'}`
+                    : 'Annual Plan Active'}
+                  </h4>
+                  <p className={`text-sm mb-4 ${
+                    isExpired || isSuspended ? 'text-red-700' : isUrgent ? 'text-amber-700' : 'text-teal-700'
+                  }`}>
+                    {isSuspended
+                      ? 'Your access has been suspended. Renew at $65/year to restore full access.'
+                      : isExpired
+                      ? `Your plan expired on ${expiresAt.toLocaleDateString()}. Renew now to keep your account active.`
+                      : `Your plan ${isUrgent ? 'expires' : 'renews'} on ${expiresAt.toLocaleDateString()}. Renewal is $65/year.`}
+                  </p>
+                  {(isExpired || isUrgent || isSuspended) && (
+                    <a
+                      href="/dashboard/settings?renew=true"
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        try {
+                          const res = await import('../services/api').then(m =>
+                            m.default.post('/subscription/create-renewal-session')
+                          );
+                          if (res.data?.checkoutUrl) window.location.href = res.data.checkoutUrl;
+                        } catch {
+                          window.location.href = '/dashboard/settings';
+                        }
+                      }}
+                      className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white text-sm transition-all ${
+                        isExpired || isSuspended
+                          ? 'bg-red-600 hover:bg-red-700'
+                          : 'bg-amber-500 hover:bg-amber-600'
+                      }`}
+                    >
+                      <RefreshCw size={15}/> Renew Now — $65/year
+                    </a>
+                  )}
+                </div>
+                {!isExpired && !isSuspended && (
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-2xl font-bold text-teal-700">{daysLeft}</p>
+                    <p className="text-xs text-teal-600">days left</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ═══════════════════════════════════
             SUBSCRIPTION DETAILS CARD
@@ -438,23 +517,29 @@ const SettingsPage = () => {
               <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> QR code generation</div>
               <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> {planLimits.analytics} analytics</div>
               <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> {planLimits.storage} storage</div>
-              {(effectiveRole === 'ORG_SMALL' || effectiveRole === 'ORG_MEDIUM' || effectiveRole === 'ORG_ENTERPRISE') && (
+              {(effectiveRole === 'ORG_EVENTS' || effectiveRole === 'ORG_SMALL' || effectiveRole === 'ORG_MEDIUM' || effectiveRole === 'ORG_SCALE' || effectiveRole === 'ORG_ENTERPRISE') && (
                 <>
                   <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> Team collaboration ({planLimits.contributors} members)</div>
                   <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> Streams with QR codes</div>
                 </>
               )}
+              {(effectiveRole === 'ORG_SCALE' || effectiveRole === 'ORG_ENTERPRISE') && (
+                <>
+                  <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> Workflows & automation</div>
+                  <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> All export formats</div>
+                </>
+              )}
               {effectiveRole === 'ORG_ENTERPRISE' && (
                 <>
                   <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> White label & custom branding</div>
-                  <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> Workflows & compliance</div>
+                  <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> API access & integrations</div>
                 </>
               )}
             </div>
           </div>
 
           {/* Auto-Renewal Toggle */}
-          {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
+          {!userIsTeamMember && !isOneTime && (
             <div className="bg-blue-50 p-5 rounded-xl border border-blue-200 mb-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -471,7 +556,7 @@ const SettingsPage = () => {
           )}
 
           {/* Edit Billing / Payment Method */}
-          {!userIsTeamMember && effectiveRole !== 'INDIVIDUAL' && (
+          {!userIsTeamMember && !isOneTime && (
             <div className="mb-6">
               <button
                 onClick={handleOpenBillingPortal}

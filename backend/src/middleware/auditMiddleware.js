@@ -4,8 +4,8 @@
 // Drop this into server.js AFTER auth middleware
 // ═══════════════════════════════════════════════════════════
 
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+
+const prisma = require('../lib/prisma');
 
 // Map route patterns → human-readable action names
 const ROUTE_ACTION_MAP = {

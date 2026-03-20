@@ -112,6 +112,17 @@ const inviteTeamMember = async (req, res) => {
       }
     }
 
+    // ✅ ORG_EVENTS plan → 5 contributors max
+    if (user.role === 'ORG_EVENTS') {
+      const teamCount = await prisma.teamMember.count({ where: { userId } });
+      if (teamCount >= 5) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'Contributor limit reached (5/5) on Org Events plan. Please upgrade to invite more team members.'
+        });
+      }
+    }
+
     // ✅ CRITICAL CHECK: Prevent inviting already registered emails (case-insensitive)
     const existingUser = await prisma.user.findUnique({
       where: { email: normalizedEmail },

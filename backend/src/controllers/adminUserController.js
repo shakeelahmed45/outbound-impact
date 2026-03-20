@@ -198,24 +198,27 @@ const suspendUser = async (req, res) => {
     const { userId } = req.params;
     const { suspend, reason } = req.body;
 
+    // ✅ FIX: Detect if this is a ban action (called via /ban route)
+    const isBan = req.path === '/ban' || req.originalUrl.includes('/ban');
+    const newStatus = isBan ? 'banned' : (suspend ? 'suspended' : 'active');
+    const actionLabel = isBan ? 'banned' : (suspend ? 'suspended' : 'unsuspended');
+
     const user = await prisma.user.update({
       where: { id: userId },
-      data: { 
-        status: suspend ? 'suspended' : 'active'
-      }
+      data: { status: newStatus }
     });
 
     // ─── Create in-app notification ───
     try {
-      if (suspend) {
+      if (suspend || isBan) {
         await createNotification(userId, {
           type: 'warning',
           category: 'account',
-          title: 'Account Suspended',
+          title: isBan ? 'Account Banned' : 'Account Suspended',
           message: reason
-            ? `Your account has been suspended. Reason: ${reason}. Contact support@outboundimpact.org for assistance.`
-            : 'Your account has been suspended. Contact support@outboundimpact.org for assistance.',
-          metadata: { action: 'suspended', reason: reason || null }
+            ? `Your account has been ${actionLabel}. Reason: ${reason}. Contact support@outboundimpact.org for assistance.`
+            : `Your account has been ${actionLabel}. Contact support@outboundimpact.org for assistance.`,
+          metadata: { action: actionLabel, reason: reason || null }
         });
       } else {
         await createNotification(userId, {
@@ -230,20 +233,20 @@ const suspendUser = async (req, res) => {
       console.error('⚠️ Failed to create suspension notification:', notifErr.message);
     }
 
-    // ─── Notify admins: user suspended/restored ───
-    if (suspend) {
+    // ─── Notify admins ───
+    if (suspend || isBan) {
       await notifyAdminUserSuspended(user.name, user.email, reason);
     } else {
       await notifyAdminUserRestored(user.name, user.email);
     }
 
-    // ─── Send email notification via Resend ───
+    // ─── Send email notification via emailService ───
     try {
       if (process.env.RESEND_API_KEY) {
         const { Resend } = require('resend');
         const resend = new Resend(process.env.RESEND_API_KEY);
 
-        if (suspend) {
+        if (suspend || isBan) {
           // Suspension email
           await resend.emails.send({
             from: 'Outbound Impact <noreply@outboundimpact.org>',
@@ -336,7 +339,7 @@ const suspendUser = async (req, res) => {
 
     res.json({
       status: 'success',
-      message: `User ${suspend ? 'suspended' : 'unsuspended'} successfully`,
+      message: `User ${actionLabel} successfully`,
       user: {
         id: user.id,
         email: user.email,
@@ -494,6 +497,164 @@ const exportUsers = async (req, res) => {
       status: 'error',
       message: 'Failed to export users'
     });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// EXPORT GEOGRAPHY DATA TO CSV
+// ═══════════════════════════════════════════════════════════
+const exportGeography = async (req, res) => {
+  try {
+    const countryData = await prisma.analytics.groupBy({
+      by: ['country', 'source'],
+      _count: { id: true },
+      orderBy: { _count: { id: 'desc' } },
+    });
+
+    const headers = ['Country', 'Source', 'Views'];
+    const rows = countryData.map(d => [
+      d.country || 'Unknown',
+      d.source || 'direct',
+      d._count.id,
+    ]);
+
+    const csv = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=geography_export_${new Date().toISOString().split('T')[0]}.csv`);
+    res.send(csv);
+  } catch (error) {
+    console.error('Export geography error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to export geography data' });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// EXPORT REVENUE REPORT TO CSV
+// ═══════════════════════════════════════════════════════════
+const exportRevenue = async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: {
+        subscriptionStatus: { in: ['active', 'trialing', 'canceling'] },
+      },
+      select: {
+        email: true,
+        name: true,
+        role: true,
+        subscriptionStatus: true,
+        priceId: true,
+        currentPeriodStart: true,
+        currentPeriodEnd: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const PLAN_PRICES = {
+      INDIVIDUAL:    { name: 'Personal Single Use', price: 69,  period: 'one-time' },
+      PERSONAL_LIFE: { name: 'Personal Life Events', price: 15,  period: 'monthly' },
+      ORG_EVENTS:    { name: 'Org Events',           price: 199, period: 'one-time' },
+      ORG_SMALL:     { name: 'Starter',              price: 49,  period: 'monthly' },
+      ORG_MEDIUM:    { name: 'Growth',               price: 69,  period: 'monthly' },
+      ORG_SCALE:     { name: 'Pro',                  price: 99,  period: 'monthly' },
+      ORG_ENTERPRISE:{ name: 'Enterprise',           price: 99,  period: 'monthly' },
+    };
+
+    const headers = ['Name', 'Email', 'Plan', 'Price (AUD)', 'Billing Period', 'Status', 'Period Start', 'Period End', 'Joined'];
+    const rows = users.map(u => {
+      const plan = PLAN_PRICES[u.role] || { name: u.role, price: 0, period: 'unknown' };
+      return [
+        u.name,
+        u.email,
+        plan.name,
+        plan.price,
+        plan.period,
+        u.subscriptionStatus,
+        u.currentPeriodStart ? new Date(u.currentPeriodStart).toISOString().split('T')[0] : '',
+        u.currentPeriodEnd   ? new Date(u.currentPeriodEnd).toISOString().split('T')[0]   : '',
+        new Date(u.createdAt).toISOString().split('T')[0],
+      ];
+    });
+
+    const csv = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=revenue_export_${new Date().toISOString().split('T')[0]}.csv`);
+    res.send(csv);
+  } catch (error) {
+    console.error('Export revenue error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to export revenue data' });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// EXPORT USAGE ANALYTICS TO CSV
+// ═══════════════════════════════════════════════════════════
+const exportUsage = async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: { role: { notIn: ['ADMIN', 'CUSTOMER_SUPPORT'] } },
+      select: {
+        email: true,
+        name: true,
+        role: true,
+        storageUsed: true,
+        storageLimit: true,
+        lastLoginAt: true,
+        createdAt: true,
+        _count: {
+          select: {
+            items: true,
+            campaigns: true,
+          },
+        },
+      },
+      orderBy: { storageUsed: 'desc' },
+    });
+
+    const headers = [
+      'Name', 'Email', 'Plan',
+      'Items', 'Campaigns',
+      'Storage Used (GB)', 'Storage Limit (GB)', 'Storage %',
+      'Last Login', 'Joined',
+    ];
+
+    const rows = users.map(u => {
+      const used  = Number(u.storageUsed  || 0);
+      const limit = Number(u.storageLimit || 2147483648);
+      const pct   = limit > 0 ? ((used / limit) * 100).toFixed(1) : '0';
+      return [
+        u.name,
+        u.email,
+        u.role,
+        u._count.items,
+        u._count.campaigns,
+        (used  / 1073741824).toFixed(2),
+        (limit / 1073741824).toFixed(2),
+        pct,
+        u.lastLoginAt ? new Date(u.lastLoginAt).toISOString().split('T')[0] : 'Never',
+        new Date(u.createdAt).toISOString().split('T')[0],
+      ];
+    });
+
+    const csv = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=usage_export_${new Date().toISOString().split('T')[0]}.csv`);
+    res.send(csv);
+  } catch (error) {
+    console.error('Export usage error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to export usage data' });
   }
 };
 
@@ -917,6 +1078,9 @@ module.exports = {
   impersonateUser,
   exportUsers,
   exportSelectedUsers,
+  exportGeography,
+  exportRevenue,
+  exportUsage,
   getUserDetails,
   updateUser,
   deleteUser,

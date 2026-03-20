@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+
+const prisma = require('../lib/prisma');
 
 // ✅ TEST ROUTE - No auth required - just to verify route works
 router.get('/test', async (req, res) => {

@@ -109,7 +109,7 @@ const SupportPage = () => {
 
     setSending(true);
     try {
-      await api.post('/api/feedback', {
+      await api.post('/user/feedback', {
         type: 'support',
         subject: contactForm.subject,
         message: contactForm.message,
@@ -123,7 +123,7 @@ const SupportPage = () => {
     } catch (error) {
       console.error('Failed to send:', error);
       // Fallback: open mailto
-      const mailtoLink = `mailto:business.shakeelahmed@gmail.com?subject=${encodeURIComponent(contactForm.subject)}&body=${encodeURIComponent(`Name: ${contactForm.name}\nEmail: ${contactForm.email}\nCategory: ${contactForm.category}\n\n${contactForm.message}`)}`;
+      const mailtoLink = `mailto:support@outboundimpact.org?subject=${encodeURIComponent(contactForm.subject)}&body=${encodeURIComponent(`Name: ${contactForm.name}\nEmail: ${contactForm.email}\nCategory: ${contactForm.category}\n\n${contactForm.message}`)}`;
       window.open(mailtoLink, '_blank');
       setSent(true);
       setTimeout(() => setSent(false), 5000);

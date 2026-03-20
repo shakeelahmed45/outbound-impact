@@ -1,11 +1,4 @@
-// ═══════════════════════════════════════════════════════════
-// helpers/auditLogger.js
-// Fire-and-forget audit logging utility
-// Usage: await logAudit(req, 'ITEM_CREATED', { itemId, title })
-// ═══════════════════════════════════════════════════════════
-
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 /**
  * Log an action to the AuditLog table.

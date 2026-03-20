@@ -1,9 +1,46 @@
-// ═══════════════════════════════════════════════════════════
-// OUTBOUND IMPACT — SERVICE WORKER
-// Handles: Push notifications, badge count, click-to-open
-// ═══════════════════════════════════════════════════════════
-
 const SW_VERSION = '1.1.0';
+
+// ─── FETCH: Intercept share target POST from phone share sheet ───
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // Only intercept POST requests to /share-receive
+  if (event.request.method !== 'POST' || url.pathname !== '/share-receive') return;
+
+  event.respondWith((async () => {
+    try {
+      const formData = await event.request.formData();
+
+      const title   = formData.get('title') || '';
+      const text    = formData.get('text')  || '';
+      const shareUrl = formData.get('url')  || '';
+      const file    = formData.get('media') || null;
+
+      // Build query params to pass text data to the React page
+      const params = new URLSearchParams();
+      if (title)    params.set('title',    title);
+      if (text)     params.set('text',     text);
+      if (shareUrl) params.set('url',      shareUrl);
+
+      // Store file in cache so the React page can retrieve it
+      if (file) {
+        const cache = await caches.open('share-target-v1');
+        await cache.put('/share-target-file', new Response(file, {
+          headers: { 'Content-Type': file.type, 'X-File-Name': file.name }
+        }));
+        params.set('hasFile', '1');
+        params.set('fileType', file.type);
+        params.set('fileName', file.name);
+      }
+
+      // Redirect to the share-receive React page with data in query string
+      return Response.redirect(`/share-receive?${params.toString()}`, 303);
+    } catch (err) {
+      console.error('[SW] Share target error:', err);
+      return Response.redirect('/share-receive?error=1', 303);
+    }
+  })());
+});
 
 // ─── INSTALL: Activate immediately ───
 self.addEventListener('install', (event) => {

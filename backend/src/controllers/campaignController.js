@@ -5,6 +5,7 @@ const QRCode = require('qrcode');
 const axios = require('axios');
 const { nanoid } = require('nanoid');
 const { notifyStreamPublished, notifyQrScan } = require('../services/notificationService');
+const { uploadToCloudflare } = require('../services/cloudflareService');
 
 // ✅ Push to actual team member (their subscription is under their real ID)
 let _sendPushToUser = null;
@@ -86,28 +87,18 @@ const generateCampaignQRCode = async (slug) => {
       },
     });
 
-    const bunnyHostname = process.env.BUNNY_HOSTNAME || 'storage.bunnycdn.com';
-    const bunnyStorageZone = process.env.BUNNY_STORAGE_ZONE;
-    const bunnyStoragePassword = process.env.BUNNY_STORAGE_PASSWORD;
-    const bunnyPullZone = process.env.BUNNY_PULL_ZONE;
-
-    // âœ… Use unique filename to bust CDN cache
+    // Upload to Cloudflare R2
     const timestamp = Date.now();
     const fileName = `campaign-qr-${slug}-${timestamp}.png`;
 
-    const response = await axios.put(
-      `https://${bunnyHostname}/${bunnyStorageZone}/qr-codes/${fileName}`,
-      qrCodeBuffer,
-      {
-        headers: {
-          'AccessKey': bunnyStoragePassword,
-          'Content-Type': 'image/png',
-        },
-      }
-    );
+    const uploadResult = await uploadToCloudflare(qrCodeBuffer, fileName, 'qr-codes', 'image/png');
 
-    const qrCodeUrl = `https://${bunnyPullZone}/qr-codes/${fileName}`;
-    return qrCodeUrl;
+    if (uploadResult.success) {
+      return uploadResult.url;
+    }
+
+    console.warn('⚠️ Campaign QR upload to R2 failed, returning null');
+    return null;
   } catch (error) {
     console.error('QR code generation error:', error);
     return null;
@@ -177,10 +168,13 @@ const createCampaign = async (req, res) => {
     // ✅ STRICT: Enforce stream limits per plan
     // ═══════════════════════════════════════════════════════
     const STREAM_LIMITS = {
-      INDIVIDUAL: 2,
-      ORG_SMALL: 5,
-      ORG_MEDIUM: 20,
-      ORG_ENTERPRISE: null, // unlimited
+      INDIVIDUAL: 1,          // Personal Single Use — 1 stream
+      PERSONAL_LIFE: 10,      // Personal Life Events — up to 10 streams
+      ORG_EVENTS: 80,         // Org Events — 80 campaigns
+      ORG_SMALL: 20,          // Starter — 20 campaigns
+      ORG_MEDIUM: 30,         // Growth — 30 campaigns
+      ORG_SCALE: 50,          // Pro — 50 campaigns
+      ORG_ENTERPRISE: null,   // Enterprise — unlimited
     };
 
     const owner = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
@@ -551,13 +545,15 @@ const getPublicCampaign = async (req, res) => {
     }
 
     let userName = 'Unknown';
+    let userRole = 'INDIVIDUAL';
     try {
       const user = await prisma.user.findUnique({
         where: { id: campaign.userId },
-        select: { name: true },
+        select: { name: true, role: true },
       });
       if (user) {
         userName = user.name;
+        userRole = user.role || "INDIVIDUAL";
       }
     } catch (userError) {
       console.error('âš ï¸ Could not fetch user name:', userError.message);
@@ -578,6 +574,7 @@ const getPublicCampaign = async (req, res) => {
       })),
       user: {
         name: userName,
+        role: userRole,
       },
     };
 

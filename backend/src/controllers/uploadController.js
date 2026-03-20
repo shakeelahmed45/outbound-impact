@@ -1,6 +1,7 @@
 const prisma = require('../lib/prisma');
 const { getAutoAssignOrgId } = require("../helpers/orgScope");
-const { uploadToBunny, generateFileName, generateSlug } = require('../services/bunnyService');
+const { uploadToCloudflare, generateFileName, generateSlug } = require('../services/cloudflareService');
+const { optimiseVideo } = require('../services/videoProcessingService');
 const QRCode = require('qrcode');
 const { notifyUpload, notifyStorageWarning, createNotification } = require('../services/notificationService');
 const { sendEditorUploadNotification } = require('../services/emailService');
@@ -106,10 +107,13 @@ const notifyOwnerAndAdmins = async (ownerId, uploaderEmail, itemTitle, itemType,
 // PLAN LIMITS — Strict enforcement
 // ═══════════════════════════════════════════════════════════
 const PLAN_UPLOAD_LIMITS = {
-  INDIVIDUAL: 5,
-  ORG_SMALL: null,    // unlimited
-  ORG_MEDIUM: null,   // unlimited
-  ORG_ENTERPRISE: null // unlimited
+  INDIVIDUAL: null,       // unlimited — storage-based only
+  PERSONAL_LIFE: null,    // unlimited — storage-based only
+  ORG_EVENTS: null,       // unlimited — storage-based only
+  ORG_SMALL: null,        // unlimited — storage-based only
+  ORG_MEDIUM: null,       // unlimited — storage-based only
+  ORG_SCALE: null,        // unlimited — storage-based only
+  ORG_ENTERPRISE: null    // unlimited — storage-based only
 };
 
 const checkUploadLimit = async (userId) => {
@@ -290,10 +294,25 @@ const uploadFile = async (req, res) => {
       });
     }
 
-    // Upload to Bunny.net
-    const uniqueFileName = generateFileName(fileName, userId);
-    const uploadResult = await uploadToBunny(
-      fileBuffer,
+    // ── Video optimisation (FFmpeg faststart) ─────────────────
+    // Runs only for video files. Falls back to original if FFmpeg fails.
+    let finalBuffer   = fileBuffer;
+    let finalFileName = fileName;
+
+    if (type === 'VIDEO') {
+      console.log('🎬 Running FFmpeg faststart optimisation…');
+      const optimised = await optimiseVideo(fileBuffer, fileName);
+      finalBuffer   = optimised.buffer;
+      finalFileName = optimised.fileName;
+      if (optimised.processed) {
+        console.log('✅ Video optimised with faststart');
+      }
+    }
+
+    // Upload to Cloudflare R2
+    const uniqueFileName = generateFileName(finalFileName, userId);
+    const uploadResult = await uploadToCloudflare(
+      finalBuffer,
       uniqueFileName,
       type.toLowerCase()
     );
@@ -302,14 +321,14 @@ const uploadFile = async (req, res) => {
     let thumbnailUrl = null;
     
     if (uploadResult.success) {
-      console.log('✅ File uploaded to Bunny.net CDN');
+      console.log('✅ File uploaded to Cloudflare R2');
       mediaUrl = uploadResult.url;
       
       if (type === 'IMAGE') {
         thumbnailUrl = mediaUrl;
       }
     } else {
-      console.log('⚠️ Bunny.net upload failed');
+      console.log('⚠️ Cloudflare R2 upload failed');
       console.log('Error:', uploadResult.error);
       
       // If multipart, we can't fall back to base64 in database
@@ -352,7 +371,7 @@ const uploadFile = async (req, res) => {
     const qrBuffer = Buffer.from(base64QRData, 'base64');
     const qrFileName = `qr-${slug}.png`;
     
-    const qrUploadResult = await uploadToBunny(qrBuffer, qrFileName, 'image/png');
+    const qrUploadResult = await uploadToCloudflare(qrBuffer, qrFileName, 'qr-codes', 'image/png');
     const qrCodeUrl = qrUploadResult.success ? qrUploadResult.url : qrCodeDataUrl;
 
     // Update storage
@@ -522,7 +541,7 @@ const createTextPost = async (req, res) => {
     const qrBuffer = Buffer.from(base64QRData, 'base64');
     const qrFileName = `qr-${slug}.png`;
     
-    const qrUploadResult = await uploadToBunny(qrBuffer, qrFileName, 'image/png');
+    const qrUploadResult = await uploadToCloudflare(qrBuffer, qrFileName, 'qr-codes', 'image/png');
     const qrCodeUrl = qrUploadResult.success ? qrUploadResult.url : qrCodeDataUrl;
 
     // ═══ Content Approval ═══
@@ -646,7 +665,7 @@ const createEmbedPost = async (req, res) => {
     const qrBuffer = Buffer.from(base64QRData, 'base64');
     const qrFileName = `qr-${slug}.png`;
     
-    const qrUploadResult = await uploadToBunny(qrBuffer, qrFileName, 'image/png');
+    const qrUploadResult = await uploadToCloudflare(qrBuffer, qrFileName, 'qr-codes', 'image/png');
     const qrCodeUrl = qrUploadResult.success ? qrUploadResult.url : qrCodeDataUrl;
 
     let thumbnailUrl = null;
@@ -669,8 +688,7 @@ const createEmbedPost = async (req, res) => {
         title,
         description: description || null,
         type: 'EMBED',
-        embedUrl,
-        embedType: embedType || 'External',
+        mediaUrl: embedUrl,
         qrCodeUrl,
         thumbnailUrl,
         fileSize: BigInt(0),

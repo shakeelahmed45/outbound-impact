@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { TrendingUp, Eye, FolderOpen, BarChart3, Download, FileText, Clock, QrCode, Upload, Sparkles } from 'lucide-react';
+import { TrendingUp, Eye, FolderOpen, BarChart3, Download, FileText, Clock, QrCode, Upload, Sparkles, Zap } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import useAuthStore from '../store/authStore';
 import api from '../services/api';
@@ -44,7 +44,7 @@ const AnalyticsPage = () => {
     try {
       const response = await api.get('/analytics/time-of-day');
       if (response.data.status === 'success') {
-        setHourlyData(response.data.activityByHour);
+        setHourlyData(response.data.hourly);
       }
     } catch (error) {
       console.error('Failed to fetch hourly data:', error);
@@ -66,7 +66,8 @@ const AnalyticsPage = () => {
     csvData.push(['Summary Statistics']);
     csvData.push(['Total Views', analytics.totalViews || 0]);
     csvData.push(['Total Items', analytics.totalItems || 0]);
-    csvData.push(['Active Campaigns', analytics.campaignStats?.length || 0]);
+    csvData.push(['Active Streams/Campaigns', analytics.campaigns?.length || 0]);
+    csvData.push(['Amplify Views', analytics.amplifyViews || analytics.sourceBreakdown?.amplify || 0]);
     csvData.push(['']); // Empty row
     
     // Content by Type
@@ -81,10 +82,10 @@ const AnalyticsPage = () => {
     }
     
     // Campaign Performance
-    if (analytics.campaignStats && analytics.campaignStats.length > 0) {
+    if (analytics.campaigns && analytics.campaigns.length > 0) {
       csvData.push(['Campaign Performance']);
       csvData.push(['Campaign Name', 'Items', 'Views']);
-      analytics.campaignStats.forEach((campaign) => {
+      analytics.campaigns.forEach((campaign) => {
         csvData.push([campaign.name, campaign.itemCount, campaign.views]);
       });
       csvData.push(['']); // Empty row
@@ -111,7 +112,7 @@ const AnalyticsPage = () => {
       csvData.push(['Activity by Time of Day']);
       csvData.push(['Hour', 'Views']);
       hourlyData.forEach((data) => {
-        csvData.push([data.hourLabel, data.views]);
+        csvData.push([data.label, data.views]);
       });
     }
     
@@ -179,7 +180,7 @@ const AnalyticsPage = () => {
       yPosition += 6;
       doc.text(`Total Items: ${analytics.totalItems || 0}`, 20, yPosition);
       yPosition += 6;
-      doc.text(`Active Campaigns: ${analytics.campaignStats?.length || 0}`, 20, yPosition);
+      doc.text(`Active ${useStreamLabel ? 'Streams' : 'Campaigns'}: ${analytics.campaigns?.length || 0}`, 20, yPosition);
       yPosition += 12;
       
       // Content by Type Table
@@ -206,7 +207,7 @@ const AnalyticsPage = () => {
       }
       
       // Campaign Performance Table
-      if (analytics.campaignStats && analytics.campaignStats.length > 0) {
+      if (analytics.campaigns && analytics.campaigns.length > 0) {
         if (yPosition > 250) {
           doc.addPage();
           yPosition = 20;
@@ -216,7 +217,7 @@ const AnalyticsPage = () => {
         doc.text('Campaign Performance', 20, yPosition);
         yPosition += 5;
         
-        const campaignData = analytics.campaignStats.map((campaign) => [
+        const campaignData = analytics.campaigns.map((campaign) => [
           campaign.name,
           campaign.itemCount,
           campaign.views
@@ -342,7 +343,7 @@ const AnalyticsPage = () => {
     const activeHours = hourlyData.filter(d => d.views > 0).length;
     
     return {
-      peakHour: peakHourData ? peakHourData.hourLabel : '--:--',
+      peakHour: peakHourData ? peakHourData.label : '--:--',
       peakViews: maxViews,
       avgPerHour: Math.round(totalViews / 24),
       activeHours
@@ -355,6 +356,8 @@ const AnalyticsPage = () => {
   const { user } = useAuthStore();
   const effectiveUser = user?.isTeamMember ? user.organization : user;
   const isIndividual = effectiveUser?.role === 'INDIVIDUAL';
+  const isPersonalLife = effectiveUser?.role === 'PERSONAL_LIFE';
+  const useStreamLabel = isIndividual || isPersonalLife;
 
   if (loading) {
     return (
@@ -367,7 +370,7 @@ const AnalyticsPage = () => {
   }
 
   // ═══ Individual plan → Pablo-style simple analytics ═══
-  if (isIndividual) {
+  if (isIndividual && !isPersonalLife) {
     return (
       <DashboardLayout>
         <div className="max-w-6xl mx-auto">
@@ -452,7 +455,7 @@ const AnalyticsPage = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
@@ -484,11 +487,68 @@ const AnalyticsPage = () => {
               </div>
             </div>
             <p className="text-3xl font-bold text-primary mb-1">
-              {analytics?.campaignStats?.length || 0}
+              {analytics?.campaigns?.length || 0}
             </p>
-            <p className="text-sm text-gray-600">Active Campaigns</p>
+            <p className="text-sm text-gray-600">{useStreamLabel ? 'Active Streams' : 'Active Campaigns'}</p>
           </div>
+
+          {/* ⚡ Amplify Views — org plans only */}
+          {!useStreamLabel && (
+            <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-teal-50 to-violet-50 opacity-60 pointer-events-none"/>
+              <div className="relative">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-teal-500 to-violet-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <Zap size={24} className="text-white" />
+                  </div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-teal-600 bg-teal-100 px-2 py-1 rounded-full">Amplify</span>
+                </div>
+                <p className="text-3xl font-bold text-primary mb-1">
+                  {analytics?.amplifyViews || analytics?.sourceBreakdown?.amplify || 0}
+                </p>
+                <p className="text-sm text-gray-600">Amplify Views</p>
+                <p className="text-xs text-gray-400 mt-1">Views from social shares</p>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* ⚡ AMPLIFY SOURCE BREAKDOWN — org plans only */}
+        {!useStreamLabel && (analytics?.sourceBreakdown?.amplify > 0 || analytics?.amplifyViews > 0) && (
+          <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 mb-8">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-violet-600 rounded-xl flex items-center justify-center">
+                <Zap size={20} className="text-white"/>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-primary">Amplify Performance</h3>
+                <p className="text-sm text-gray-500">Views that came from your social media shares</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: 'Total Amplify Views', value: analytics?.amplifyViews || analytics?.sourceBreakdown?.amplify || 0, color: 'from-teal-500 to-violet-600', icon: '⚡' },
+                { label: 'Direct Views',         value: analytics?.sourceBreakdown?.direct || 0,  color: 'from-blue-500 to-blue-600',   icon: '🔗' },
+                { label: 'QR Code Scans',        value: analytics?.sourceBreakdown?.qr || 0,      color: 'from-purple-500 to-purple-600', icon: '📱' },
+                { label: 'NFC Taps',             value: analytics?.sourceBreakdown?.nfc || 0,     color: 'from-green-500 to-green-600',  icon: '📡' },
+              ].map(({ label, value, color, icon }) => (
+                <div key={label} className="bg-gray-50 rounded-xl p-4 border border-gray-200 text-center">
+                  <p className="text-2xl mb-1">{icon}</p>
+                  <p className="text-2xl font-bold text-gray-900">{value.toLocaleString()}</p>
+                  <p className="text-xs text-gray-500 mt-1 font-medium">{label}</p>
+                </div>
+              ))}
+            </div>
+            {/* Amplify share percentage */}
+            {(analytics?.totalViews || 0) > 0 && (
+              <div className="mt-4 p-3 bg-gradient-to-r from-teal-50 to-violet-50 rounded-xl border border-teal-200">
+                <p className="text-sm text-teal-800 font-medium text-center">
+                  ⚡ <strong>{Math.round(((analytics?.amplifyViews || 0) / analytics.totalViews) * 100)}%</strong> of your total views came from Amplify social shares
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ACTIVITY BY TIME OF DAY CARD - NOW WITH REAL DATA */}
         <div className="bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 rounded-3xl shadow-2xl p-8 border-2 border-orange-200 mb-8 relative overflow-hidden">
@@ -538,7 +598,7 @@ const AnalyticsPage = () => {
                               {data.views > 0 && (
                                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
                                   <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-xl">
-                                    <p className="font-bold">{data.hourLabel}</p>
+                                    <p className="font-bold">{data.label}</p>
                                     <p>{data.views} {data.views === 1 ? 'view' : 'views'}</p>
                                   </div>
                                 </div>
@@ -665,10 +725,10 @@ const AnalyticsPage = () => {
           </div>
 
           <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-            <h3 className="text-xl font-bold text-primary mb-6">Campaign Performance</h3>
-            {analytics?.campaignStats && analytics.campaignStats.length > 0 ? (
+            <h3 className="text-xl font-bold text-primary mb-6">{useStreamLabel ? 'Stream Performance' : 'Campaign Performance'}</h3>
+            {analytics?.campaigns && analytics.campaigns.length > 0 ? (
               <div className="space-y-4">
-                {analytics.campaignStats.map((campaign) => (
+                {analytics.campaigns.map((campaign) => (
                   <div key={campaign.id} className="flex items-center justify-between p-4 bg-purple-50 rounded-lg">
                     <div>
                       <p className="font-semibold text-gray-800">{campaign.name}</p>

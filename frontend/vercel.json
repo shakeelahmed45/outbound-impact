@@ -4,6 +4,17 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/l/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|Slackbot|TelegramBot|Discordbot|baiduspider|Googlebot|Bingbot|redditbot|pinterest|vkShare|Embedly|quora|outbrain|W3C_Validator|preview).*"
+        }
+      ],
+      "destination": "https://outbound-impact-production.up.railway.app/og/:slug"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

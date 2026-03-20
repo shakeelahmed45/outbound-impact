@@ -18,7 +18,8 @@ const useBrandColors = (userId = null) => {
         
         // ✅ CRITICAL FIX: Check if we're on a public route
         const isPublicRoute = location.pathname.startsWith('/l/') || 
-                             location.pathname.startsWith('/c/');
+                             location.pathname.startsWith('/c/') ||
+                             location.pathname.startsWith('/g/');
         
         if (isPublicRoute) {
           console.log('ℹ️ Public route detected - using default brand colors (skipping API call)');

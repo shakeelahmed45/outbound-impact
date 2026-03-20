@@ -113,12 +113,15 @@ const authMiddleware = async (req, res, next) => {
         select: { status: true }
       });
 
-      if (dbUser && dbUser.status === 'suspended') {
-        console.log(`🚫 Blocked suspended user: ${decoded.email || decoded.userId}`);
+      if (dbUser && (dbUser.status === 'suspended' || dbUser.status === 'banned')) {
+        const isBanned = dbUser.status === 'banned';
+        console.log(`🚫 Blocked ${isBanned ? 'banned' : 'suspended'} user: ${decoded.email || decoded.userId}`);
         return res.status(403).json({
           status: 'error',
           code: 'ACCOUNT_SUSPENDED',
-          message: 'Your account has been suspended. Please contact support@outboundimpact.org for assistance.'
+          message: isBanned
+            ? 'Your account has been permanently banned. Please contact support@outboundimpact.org.'
+            : 'Your account has been suspended. Please contact support@outboundimpact.org for assistance.'
         });
       }
     } catch (dbErr) {

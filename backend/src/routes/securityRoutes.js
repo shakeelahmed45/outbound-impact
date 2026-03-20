@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const crypto = require('crypto');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+
+const prisma = require('../lib/prisma');
 
 // Temporary storage for 2FA codes (in production, use Redis or database)
 const twoFactorCodes = new Map();

@@ -99,4 +99,7 @@ router.get('/refund/status', authMiddleware, resolveEffectiveUserId, (req, res, 
   next();
 }, refundController.getRefundStatus);
 
+// ── Feedback / Support ────────────────────────────────────────
+router.post('/feedback', authMiddleware, userController.submitFeedback);
+
 module.exports = router;

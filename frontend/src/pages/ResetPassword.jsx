@@ -96,6 +96,7 @@ const ResetPassword = () => {
 
   // Invalid token
   if (!tokenValid) {
+    const isExpired = error?.toLowerCase().includes('expired');
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-violet-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
@@ -103,11 +104,23 @@ const ResetPassword = () => {
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <XCircle className="text-red-600" size={32} />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Invalid Reset Link</h2>
-            <p className="text-gray-600 mb-6">{error || 'This password reset link is invalid or has expired.'}</p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              {isExpired ? 'Link Expired' : 'Invalid Reset Link'}
+            </h2>
+            <p className="text-gray-600 mb-6">
+              {isExpired
+                ? 'This password reset link has expired. Reset links are valid for 24 hours. Please request a new one.'
+                : (error || 'This password reset link is invalid or has expired. Please request a new one.')}
+            </p>
+            <button
+              onClick={() => navigate('/forgot-password')}
+              className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition-all mb-3"
+            >
+              Request New Reset Link
+            </button>
             <button
               onClick={() => navigate('/signin')}
-              className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition-all"
+              className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-all"
             >
               Back to Sign In
             </button>

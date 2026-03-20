@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, Folder, Play, FileText, Music, Image as ImageIcon, Eye, Mic, ArrowLeft, Share2, Copy, Check, X, Lock, Loader2, Key, Shield, ExternalLink, Link } from 'lucide-react';
 import axios from 'axios';
@@ -324,6 +324,15 @@ const PublicCampaignViewer = () => {
   // ✅ Get current user from auth store
   const { user } = useAuthStore();
   const effectiveUserId = getEffectiveUserId();
+
+  // ── "Campaigns" for org plans, "Streams" for personal plans ──
+  // Use the logged-in user's role first; fall back to campaign owner's role once loaded
+  const effectiveRole = user?.isTeamMember ? user?.organization?.role : user?.role;
+  const campaignOwnerRole = campaign?.user?.role;
+  const resolvedRole = effectiveRole || campaignOwnerRole || 'INDIVIDUAL';
+  const ORG_ROLES = ['ORG_SMALL', 'ORG_MEDIUM', 'ORG_SCALE', 'ORG_ENTERPRISE', 'ORG_EVENTS'];
+  const isOrgPlan = useMemo(() => ORG_ROLES.includes(resolvedRole), [resolvedRole]);
+  const backLabel = isOrgPlan ? 'Back to Campaigns' : 'Back to Streams';
   
   // ✅ Check if this is a preview from Campaigns page
   const searchParams = new URLSearchParams(window.location.search);
@@ -909,44 +918,62 @@ const PublicCampaignViewer = () => {
     );
   }
 
-  // ✅ EMBED card with PROPER CATEGORIZATION - ALL USING OFFICIAL GRADIENT COLORS
+  // ✅ EMBED card with PROPER CATEGORIZATION - detect platform from mediaUrl
   if (item.type === 'EMBED') {
-    const platformType = item.buttonText || 'External';
+    const url = item.mediaUrl || '';
+
+    // ── Detect platform from URL ──────────────────────────────
+    const detectPlatform = (u) => {
+      if (u.includes('youtube.com') || u.includes('youtu.be'))  return 'YouTube';
+      if (u.includes('vimeo.com'))                              return 'Vimeo';
+      if (u.includes('soundcloud.com'))                         return 'SoundCloud';
+      if (u.includes('spotify.com'))                            return 'Spotify';
+      if (u.includes('docs.google.com/document'))               return 'Google Docs';
+      if (u.includes('docs.google.com/spreadsheets'))           return 'Google Sheets';
+      if (u.includes('docs.google.com/presentation'))           return 'Google Slides';
+      if (u.includes('drive.google.com'))                       return 'Google Drive';
+      if (u.includes('tiktok.com'))                             return 'TikTok';
+      if (u.includes('twitch.tv'))                              return 'Twitch';
+      if (u.includes('dailymotion.com'))                        return 'Dailymotion';
+      return 'External';
+    };
+
+    const platformType = detectPlatform(url);
+    const isVideoEmbed = ['YouTube', 'Vimeo', 'TikTok', 'Twitch', 'Dailymotion'].includes(platformType);
+    const isAudioEmbed = ['SoundCloud', 'Spotify'].includes(platformType);
+    const isDocumentEmbed = ['Google Docs', 'Google Sheets', 'Google Slides', 'Google Drive'].includes(platformType);
     
-    // ✅ CATEGORIZE EMBED TYPE
-    const isVideoEmbed = platformType.includes('YouTube') || platformType.includes('Vimeo');
-    const isAudioEmbed = platformType.includes('SoundCloud') || platformType.includes('Spotify');
-    const isDocumentEmbed = platformType.includes('Google Docs') || 
-                            platformType.includes('Google Sheets') || 
-                            platformType.includes('Google Drive') || 
-                            platformType.includes('Google Slides');
-    
-    // 🎬 VIDEO EMBEDS (YouTube, Vimeo) - WITH ACTUAL THUMBNAILS
+    // 🎬 VIDEO EMBEDS (YouTube, Vimeo, etc.) - WITH ACTUAL THUMBNAILS
     if (isVideoEmbed) {
+      // Extract YouTube thumbnail from mediaUrl if thumbnailUrl is missing
+      let thumbUrl = item.thumbnailUrl;
+      if (!thumbUrl && platformType === 'YouTube') {
+        const ytMatch = url.match(/(?:youtube\.com\/embed\/|youtu\.be\/)([^?&]+)/);
+        if (ytMatch) thumbUrl = `https://img.youtube.com/vi/${ytMatch[1]}/maxresdefault.jpg`;
+      }
+
       return (
         <div className="relative w-full h-full">
-          {/* 🎬 FIXED: Show actual YouTube thumbnail if available */}
-          {item.thumbnailUrl ? (
+          {/* 🎬 Show actual thumbnail if available */}
+          {thumbUrl ? (
             <>
-              {/* YouTube Thumbnail */}
+              {/* Thumbnail */}
               <img
-                src={item.thumbnailUrl}
+                src={thumbUrl}
                 alt={item.title}
                 className="w-full h-full object-cover"
                 onError={(e) => {
-                  // Fallback to red gradient if thumbnail fails to load
                   e.target.style.display = 'none';
                   e.target.nextElementSibling.style.display = 'block';
                 }}
               />
               {/* Fallback red gradient (hidden by default) */}
-              <div 
+              <div
                 className="absolute inset-0 w-full h-full bg-gradient-to-br from-red-600 via-rose-600 to-pink-700"
                 style={{ display: 'none' }}
               ></div>
             </>
           ) : (
-            /* Red gradient fallback for non-YouTube embeds or old embeds */
             <div className="w-full h-full bg-gradient-to-br from-red-600 via-rose-600 to-pink-700"></div>
           )}
           
@@ -1336,7 +1363,7 @@ const PublicCampaignViewer = () => {
             className="mb-6 flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow-md hover:shadow-lg transition-all text-primary font-semibold"
           >
             <ArrowLeft size={20} />
-            <span>Back to Streams</span>
+            <span>{backLabel}</span>
           </button>
         )}
         

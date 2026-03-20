@@ -1,74 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, Loader2, Zap, Tag } from 'lucide-react';
+import { Check, Loader2, Zap, Tag, ArrowRight } from 'lucide-react';
 import api from '../services/api';
 import CouponModal from '../components/CouponModal';
+import EnterpriseContactModal from '../components/EnterpriseContactModal';
 
 const Plans = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('');
-  
-  // ✅ FIXED: Track coupons per plan
+  const [activeTab, setActiveTab] = useState('org');
   const [appliedCoupons, setAppliedCoupons] = useState({});
   const [currentPlanForCoupon, setCurrentPlanForCoupon] = useState(null);
   const [couponModalOpen, setCouponModalOpen] = useState(false);
   const [couponError, setCouponError] = useState('');
-  
-  // Enterprise customization state
   const [enterpriseStorage, setEnterpriseStorage] = useState(1500);
   const [enterpriseTeamMembers, setEnterpriseTeamMembers] = useState(50);
+  const [enterpriseModalOpen, setEnterpriseModalOpen] = useState(false);
 
-  const plans = [
-    {
-      id: 'INDIVIDUAL',
-      name: 'Individual',
-      price: '$85',
-      period: 'one-time',
-      storage: '250GB',
-      features: [
-        'Upload images, videos, audio',
-        'QR code generation',
-        'View tracking & analytics',
-        '250GB storage',
-        'Unlimited views',
-        '12 Months access',
-      ],
-    },
-    {
-      id: 'ORG_SMALL',
-      name: 'Small Organization',
-      price: '$35',
-      period: 'per month',
-      storage: '250GB',
-      features: [
-        'Everything in Individual',
-        'Team management (up to 5 users)',
-        'Campaign creation',
-        '250GB storage',
-        'Advanced analytics',
-        'Priority support',
-      ],
-      popular: true,
-    },
-    {
-      id: 'ORG_MEDIUM',
-      name: 'Medium Organization',
-      price: '$60',
-      period: 'per month',
-      storage: '500GB',
-      features: [
-        'Everything in Small Org',
-        'Team management (up to 20 users)',
-        'Custom branding',
-        '500GB storage',
-        'Export reports (CSV/PDF)',
-        'Dedicated support',
-      ],
-    },
-  ];
+  useEffect(() => { document.title = 'Choose Your Plan | Outbound Impact'; }, []);
 
-  // Storage options for Enterprise
   const storageOptions = [
     { value: 1500, label: '1.5 TB', price: 0 },
     { value: 2000, label: '2 TB', price: 50 },
@@ -76,8 +27,6 @@ const Plans = () => {
     { value: 5000, label: '5 TB', price: 350 },
     { value: 10000, label: '10 TB', price: 850 },
   ];
-
-  // Team member options for Enterprise
   const teamOptions = [
     { value: 50, label: '50 Members', price: 0 },
     { value: 100, label: '100 Members', price: 30 },
@@ -86,460 +35,267 @@ const Plans = () => {
     { value: 1000, label: '1000 Members', price: 570 },
     { value: -1, label: 'Unlimited', price: 150 },
   ];
-
-  // Calculate Enterprise price
   const calculateEnterprisePrice = () => {
-    let basePrice = 99;
-    
-    const storageOption = storageOptions.find(opt => opt.value === enterpriseStorage);
-    if (storageOption) {
-      basePrice += storageOption.price;
-    }
-    
-    const teamOption = teamOptions.find(opt => opt.value === enterpriseTeamMembers);
-    if (teamOption) {
-      basePrice += teamOption.price;
-    }
-    
-    return basePrice;
+    let base = 99;
+    const s = storageOptions.find(o => o.value === enterpriseStorage);
+    if (s) base += s.price;
+    const t = teamOptions.find(o => o.value === enterpriseTeamMembers);
+    if (t) base += t.price;
+    return base;
   };
-
-  // ✅ FIXED: Apply coupon to specific plan only
-  const handleApplyCoupon = (couponCode) => {
-    if (currentPlanForCoupon) {
-      setAppliedCoupons(prev => ({
-        ...prev,
-        [currentPlanForCoupon]: couponCode
-      }));
-      console.log(`✅ Applied ${couponCode} to ${currentPlanForCoupon}`);
-    }
-    setCouponError('');
-  };
-
-  // ✅ FIXED: Open modal for specific plan
-  const handleOpenCouponModal = (planId) => {
-    setCurrentPlanForCoupon(planId);
-    setCouponModalOpen(true);
-  };
-
-  const handleSelectPlan = async (planId) => {
-    setLoading(true);
-    setSelectedPlan(planId);
-    setCouponError('');
-
-    try {
-      const signupData = JSON.parse(localStorage.getItem('signupData') || '{}');
-
-      if (!signupData.email || !signupData.password) {
-        navigate('/signup');
-        return;
-      }
-
-      // Prepare request data
-      const requestData = {
-        ...signupData,
-        plan: planId,
-      };
-
-      // ✅ FIXED: Only add coupon for THIS specific plan
-      const planCoupon = appliedCoupons[planId];
-      if (planCoupon) {
-        requestData.couponCode = planCoupon;
-        console.log(`✅ Applying coupon ${planCoupon} to ${planId} plan`);
-      }
-
-      const response = await api.post('/auth/checkout', requestData);
-
-      if (response.data.status === 'success') {
-        window.location.href = response.data.url;
-      }
-    } catch (error) {
-      console.error('Checkout error:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to create checkout';
-      
-      // Check if error is coupon-related
-      if (errorMessage.toLowerCase().includes('coupon') || errorMessage.toLowerCase().includes('invalid')) {
-        setCouponError(errorMessage);
-        // ✅ FIXED: Remove coupon from THIS plan only
-        setAppliedCoupons(prev => ({
-          ...prev,
-          [planId]: null
-        }));
-        alert(errorMessage);
-      } else {
-        alert(errorMessage);
-      }
-    } finally {
-      setLoading(false);
-      setSelectedPlan('');
-    }
-  };
-
-  const handleEnterpriseCheckout = async () => {
-    setLoading(true);
-    setSelectedPlan('ORG_ENTERPRISE');
-    setCouponError('');
-
-    try {
-      const signupData = JSON.parse(localStorage.getItem('signupData') || '{}');
-
-      if (!signupData.email || !signupData.password) {
-        alert('Please sign up first before selecting a plan');
-        navigate('/signup');
-        return;
-      }
-
-      const enterpriseConfig = {
-        storageGB: enterpriseStorage,
-        teamMembers: enterpriseTeamMembers,
-        calculatedPrice: calculateEnterprisePrice(),
-        features: {
-          whiteLabel: true,
-          apiAccess: true,
-          customIntegrations: true,
-          dedicatedSupport: true,
-        }
-      };
-
-      // Prepare request data
-      const requestData = {
-        ...signupData,
-        plan: 'ORG_ENTERPRISE',
-        enterpriseConfig,
-      };
-
-      // ✅ FIXED: Only add coupon for Enterprise plan
-      const enterpriseCoupon = appliedCoupons['ORG_ENTERPRISE'];
-      if (enterpriseCoupon) {
-        requestData.couponCode = enterpriseCoupon;
-        console.log(`✅ Applying coupon ${enterpriseCoupon} to Enterprise plan`);
-      }
-
-      const response = await api.post('/auth/checkout', requestData);
-
-      if (response.data.status === 'success') {
-        window.location.href = response.data.url;
-      }
-    } catch (error) {
-      console.error('Enterprise checkout error:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to create enterprise checkout';
-      
-      // Check if error is coupon-related
-      if (errorMessage.toLowerCase().includes('coupon') || errorMessage.toLowerCase().includes('invalid')) {
-        setCouponError(errorMessage);
-        // ✅ FIXED: Remove coupon from Enterprise plan only
-        setAppliedCoupons(prev => ({
-          ...prev,
-          'ORG_ENTERPRISE': null
-        }));
-        alert(errorMessage);
-      } else {
-        alert(errorMessage);
-      }
-    } finally {
-      setLoading(false);
-      setSelectedPlan('');
-    }
-  };
-
   const enterprisePrice = calculateEnterprisePrice();
 
+  const handleApplyCoupon = (code) => {
+    if (currentPlanForCoupon) setAppliedCoupons(prev => ({ ...prev, [currentPlanForCoupon]: code }));
+    setCouponError('');
+  };
+  const openCoupon = (planId) => { setCurrentPlanForCoupon(planId); setCouponModalOpen(true); };
+
+  const handleSelect = async (planId, extraData) => {
+    const signupData = JSON.parse(localStorage.getItem('signupData') || '{}');
+    if (signupData.email && signupData.password) {
+      setLoading(true); setSelectedPlan(planId); setCouponError('');
+      try {
+        const req = { ...signupData, plan: planId, ...extraData };
+        const c = appliedCoupons[planId];
+        if (c) req.couponCode = c;
+        const res = await api.post('/auth/checkout', req);
+        if (res.data.status === 'success') window.location.href = res.data.url;
+      } catch (err) {
+        const msg = err.response?.data?.message || 'Failed to create checkout';
+        if (msg.toLowerCase().includes('coupon') || msg.toLowerCase().includes('invalid')) {
+          setCouponError(msg); setAppliedCoupons(prev => ({ ...prev, [planId]: null }));
+        }
+        alert(msg);
+      } finally { setLoading(false); setSelectedPlan(''); }
+    } else {
+      localStorage.setItem('selectedPlan', JSON.stringify({ planId, couponCode: appliedCoupons[planId] || null, ...extraData }));
+      navigate('/signup');
+    }
+  };
+
+  const handleEnterprise = () => {
+    handleSelect('ORG_ENTERPRISE', { enterpriseConfig: { storageGB: enterpriseStorage, teamMembers: enterpriseTeamMembers, calculatedPrice: enterprisePrice, features: { whiteLabel: true, apiAccess: true, customIntegrations: true, dedicatedSupport: true } } });
+  };
+
+  const Ck = ({ color, children }) => (
+    <div className="flex items-start gap-2 mb-2">
+      <div className="w-[18px] h-[18px] rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: `${color}12` }}>
+        <Check size={10} style={{ color }} strokeWidth={3} />
+      </div>
+      <span className="text-[13px] text-gray-900 leading-snug">{children}</span>
+    </div>
+  );
+
+  const CouponBadge = ({ planId }) => {
+    const c = appliedCoupons[planId];
+    if (!c) return null;
+    return (
+      <div className="mb-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 rounded-lg p-2.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5"><Tag className="text-green-600" size={13} /><span className="text-xs font-semibold text-green-900">Coupon Applied</span></div>
+          <span className="text-xs font-mono font-bold text-green-700">{c}</span>
+        </div>
+      </div>
+    );
+  };
+
+  const CtaBtn = ({ planId, gradient, label = 'Get Started', extraData }) => {
+    const isLoading = loading && selectedPlan === planId;
+    return (
+      <>
+        <CouponBadge planId={planId} />
+        <button onClick={() => extraData ? handleSelect(planId, extraData) : handleSelect(planId)} disabled={isLoading}
+          className="block w-full py-3.5 rounded-xl font-bold text-[15px] text-white text-center mb-2 transition-all hover:opacity-90 disabled:opacity-50"
+          style={{ background: `linear-gradient(135deg, ${gradient})`, boxShadow: `0 4px 18px ${gradient.split(',')[0].trim()}33` }}>
+          {isLoading ? <span className="flex items-center justify-center gap-2"><Loader2 className="animate-spin" size={18} /> Processing...</span> : label}
+        </button>
+        <button onClick={() => openCoupon(planId)} className="w-full text-center text-sm text-gray-500 hover:text-gray-700 font-semibold transition-colors mt-1">
+          {appliedCoupons[planId] ? '🎫 Change coupon code' : '🎫 Have a coupon code?'}
+        </button>
+      </>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-white py-12 px-4">
-      {/* Coupon Modal */}
-      <CouponModal
-        isOpen={couponModalOpen}
-        onClose={() => {
-          setCouponModalOpen(false);
-          setCurrentPlanForCoupon(null);
-        }}
-        onApplyCoupon={handleApplyCoupon}
-        appliedCoupon={currentPlanForCoupon ? appliedCoupons[currentPlanForCoupon] : null}
-      />
+    <div className="min-h-screen bg-gradient-to-b from-[#FDFBF7] via-white to-[#F0EBE1]">
+      <CouponModal isOpen={couponModalOpen} onClose={() => { setCouponModalOpen(false); setCurrentPlanForCoupon(null); }} onApplyCoupon={handleApplyCoupon} appliedCoupon={currentPlanForCoupon ? appliedCoupons[currentPlanForCoupon] : null} />
 
-      <div className="text-center mb-12">
-        <img 
-          src="/logo.webp" 
-          alt="Outbound Impact" 
-          className="w-45 h-20 mx-auto mb-4 animate-pulse-slow"
-          onError={(e) => e.target.style.display = 'none'}
-        />
-        <h1 className="text-5xl font-bold text-primary mb-3">
-          Choose Your Plan
-        </h1>
-        <p className="text-xl text-secondary">
-          Select the perfect plan for your needs
-        </p>
-      </div>
-
-      {/* Plans Grid */}
-      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
-        {plans.map((plan) => {
-          // ✅ FIXED: Get coupon for THIS specific plan only
-          const planCoupon = appliedCoupons[plan.id];
-          
-          return (
-            <div
-              key={plan.id}
-              className={`relative bg-white rounded-2xl shadow-xl p-8 border-2 transition-all hover:scale-105 ${
-                plan.popular ? 'border-primary' : 'border-gray-200'
-              }`}
-            >
-              {plan.popular && (
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-2 rounded-full text-sm font-bold shadow-lg">
-                    Most Popular
-                  </span>
-                </div>
-              )}
-
-              <div className="text-center mb-6">
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                  {plan.name}
-                </h3>
-                <div className="mb-2">
-                  <span className="text-5xl font-bold text-primary">
-                    {plan.price}
-                  </span>
-                  <span className="text-secondary ml-2">
-                    {plan.period}
-                  </span>
-                </div>
-                <p className="text-lg text-secondary font-semibold">
-                  {plan.storage} Storage
-                </p>
-              </div>
-
-              <ul className="space-y-3 mb-8">
-                {plan.features.map((feature, index) => (
-                  <li key={index} className="flex items-start gap-3">
-                    <Check className="text-primary flex-shrink-0 mt-1" size={20} />
-                    <span className="text-gray-700">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-
-              {/* ✅ FIXED: Only show badge if THIS plan has a coupon */}
-              {planCoupon && (
-                <div className="mb-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 rounded-lg p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Tag className="text-green-600" size={16} />
-                      <span className="text-sm font-semibold text-green-900">Coupon Applied</span>
-                    </div>
-                    <span className="text-xs font-mono font-bold text-green-700">{planCoupon}</span>
-                  </div>
-                </div>
-              )}
-
-              <button
-                onClick={() => handleSelectPlan(plan.id)}
-                disabled={loading && selectedPlan === plan.id}
-                className="w-full gradient-btn text-white py-3 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 disabled:opacity-50 mb-3"
-              >
-                {loading && selectedPlan === plan.id ? (
-                  <>
-                    <Loader2 className="animate-spin" size={20} />
-                    Processing...
-                  </>
-                ) : (
-                  'Select Plan'
-                )}
-              </button>
-
-              {/* ✅ FIXED: Open modal for THIS specific plan */}
-              <button
-                onClick={() => handleOpenCouponModal(plan.id)}
-                className="w-full text-center text-sm text-purple-600 hover:text-purple-700 font-medium transition-colors"
-              >
-                {planCoupon ? 'Change coupon code' : 'Have a coupon code?'}
-              </button>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Interactive Enterprise Section */}
-      <div className="max-w-7xl mx-auto mt-16">
-        <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-3xl p-4 sm:p-8 md:p-12 border-4 border-yellow-500">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full mb-4">
-              <Zap className="text-white" size={32} />
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">Enterprise Plan</h2>
-            <p className="text-lg sm:text-xl text-gray-700">Customize your plan to fit your organization's needs</p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-            {/* Configuration Panel */}
-            <div className="lg:col-span-2 space-y-6 lg:space-y-8">
-              {/* Storage Selection */}
-              <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg">
-                <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">Select Storage Capacity</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
-                  {storageOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => setEnterpriseStorage(option.value)}
-                      className={`p-3 sm:p-4 rounded-lg border-2 font-semibold transition-all text-sm sm:text-base ${
-                        enterpriseStorage === option.value
-                          ? 'border-yellow-500 bg-yellow-50 text-yellow-700'
-                          : 'border-gray-200 hover:border-yellow-300'
-                      }`}
-                    >
-                      <div className="font-bold">{option.label}</div>
-                      {option.price > 0 && (
-                        <div className="text-xs text-gray-500">+${option.price}/mo</div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Team Members Selection */}
-              <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg">
-                <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">Select Team Size</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
-                  {teamOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => setEnterpriseTeamMembers(option.value)}
-                      className={`p-3 sm:p-4 rounded-lg border-2 font-semibold transition-all text-sm sm:text-base ${
-                        enterpriseTeamMembers === option.value
-                          ? 'border-yellow-500 bg-yellow-50 text-yellow-700'
-                          : 'border-gray-200 hover:border-yellow-300'
-                      }`}
-                    >
-                      <div className="font-bold">{option.label}</div>
-                      {option.price > 0 && (
-                        <div className="text-xs text-gray-500">+${option.price}/mo</div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Enterprise Features List */}
-              <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg">
-                <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">All Enterprise Features Included</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {[
-                    'Everything in Medium Org',
-                    'Custom storage capacity',
-                    'Flexible team size',
-                    'White-label solution',
-                    'Full API access',
-                    'Custom integrations',
-                    'Advanced security features',
-                    'Priority email support',
-                    '24/7 phone support',
-                    'Dedicated account manager',
-                    'Custom SLA agreements',
-                    'Training & onboarding'
-                  ].map((feature, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <Check className="text-yellow-600 flex-shrink-0" size={18} />
-                      <span className="text-gray-700 text-sm">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Price Summary Card */}
-            <div className="lg:col-span-1">
-              <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl p-6 sm:p-8 text-white sticky top-8 shadow-2xl">
-                <h3 className="text-xl sm:text-2xl font-bold mb-6">Your Enterprise Plan</h3>
-
-                <div className="space-y-4 mb-6">
-                  <div className="flex justify-between items-center pb-3 border-b border-white/30">
-                    <span className="font-medium text-sm sm:text-base">Storage</span>
-                    <span className="font-bold text-base sm:text-lg">
-                      {enterpriseStorage >= 1000 
-                        ? `${enterpriseStorage / 1000} TB` 
-                        : `${enterpriseStorage} GB`}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between items-center pb-3 border-b border-white/30">
-                    <span className="font-medium text-sm sm:text-base">Team Members</span>
-                    <span className="font-bold text-base sm:text-lg">
-                      {enterpriseTeamMembers === -1 ? 'Unlimited' : enterpriseTeamMembers}
-                    </span>
-                  </div>
-
-                  {/* ✅ FIXED: Only show Enterprise coupon */}
-                  {appliedCoupons['ORG_ENTERPRISE'] && (
-                    <div className="flex justify-between items-center pb-3 border-b border-white/30">
-                      <span className="font-medium text-sm sm:text-base">Coupon</span>
-                      <span className="font-bold text-base sm:text-lg font-mono">{appliedCoupons['ORG_ENTERPRISE']}</span>
-                    </div>
-                  )}
-
-                  <div className="pt-2">
-                    <div className="text-xs sm:text-sm opacity-90 mb-2">Included Features:</div>
-                    <div className="space-y-1 text-xs sm:text-sm">
-                      <div className="flex items-center gap-2">
-                        <Check size={14} />
-                        <span>White-label solution</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check size={14} />
-                        <span>Full API access</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check size={14} />
-                        <span>Custom integrations</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check size={14} />
-                        <span>24/7 dedicated support</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white/20 rounded-xl p-4 sm:p-6 mb-6">
-                  <div className="text-xs sm:text-sm opacity-90 mb-2">Total Monthly Price</div>
-                  <div className="text-4xl sm:text-5xl font-bold mb-1">${enterprisePrice}</div>
-                  <div className="text-xs sm:text-sm opacity-90">per month, billed monthly</div>
-                </div>
-
-                <button
-                  onClick={handleEnterpriseCheckout}
-                  disabled={loading && selectedPlan === 'ORG_ENTERPRISE'}
-                  className="w-full bg-white text-yellow-600 py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg hover:bg-gray-100 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg mb-3"
-                >
-                  {loading && selectedPlan === 'ORG_ENTERPRISE' ? (
-                    <>
-                      <Loader2 className="animate-spin" size={20} />
-                      <span className="hidden sm:inline">Processing...</span>
-                      <span className="sm:hidden">Processing</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="hidden sm:inline">Proceed to Checkout</span>
-                      <span className="sm:hidden">Checkout</span>
-                    </>
-                  )}
-                </button>
-
-                {/* ✅ FIXED: Enterprise coupon link */}
-                <button
-                  onClick={() => handleOpenCouponModal('ORG_ENTERPRISE')}
-                  className="w-full text-center text-sm text-white/90 hover:text-white font-medium transition-colors"
-                >
-                  {appliedCoupons['ORG_ENTERPRISE'] ? 'Change coupon code' : 'Have a coupon code?'}
-                </button>
-
-                <p className="text-xs text-center mt-4 opacity-80">
-                  Secure checkout powered by Stripe
-                </p>
-              </div>
-            </div>
+      {/* HERO */}
+      <div className="pt-12 pb-10 px-4">
+        <div className="max-w-3xl mx-auto text-center">
+          <img src="/logo.webp" alt="Outbound Impact" className="w-44 h-auto mx-auto mb-6" onError={(e) => e.target.style.display = 'none'} />
+          <div className="flex items-center justify-center gap-2 mb-5"><div className="h-px w-8 bg-[#00C49A]" /><span className="text-[11px] font-extrabold tracking-[.12em] uppercase text-[#00C49A]">Pricing</span><div className="h-px w-8 bg-[#00C49A]" /></div>
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-5 tracking-tight" style={{ fontFamily: "'Fraunces', Georgia, serif", letterSpacing: '-2px', lineHeight: 1.05 }}>Plans that <span className="bg-gradient-to-r from-[#00C49A] via-[#7B4FD6] to-[#3AABF7] bg-clip-text text-transparent">scale with you.</span></h1>
+          <p className="text-lg text-gray-500 max-w-md mx-auto mb-8 leading-relaxed">From a single QR code to thousands of members. No hidden fees. No app required.</p>
+          <div className="inline-flex bg-white rounded-2xl p-1 border border-gray-200/60 gap-1 shadow-sm mb-6">
+            <button onClick={() => setActiveTab('personal')} className={`px-7 py-3 rounded-xl text-[15px] font-bold transition-all ${activeTab === 'personal' ? 'text-white shadow-lg' : 'text-gray-400 hover:text-gray-600'}`} style={activeTab === 'personal' ? { background: 'linear-gradient(135deg, #7B4FD6, #A855F7)', boxShadow: '0 6px 24px rgba(123,79,214,.31)' } : {}}>❤️ Personal</button>
+            <button onClick={() => setActiveTab('org')} className={`px-7 py-3 rounded-xl text-[15px] font-bold transition-all ${activeTab === 'org' ? 'text-white shadow-lg' : 'text-gray-400 hover:text-gray-600'}`} style={activeTab === 'org' ? { background: '#00C49A', boxShadow: '0 6px 24px rgba(0,196,154,.31)' } : {}}>🏢 Organization</button>
           </div>
         </div>
       </div>
+
+      {/* PERSONAL TAB */}
+      {activeTab === 'personal' && (
+        <div className="pb-16 px-4 animate-fadeIn">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-8">
+              <div className="flex items-center justify-center gap-2 mb-3"><div className="h-px w-8 bg-[#7B4FD6]" /><span className="text-[11px] font-extrabold tracking-[.12em] uppercase text-[#7B4FD6]">Personal Plans</span><div className="h-px w-8 bg-[#7B4FD6]" /></div>
+              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight" style={{ fontFamily: "'Fraunces', Georgia, serif", letterSpacing: '-1.5px' }}>Your story. <em className="italic text-[#7B4FD6]">Your way.</em></h2>
+              <p className="text-gray-500 text-base mt-3">From a single campaign to a lifetime of memories.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
+              {/* Personal Single Use */}
+              <div className="rounded-3xl p-0.5 transition-all hover:-translate-y-2" style={{ background: 'linear-gradient(135deg, rgba(0,196,154,.25), rgba(58,171,247,.13))' }}>
+                <div className="bg-white rounded-[22px] overflow-hidden h-full">
+                  <div className="p-7 pb-8">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-12 h-12 rounded-[14px] flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #00C49A, #3AABF7)' }}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg></div>
+                      <div><h3 className="text-[22px] font-bold text-gray-900" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>Personal Single Use</h3><span className="text-[10px] font-extrabold uppercase tracking-widest text-[#00C49A] bg-[#00C49A]/[.07] px-2.5 py-0.5 rounded-lg">One-time</span></div>
+                    </div>
+                    <p className="text-gray-500 text-[13px] leading-relaxed mb-5">One stream. Perfect for a single event, memorial, or personal project.</p>
+                    <div className="mb-5 pb-5 border-b border-gray-100">
+                      <div className="flex items-baseline gap-1"><span className="text-[52px] font-bold leading-none bg-gradient-to-r from-[#00C49A] to-[#3AABF7] bg-clip-text text-transparent" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>$69</span><span className="text-[15px] text-gray-500 font-semibold">one-time</span></div>
+                      <p className="text-xs text-gray-400 mt-1">25GB storage included</p>
+                      <p className="text-xs text-[#00C49A] font-bold mt-1">Viewing only after year 1 · $10/year continued viewing</p>
+                    </div>
+                    <CtaBtn planId="INDIVIDUAL" gradient="#00C49A, #3AABF7" />
+                    <div className="mt-5"><Ck color="#00C49A">1 stream</Ck><Ck color="#00C49A">25GB media storage</Ck><Ck color="#00C49A">Video, image, audio, links</Ck><Ck color="#00C49A">Basic analytics</Ck><Ck color="#00C49A">Active for 12 months</Ck><Ck color="#00C49A">No app required for viewers</Ck></div>
+                  </div>
+                </div>
+              </div>
+              {/* Personal Life Events */}
+              <div className="rounded-3xl p-[3px] transition-all hover:-translate-y-2" style={{ background: 'linear-gradient(135deg, #7B4FD6, #A855F7)' }}>
+                <div className="bg-white rounded-[22px] overflow-hidden h-full">
+                  <div className="text-center py-2.5 text-[11px] font-extrabold tracking-[.12em] uppercase text-white" style={{ background: 'linear-gradient(90deg, #7B4FD6, #A855F7)' }}>Best Value</div>
+                  <div className="p-7 pb-8">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-12 h-12 rounded-[14px] flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #7B4FD6, #A855F7)' }}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg></div>
+                      <div><h3 className="text-[22px] font-bold text-gray-900" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>Personal Life Events</h3><span className="text-[10px] font-extrabold uppercase tracking-widest text-[#7B4FD6] bg-[#7B4FD6]/[.07] px-2.5 py-0.5 rounded-lg">Best for personal</span></div>
+                    </div>
+                    <p className="text-gray-500 text-[13px] leading-relaxed mb-5">Multiple streams, ongoing. Memorials, portfolios, family milestones — content that lasts.</p>
+                    <div className="mb-5 pb-5 border-b border-gray-100">
+                      <div className="flex items-baseline gap-1"><span className="text-[52px] font-bold leading-none bg-gradient-to-r from-[#7B4FD6] to-[#A855F7] bg-clip-text text-transparent" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>$15</span><span className="text-[15px] text-gray-500 font-semibold">/month</span></div>
+                      <p className="text-xs text-gray-400 mt-1">100GB storage included</p>
+                      <p className="text-xs text-[#7B4FD6] font-bold mt-1">Up to 10 streams</p>
+                    </div>
+                    <CtaBtn planId="PERSONAL_LIFE" gradient="#7B4FD6, #A855F7" />
+                    <div className="mt-5"><Ck color="#7B4FD6">Up to 10 streams</Ck><Ck color="#7B4FD6">100GB media storage</Ck><Ck color="#7B4FD6">Video, image, audio, links</Ck><Ck color="#7B4FD6">Analytics</Ck><Ck color="#7B4FD6">Team Access (2 users)</Ck><Ck color="#7B4FD6">Push notifications</Ck><Ck color="#7B4FD6">Up to 10 QR & NFC codes</Ck></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p className="text-center text-sm text-gray-400 mt-8">Already have an account? <button onClick={() => navigate('/signin')} className="text-[#7B4FD6] font-semibold hover:underline">Sign in</button></p>
+          </div>
+        </div>
+      )}
+
+      {/* ORGANIZATION TAB */}
+      {activeTab === 'org' && (
+        <div className="pb-16 px-4 animate-fadeIn">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-8">
+              <div className="flex items-center justify-center gap-2 mb-3"><div className="h-px w-8 bg-[#00C49A]" /><span className="text-[11px] font-extrabold tracking-[.12em] uppercase text-[#00C49A]">Organization Plans</span><div className="h-px w-8 bg-[#00C49A]" /></div>
+              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight" style={{ fontFamily: "'Fraunces', Georgia, serif", letterSpacing: '-1.5px' }}>Reach your <em className="italic text-[#00C49A]">entire audience.</em></h2>
+              <p className="text-gray-500 text-base mt-3 max-w-md mx-auto">One-off events or ongoing member engagement — pick what fits.</p>
+            </div>
+
+            {/* Org Events */}
+            <div className="mb-10 rounded-3xl overflow-hidden" style={{ boxShadow: '0 16px 60px rgba(255,176,32,.09)' }}>
+              <div className="bg-white border-2 border-[#FFB020]/15 rounded-3xl overflow-hidden">
+                <div className="p-7 sm:p-9">
+                  <div className="flex flex-col lg:flex-row lg:items-center gap-6 lg:gap-8">
+                    <div className="flex items-center gap-4 min-w-[240px]">
+                      <div className="w-[60px] h-[60px] rounded-[18px] flex items-center justify-center shadow-lg flex-shrink-0" style={{ background: 'linear-gradient(135deg, #FFB020, #FF8C42)' }}><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg></div>
+                      <div><span className="text-[10px] font-extrabold uppercase tracking-widest text-[#FFB020] block mb-0.5">One-time payment</span><h3 className="text-[28px] font-bold text-gray-900 leading-tight" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>Org Events</h3></div>
+                    </div>
+                    <div className="flex flex-wrap gap-7 flex-1">
+                      <div><p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Price</p><p className="text-[26px] font-bold text-gray-900 leading-none" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>$199</p><p className="text-[11px] text-[#FFB020] font-bold mt-0.5">one-time</p></div>
+                      <div><p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Storage</p><p className="text-[26px] font-bold text-gray-900 leading-none" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>250GB</p><p className="text-[11px] text-[#FFB020] font-bold mt-0.5">included</p></div>
+                      <div><p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Renewal</p><p className="text-[26px] font-bold text-gray-900 leading-none" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>$65/yr</p><p className="text-[11px] text-[#FFB020] font-bold mt-0.5">from year 2</p></div>
+                      <div><p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">QR/NFC</p><p className="text-[26px] font-bold text-gray-900 leading-none" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>Unlimited</p><p className="text-[11px] text-[#FFB020] font-bold mt-0.5">no per-scan fees</p></div>
+                    </div>
+                    <div className="min-w-[160px]"><CtaBtn planId="ORG_EVENTS" gradient="#FFB020, #FF8C42" label="Book Event →" /></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Monthly label */}
+            <div className="flex items-center gap-3 mb-6"><div className="h-0.5 w-10 rounded-sm bg-gradient-to-r from-[#00C49A] to-[#3AABF7]" /><span className="text-xs font-extrabold uppercase tracking-[.12em] text-[#00C49A]">Monthly Subscriptions</span><div className="h-px flex-1 bg-[#00C49A]/[.09]" /></div>
+
+            {/* 3 Monthly cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+              {/* Starter (Featured) */}
+              <div className="rounded-3xl p-[3px] transition-all hover:-translate-y-2" style={{ background: 'linear-gradient(135deg, #00C49A, #3AABF7)' }}>
+                <div className="bg-white rounded-[22px] overflow-hidden h-full">
+                  <div className="text-center py-2.5 text-[11px] font-extrabold tracking-[.12em] uppercase text-white" style={{ background: 'linear-gradient(90deg, #00C49A, #3AABF7)' }}>Most Popular</div>
+                  <div className="p-6 pb-8">
+                    <div className="flex items-center gap-3 mb-3.5">
+                      <div className="w-12 h-12 rounded-[14px] flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #00C49A, #3AABF7)' }}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg></div>
+                      <div><h3 className="text-[22px] font-bold text-gray-900" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>Starter</h3><span className="text-[10px] font-extrabold uppercase tracking-wider text-[#00C49A] bg-[#00C49A]/[.07] px-2.5 py-0.5 rounded-lg">Up to 1,000 members</span></div>
+                    </div>
+                    <p className="text-gray-500 text-[13px] leading-relaxed mb-4">Growing communities, small clubs, or customer groups.</p>
+                    <div className="mb-4 pb-4 border-b border-gray-100"><div className="flex items-baseline gap-1"><span className="text-[48px] font-bold leading-none bg-gradient-to-r from-[#00C49A] to-[#3AABF7] bg-clip-text text-transparent" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>$49</span><span className="text-[15px] text-gray-500 font-semibold">/month</span></div><p className="text-xs text-gray-400 mt-1">100GB storage</p></div>
+                    <CtaBtn planId="ORG_SMALL" gradient="#00C49A, #3AABF7" />
+                    <div className="mt-5"><Ck color="#00C49A">Up to 1,000 members</Ck><Ck color="#00C49A">100GB media storage</Ck><Ck color="#00C49A">Push notifications</Ck><Ck color="#00C49A">Full analytics dashboard</Ck><Ck color="#00C49A">Team access (3 users)</Ck><Ck color="#00C49A">QR & NFC codes included</Ck><Ck color="#00C49A">CSV exports</Ck></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Growth */}
+              <div className="rounded-3xl p-0.5 transition-all hover:-translate-y-2" style={{ background: 'linear-gradient(135deg, rgba(123,79,214,.25), rgba(168,85,247,.13))' }}>
+                <div className="bg-white rounded-[22px] overflow-hidden h-full">
+                  <div className="p-6 pb-8">
+                    <div className="flex items-center gap-3 mb-3.5">
+                      <div className="w-12 h-12 rounded-[14px] flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #7B4FD6, #A855F7)' }}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" /><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" /><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" /></svg></div>
+                      <div><h3 className="text-[22px] font-bold text-gray-900" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>Growth</h3><span className="text-[10px] font-extrabold uppercase tracking-wider text-[#7B4FD6] bg-[#7B4FD6]/[.07] px-2.5 py-0.5 rounded-lg">Up to 2,500 members</span></div>
+                    </div>
+                    <p className="text-gray-500 text-[13px] leading-relaxed mb-4">Mid-size organizations, sports clubs, car clubs, and faith organizations.</p>
+                    <div className="mb-4 pb-4 border-b border-gray-100"><div className="flex items-baseline gap-1"><span className="text-[48px] font-bold leading-none bg-gradient-to-r from-[#7B4FD6] to-[#A855F7] bg-clip-text text-transparent" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>$69</span><span className="text-[15px] text-gray-500 font-semibold">/month</span></div><p className="text-xs text-gray-400 mt-1">250GB storage</p></div>
+                    <CtaBtn planId="ORG_MEDIUM" gradient="#7B4FD6, #A855F7" />
+                    <div className="mt-5"><Ck color="#7B4FD6">Up to 2,500 members</Ck><Ck color="#7B4FD6">250GB media storage</Ck><Ck color="#7B4FD6">Push notifications</Ck><Ck color="#7B4FD6">Advanced analytics</Ck><Ck color="#7B4FD6">Unlimited team users</Ck><Ck color="#7B4FD6">Segmentation & groups</Ck><Ck color="#7B4FD6">Messages feature</Ck></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pro */}
+              <div className="rounded-3xl p-0.5 transition-all hover:-translate-y-2" style={{ background: 'linear-gradient(135deg, rgba(255,78,78,.25), rgba(255,140,66,.13))' }}>
+                <div className="bg-white rounded-[22px] overflow-hidden h-full">
+                  <div className="p-6 pb-8">
+                    <div className="flex items-center gap-3 mb-3.5">
+                      <div className="w-12 h-12 rounded-[14px] flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #FF4E4E, #FF8C42)' }}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg></div>
+                      <div><h3 className="text-[22px] font-bold text-gray-900" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>Pro</h3><span className="text-[10px] font-extrabold uppercase tracking-wider text-[#FF4E4E] bg-[#FF4E4E]/[.07] px-2.5 py-0.5 rounded-lg">Up to 5,000 members</span></div>
+                    </div>
+                    <p className="text-gray-500 text-[13px] leading-relaxed mb-4">Large organizations with growing member, customer, and supporter bases.</p>
+                    <div className="mb-4 pb-4 border-b border-gray-100"><div className="flex items-baseline gap-1"><span className="text-[48px] font-bold leading-none bg-gradient-to-r from-[#FF4E4E] to-[#FF8C42] bg-clip-text text-transparent" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>$99</span><span className="text-[15px] text-gray-500 font-semibold">/month</span></div><p className="text-xs text-gray-400 mt-1">500GB storage</p></div>
+                    <CtaBtn planId="ORG_SCALE" gradient="#FF4E4E, #FF8C42" />
+                    <div className="mt-5"><Ck color="#FF4E4E">Up to 5,000 members</Ck><Ck color="#FF4E4E">500GB media storage</Ck><Ck color="#FF4E4E">Push notifications</Ck><Ck color="#FF4E4E">Full analytics + workflows</Ck><Ck color="#FF4E4E">Unlimited team users</Ck><Ck color="#FF4E4E">All export formats</Ck><Ck color="#FF4E4E">Audit logs</Ck><Ck color="#FF4E4E">Priority support</Ck></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Enterprise banner */}
+            <div className="rounded-[20px] p-8 sm:p-10 flex flex-wrap items-center gap-6 justify-between" style={{ background: 'linear-gradient(135deg, rgba(0,196,154,.06), rgba(123,79,214,.05))', border: '2px solid rgba(0,196,154,.15)', boxShadow: '0 8px 40px rgba(0,0,0,.03)' }}>
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center border border-[#00C49A]/20" style={{ background: 'linear-gradient(135deg, rgba(0,196,154,.13), rgba(0,196,154,.05))' }}><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#00C49A" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg></div>
+                <div><p className="text-2xl font-bold text-gray-900" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>5,000+ Members</p><p className="text-sm text-gray-500">Custom pricing, SLA, dedicated support, white-label options.</p></div>
+              </div>
+              <button onClick={() => setEnterpriseModalOpen(true)} className="px-8 py-3.5 rounded-xl font-bold text-[15px] text-white flex items-center gap-2 shadow-lg hover:opacity-90 transition-all" style={{ background: 'linear-gradient(135deg, #00C49A, #3AABF7)', boxShadow: '0 4px 20px rgba(0,196,154,.25)' }}>Contact Us <ArrowRight size={16} /></button>
+            </div>
+            <p className="text-center text-sm text-gray-400 mt-8">Already have an account? <button onClick={() => navigate('/signin')} className="text-[#00C49A] font-semibold hover:underline">Sign in</button></p>
+          </div>
+        </div>
+      )}
+
+      <div className="text-center pb-10 px-4"><p className="text-xs text-gray-400">No credit card required to browse · Secure checkout powered by Stripe · Cancel anytime</p></div>
+
+      {/* Enterprise Lead Capture Modal */}
+      <EnterpriseContactModal
+        isOpen={enterpriseModalOpen}
+        onClose={() => setEnterpriseModalOpen(false)}
+      />
     </div>
   );
 };

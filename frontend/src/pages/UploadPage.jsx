@@ -1,13 +1,4 @@
-// ═══════════════════════════════════════════════════════════════
-// UploadPage.jsx - COMPLETE FIXED VERSION with FormData Upload
-// ✅ Fixed: Mobile browser crashes (FormData instead of base64)
-// ✅ Fixed: Progress bar shows properly
-// ✅ Fixed: No file size limits needed
-// ✅ Works: Exactly like YouTube upload
-// COPY THIS ENTIRE FILE TO: frontend/src/pages/UploadPage.jsx
-// ═══════════════════════════════════════════════════════════════
-
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Upload, Image, Video, Music, FileText, X, Loader2, Plus, Folder, Link, ExternalLink, Paperclip, Share2, Lock, Pencil, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import MediaEditor from '../components/MediaEditor';
@@ -17,6 +8,7 @@ import { useToast } from '../hooks/useToast';
 import Tooltip from '../components/common/Tooltip';
 import Toast from '../components/common/Toast';
 import RequireEditAccess from '../components/common/RequireEditAccess';
+import useAuthStore from '../store/authStore';
 
 const STREAM_CATEGORIES = [
   'Tickets',
@@ -36,6 +28,17 @@ const STREAM_CATEGORIES = [
 const UploadPage = () => {
   const navigate = useNavigate();
   const { toasts, showToast, removeToast } = useToast();
+  const { user } = useAuthStore();
+
+  // ── "Campaign" for org plans, "Stream" for personal plans ──
+  const effectiveRole  = user?.isTeamMember ? user?.organization?.role : user?.role;
+  const isOrgPlan      = useMemo(() =>
+    ['ORG_SMALL', 'ORG_MEDIUM', 'ORG_SCALE', 'ORG_ENTERPRISE', 'ORG_EVENTS'].includes(effectiveRole),
+    [effectiveRole]
+  );
+  const streamLabel    = isOrgPlan ? 'Campaign'  : 'Stream';
+  const streamLabelLow = isOrgPlan ? 'campaign'  : 'stream';
+  const streamsLabel   = isOrgPlan ? 'Campaigns' : 'Streams';
   const [uploadType, setUploadType] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -126,7 +129,7 @@ const UploadPage = () => {
     e.preventDefault();
     
     if (!newCampaignData.name) {
-      showToast('Please enter stream name', 'error');
+      showToast(`Please enter ${streamLabelLow} name`, 'error');
       return;
     }
 
@@ -140,11 +143,11 @@ const UploadPage = () => {
         setSelectedCampaignId(newCampaign.id);
         setShowCreateCampaignModal(false);
         setNewCampaignData({ name: '', description: '', category: '' });
-        showToast('Stream created successfully!', 'success');
+        showToast(`${streamLabel} created successfully!`, 'success');
       }
     } catch (error) {
       console.error('Failed to create stream:', error);
-      showToast('Failed to create stream', 'error');
+      showToast(`Failed to create ${streamLabelLow}`, 'error');
     } finally {
       setCreatingCampaign(false);
     }
@@ -306,7 +309,7 @@ const UploadPage = () => {
     }
 
     if (!selectedCampaignId) {
-      showToast('Please select a stream', 'error');
+      showToast(`Please select a ${streamLabelLow}`, 'error');
       return;
     }
 
@@ -378,7 +381,7 @@ const UploadPage = () => {
           signal: abortControllerRef.current?.signal
         });
 
-        showToast('File uploaded and added to stream!', 'success');
+        showToast(`File uploaded and added to ${streamLabelLow}!`, 'success');
         
         setTimeout(() => {
           setTitle('');
@@ -436,7 +439,7 @@ const UploadPage = () => {
     }
 
     if (!selectedCampaignId) {
-      showToast('Please select a stream', 'error');
+      showToast(`Please select a ${streamLabelLow}`, 'error');
       return;
     }
 
@@ -476,7 +479,7 @@ const UploadPage = () => {
           signal: abortControllerRef.current?.signal
         });
 
-        showToast('Text post created and added to stream!', 'success');
+        showToast(`Text post created and added to ${streamLabelLow}!`, 'success');
         
         setTimeout(() => {
           setTitle('');
@@ -522,7 +525,7 @@ const UploadPage = () => {
     }
 
     if (!selectedCampaignId) {
-      showToast('Please select a stream', 'error');
+      showToast(`Please select a ${streamLabelLow}`, 'error');
       return;
     }
 
@@ -562,7 +565,7 @@ const UploadPage = () => {
           signal: abortControllerRef.current?.signal
         });
 
-        showToast('Embed created and added to stream!', 'success');
+        showToast(`Embed created and added to ${streamLabelLow}!`, 'success');
         
         setTimeout(() => {
           setTitle('');
@@ -818,8 +821,8 @@ const UploadPage = () => {
   const CampaignSelector = () => (
     <div className="mb-6">
       <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-        Select Stream *
-        <Tooltip content="Choose which stream this content belongs to" />
+        {streamLabel} *
+        <Tooltip content={`Choose which ${streamLabelLow} this content belongs to`} />
       </label>
       {loadingCampaigns ? (
         <div className="flex items-center justify-center py-4">
@@ -828,14 +831,14 @@ const UploadPage = () => {
       ) : campaigns.length === 0 ? (
         <div className="text-center py-6 bg-purple-50 rounded-lg border border-purple-200">
           <Folder className="mx-auto mb-3 text-primary" size={32} />
-          <p className="text-gray-700 mb-4">No streams yet. Create your first stream!</p>
+          <p className="text-gray-700 mb-4">No {streamsLabel.toLowerCase()} yet. Create your first {streamLabelLow}!</p>
           <button
             type="button"
             onClick={() => setShowCreateCampaignModal(true)}
             className="gradient-btn text-white px-6 py-3 rounded-lg font-semibold inline-flex items-center gap-2"
           >
             <Plus size={20} />
-            <span>Create Stream</span>
+            <span>Create {streamLabel}</span>
           </button>
         </div>
       ) : (
@@ -846,7 +849,7 @@ const UploadPage = () => {
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
             required
           >
-            <option value="">-- Select a stream --</option>
+            <option value="">-- Select a {streamLabelLow} --</option>
             {campaigns.map((campaign) => (
               <option key={campaign.id} value={campaign.id}>
                 {campaign.name} {campaign.category && '(' + campaign.category + ')'}
@@ -859,7 +862,7 @@ const UploadPage = () => {
             className="w-full px-4 py-3 border-2 border-primary text-primary rounded-lg font-semibold hover:bg-purple-50 transition flex items-center justify-center gap-2"
           >
             <Plus size={20} />
-            <span>Create New Stream</span>
+            <span>Create New {streamLabel}</span>
           </button>
         </div>
       )}
@@ -1888,12 +1891,12 @@ const UploadPage = () => {
         {showCreateCampaignModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl p-8 max-w-md w-full">
-              <h2 className="text-2xl font-bold text-primary mb-6">Create New Stream</h2>
+              <h2 className="text-2xl font-bold text-primary mb-6">Create New {streamLabel}</h2>
               <form onSubmit={handleCreateCampaign} className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                    Stream Name *
-                    <Tooltip content="Give your stream a clear, descriptive name" />
+                    {streamLabel} Name *
+                    <Tooltip content={`Give your ${streamLabelLow} a clear, descriptive name`} />
                   </label>
                   <input
                     type="text"
@@ -1908,7 +1911,7 @@ const UploadPage = () => {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Category
-                    <Tooltip content="Choose a category to organize your streams" />
+                    <Tooltip content={`Choose a category to organize your ${streamsLabel.toLowerCase()}`} />
                   </label>
                   <select
                     value={newCampaignData.category}
@@ -1927,7 +1930,7 @@ const UploadPage = () => {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     Description
-                    <Tooltip content="Add optional details about this stream's purpose" />
+                    <Tooltip content={`Add optional details about this ${streamLabelLow}'s purpose`} />
                   </label>
                   <textarea
                     value={newCampaignData.description}

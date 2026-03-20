@@ -4,7 +4,7 @@ import {
   FileText, QrCode, Nfc, Link2, FolderOpen, Image, Video, Music, FileType,
   Code, Eye, Shield, Building2, UserCheck, MessageSquare, ClipboardCheck,
   Activity, Database, Share2, Lock, Unlock, ChevronDown, ChevronUp,
-  Loader2, RefreshCw, ArrowUpRight, ArrowDownRight, Minus
+  Loader2, RefreshCw, ArrowUpRight, ArrowDownRight, Minus, Zap
 } from 'lucide-react';
 import DashboardLayout from '../../components/dashboard/DashboardLayout';
 import api from '../../services/api';
@@ -442,6 +442,7 @@ const AdvancedAnalyticsPage = () => {
             {/* Stat Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               <StatCard icon={TrendingUp} label="Total Views" value={a.totalViews.toLocaleString()} color="from-blue-500 to-blue-600" />
+                <StatCard icon={Zap} label="Amplify Views" value={(a.deliverySources.amplify?.count || 0).toLocaleString()} sub={`${a.deliverySources.amplify?.percentage || 0}% of views`} color="from-teal-500 to-violet-600" />
               <StatCard icon={Users} label="Unique Visitors" value={a.uniqueVisitors.toLocaleString()} color="from-green-500 to-green-600" />
               <StatCard icon={Clock} label="Avg Session" value={a.avgSessionTime} color="from-purple-500 to-purple-600" />
               <StatCard icon={BarChart3} label="Bounce Rate" value={a.bounceRate} color="from-orange-500 to-orange-600" />
@@ -460,6 +461,7 @@ const AdvancedAnalyticsPage = () => {
                 <ProgressBar label="QR Code Scans" value={a.deliverySources.qr.count} max={a.totalViews || 1} color="from-purple-500 to-purple-600" extra={`${a.deliverySources.qr.percentage}%`} />
                 <ProgressBar label="NFC Taps" value={a.deliverySources.nfc.count} max={a.totalViews || 1} color="from-blue-500 to-blue-600" extra={`${a.deliverySources.nfc.percentage}%`} />
                 <ProgressBar label="Direct Links" value={a.deliverySources.direct.count} max={a.totalViews || 1} color="from-gray-400 to-gray-500" extra={`${a.deliverySources.direct.percentage}%`} />
+                <ProgressBar label="⚡ Amplify" value={a.deliverySources.amplify?.count || 0} max={a.totalViews || 1} color="from-teal-500 to-violet-600" extra={`${a.deliverySources.amplify?.percentage || 0}%`} />
               </div>
             </SectionCard>
 
@@ -567,6 +569,7 @@ const AdvancedAnalyticsPage = () => {
               <StatCard icon={QrCode} label="QR Code Scans" value={a.deliverySources.qr.count.toLocaleString()} sub={`${a.deliverySources.qr.percentage}% of views`} color="from-purple-500 to-purple-600" />
               <StatCard icon={Nfc} label="NFC Taps" value={a.deliverySources.nfc.count.toLocaleString()} sub={`${a.deliverySources.nfc.percentage}% of views`} color="from-blue-500 to-blue-600" />
               <StatCard icon={Link2} label="Direct Links" value={a.deliverySources.direct.count.toLocaleString()} sub={`${a.deliverySources.direct.percentage}% of views`} color="from-gray-500 to-gray-600" />
+              <StatCard icon={Zap} label="⚡ Amplify" value={(a.deliverySources.amplify?.count || 0).toLocaleString()} sub={`${a.deliverySources.amplify?.percentage || 0}% of views`} color="from-teal-500 to-violet-600" />
             </div>
 
             {/* Daily Source Trend */}

@@ -3,7 +3,7 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   LogOut, BarChart3, Users, Globe, DollarSign,
   Target, Send, Tag, Download, Settings, Building2, Menu, X,
-  MessagesSquare, UserPlus
+  MessagesSquare, UserPlus, Briefcase
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import usePlatformSettings from '../../hooks/usePlatformSettings';
@@ -31,6 +31,7 @@ const AdminLayout = ({ children }) => {
   const navItems = [
     { path: '/admin-panel', icon: BarChart3, label: 'Overview', roles: ['ADMIN'] },
     { path: '/admin-panel/users', icon: Users, label: 'Customers', roles: ['ADMIN'] },
+    { path: '/admin-panel/enterprise-leads', icon: Briefcase, label: 'Enterprise Leads', roles: ['ADMIN'] },
     { path: '/admin-panel/geography', icon: Globe, label: 'Geography', roles: ['ADMIN'] },
     { path: '/admin-panel/revenue', icon: DollarSign, label: 'Revenue', roles: ['ADMIN'] },
     { path: '/admin-panel/opportunities', icon: Target, label: 'Opportunities', roles: ['ADMIN'] },

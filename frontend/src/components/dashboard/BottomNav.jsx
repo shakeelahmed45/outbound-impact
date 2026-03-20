@@ -9,8 +9,8 @@ const BottomNav = () => {
 
   // Use org owner's role for team members
   const effectiveRole = user?.isTeamMember ? user?.organization?.role : user?.role;
-  const isSmallOrAbove = effectiveRole === 'ORG_SMALL' || effectiveRole === 'ORG_MEDIUM' || effectiveRole === 'ORG_ENTERPRISE';
-  const isMediumOrAbove = effectiveRole === 'ORG_MEDIUM' || effectiveRole === 'ORG_ENTERPRISE';
+  const isSmallOrAbove = effectiveRole === 'ORG_EVENTS' || effectiveRole === 'ORG_SMALL' || effectiveRole === 'ORG_MEDIUM' || effectiveRole === 'ORG_SCALE' || effectiveRole === 'ORG_ENTERPRISE';
+  const isMediumOrAbove = effectiveRole === 'ORG_MEDIUM' || effectiveRole === 'ORG_SCALE' || effectiveRole === 'ORG_ENTERPRISE';
   const isTeamViewer = user?.isTeamMember && user?.teamRole === 'VIEWER';
 
   // ✅ NEW: VIEWER + EDITOR cannot access billing or manage team

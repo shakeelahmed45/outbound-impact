@@ -3,8 +3,8 @@
  * Handles NFC tag data generation and management
  */
 
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+
+const prisma = require('../lib/prisma');
 
 class NFCService {
   /**

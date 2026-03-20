@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Image, Video, Music, FileText, Link, Trash2, Edit, Eye, BarChart3, 
-  Download, Search, Filter, X, Loader2, Share2, Lock, ExternalLink, Paperclip, Save, Folder, Upload,
+  Download, Search, Filter, X, Loader2, Share2, Lock, ExternalLink, Paperclip, Save, Folder, Upload, Zap,
   Clock, XCircle
 } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
+import AmplifyModal from '../components/AmplifyModal';
 import { canEdit, canDelete } from '../store/authStore';
+import useAuthStore from '../store/authStore';
 import api from '../services/api';
 import { useToast } from '../hooks/useToast';
 import Toast from '../components/common/Toast';
@@ -34,6 +36,13 @@ const ItemsPage = () => {
     buttonUrl: '',
   });
   const [saving, setSaving] = useState(false);
+
+  const { user } = useAuthStore();
+  const effectiveRole = user?.isTeamMember ? user?.organization?.role : user?.role;
+  const isOrgPlan = ['ORG_EVENTS', 'ORG_SMALL', 'ORG_MEDIUM', 'ORG_SCALE', 'ORG_ENTERPRISE'].includes(effectiveRole);
+
+  // Amplify modal state
+  const [amplifyItem, setAmplifyItem] = useState(null);
 
   // ✅ RESTORED: Thumbnail upload state
   const [thumbnailFile, setThumbnailFile] = useState(null);
@@ -274,6 +283,13 @@ const ItemsPage = () => {
 
   return (
     <DashboardLayout>
+      {/* Amplify Modal */}
+      {amplifyItem && (
+        <AmplifyModal
+          item={amplifyItem}
+          onClose={() => setAmplifyItem(null)}
+        />
+      )}
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -474,14 +490,26 @@ const ItemsPage = () => {
                       <Eye size={16} />
                       View
                     </button>
+
+                    {/* Amplify button — org plans only, shareable items only */}
+                    {isOrgPlan && item.sharingEnabled && (
+                      <button
+                        onClick={() => setAmplifyItem(item)}
+                        className="flex-1 px-3 py-2 bg-gradient-to-r from-teal-500 to-violet-600 text-white rounded-lg font-semibold text-sm hover:opacity-90 transition flex items-center justify-center gap-1"
+                        title="Share to social media"
+                      >
+                        <Zap size={16} />
+                        Amplify
+                      </button>
+                    )}
+
                     {/* ✅ Edit — hidden for VIEWER */}
                     {canEdit() && (
                     <button
                       onClick={() => handleEditClick(item)}
-                      className="flex-1 px-3 py-2 border-2 border-primary text-primary rounded-lg font-semibold text-sm hover:bg-purple-50 transition flex items-center justify-center gap-1"
+                      className="px-3 py-2 border-2 border-primary text-primary rounded-lg font-semibold text-sm hover:bg-purple-50 transition flex items-center justify-center gap-1"
                     >
                       <Edit size={16} />
-                      Edit
                     </button>
                     )}
                     {/* ✅ Delete — hidden for VIEWER + EDITOR */}

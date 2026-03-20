@@ -161,7 +161,7 @@ const Dashboard = () => {
     );
   }
 
-  const isOrganization = effectiveRole === 'ORG_SMALL' || effectiveRole === 'ORG_MEDIUM' || effectiveRole === 'ORG_ENTERPRISE';
+  const isOrganization = effectiveRole === 'ORG_EVENTS' || effectiveRole === 'ORG_SMALL' || effectiveRole === 'ORG_MEDIUM' || effectiveRole === 'ORG_SCALE' || effectiveRole === 'ORG_ENTERPRISE';
 
   // Individual plan → clean personal dashboard
   if (!isOrganization && !isTeamMember) {
@@ -169,7 +169,9 @@ const Dashboard = () => {
   }
 
   const isEnterprise = effectiveRole === 'ORG_ENTERPRISE';
-  const isMedium = effectiveRole === 'ORG_MEDIUM';
+  const isMedium = effectiveRole === 'ORG_MEDIUM' || effectiveRole === 'ORG_SCALE';
+  const hasAdvancedAnalytics = effectiveRole === 'ORG_EVENTS' || effectiveRole === 'ORG_MEDIUM' || effectiveRole === 'ORG_SCALE' || effectiveRole === 'ORG_ENTERPRISE';
+  const isStarter = effectiveRole === 'ORG_SMALL';
   const { linePath, areaPath, points } = buildChartPath();
 
   return (
@@ -339,7 +341,7 @@ const Dashboard = () => {
             <p className="text-3xl font-bold text-gray-900">{(stats?.totalViews || 0).toLocaleString()}</p>
             <p className="text-xs text-gray-400 mt-1">All access methods</p>
             {hasFeature('analytics') && (
-            <button onClick={() => navigate(isOrganization ? '/dashboard/advanced-analytics' : '/dashboard/analytics')} className="text-primary text-sm font-medium mt-3 flex items-center gap-1 hover:gap-2 transition-all">
+            <button onClick={() => navigate(hasAdvancedAnalytics ? '/dashboard/advanced-analytics' : (isStarter ? '/dashboard/activity' : '/dashboard/analytics'))} className="text-primary text-sm font-medium mt-3 flex items-center gap-1 hover:gap-2 transition-all">
               View details <ChevronRight size={16} />
             </button>
             )}
@@ -536,16 +538,22 @@ const Dashboard = () => {
               <span className="text-sm font-semibold text-gray-700">My Items</span>
             </button>
             )}
-            {hasFeature('analytics') && (
-            <button onClick={() => navigate(isOrganization ? '/dashboard/advanced-analytics' : '/dashboard/analytics')} className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center">
+            {hasAdvancedAnalytics && hasFeature('analytics') && (
+            <button onClick={() => navigate('/dashboard/advanced-analytics')} className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center">
               <BarChart3 className="mx-auto mb-2 text-primary" size={24} />
-              <span className="text-sm font-semibold text-gray-700">{isOrganization ? 'Advanced Analytics' : 'Analytics'}</span>
+              <span className="text-sm font-semibold text-gray-700">Advanced Analytics</span>
+            </button>
+            )}
+            {isStarter && hasFeature('activity') && (
+            <button onClick={() => navigate('/dashboard/activity')} className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center">
+              <BarChart3 className="mx-auto mb-2 text-primary" size={24} />
+              <span className="text-sm font-semibold text-gray-700">All Activity</span>
             </button>
             )}
             {hasFeature('streams') && (
             <button onClick={() => navigate('/dashboard/campaigns')} className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center">
               <Folder className="mx-auto mb-2 text-primary" size={24} />
-              <span className="text-sm font-semibold text-gray-700">Streams</span>
+              <span className="text-sm font-semibold text-gray-700">Campaigns</span>
             </button>
             )}
           </div>

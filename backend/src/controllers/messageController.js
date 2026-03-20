@@ -3,8 +3,8 @@
 // Internal team messaging + External email via Resend
 // ═══════════════════════════════════════════════════════════
 
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+
+const prisma = require('../lib/prisma');
 const { logAudit, AUDIT_ACTIONS } = require('../helpers/auditLogger');
 
 // ═══════════════════════════════════════════════

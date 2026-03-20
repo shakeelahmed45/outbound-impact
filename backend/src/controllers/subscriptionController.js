@@ -519,8 +519,11 @@ const reactivateSubscription = async (req, res) => {
     if (!priceId) {
       const roleToPriceMap = {
         'INDIVIDUAL': process.env.STRIPE_INDIVIDUAL_PRICE,
+        'PERSONAL_LIFE': process.env.STRIPE_PERSONAL_LIFE_PRICE,
+        'ORG_EVENTS': process.env.STRIPE_ORG_EVENTS_PRICE,
         'ORG_SMALL': process.env.STRIPE_SMALL_ORG_PRICE,
         'ORG_MEDIUM': process.env.STRIPE_MEDIUM_ORG_PRICE,
+        'ORG_SCALE': process.env.STRIPE_SCALE_ORG_PRICE,
         'ORG_ENTERPRISE': process.env.STRIPE_ENTERPRISE_PRICE,
       };
 
@@ -645,9 +648,56 @@ const createBillingPortal = async (req, res) => {
   }
 };
 
+/**
+ * ✅ CREATE ORG EVENTS RENEWAL CHECKOUT SESSION ($65/year)
+ */
+const createOrgEventsRenewalSession = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const renewalPriceId = process.env.STRIPE_ORG_EVENTS_RENEWAL_PRICE;
+
+    if (!renewalPriceId) {
+      return res.status(503).json({
+        status: 'error',
+        message: 'Renewal not configured. Please contact support@outboundimpact.org',
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, role: true, orgEventsExpiresAt: true },
+    });
+
+    if (!user || user.role !== 'ORG_EVENTS') {
+      return res.status(403).json({ status: 'error', message: 'This renewal is only for Org Events plans.' });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items:           [{ price: renewalPriceId, quantity: 1 }],
+      mode:                 'payment',
+      customer_email:       user.email,
+      success_url:          `${process.env.FRONTEND_URL}/dashboard?renewed=true`,
+      cancel_url:           `${process.env.FRONTEND_URL}/dashboard/settings`,
+      metadata: {
+        userId:   user.id,
+        planName: 'ORG_EVENTS',
+        priceId:  renewalPriceId,
+        type:     'renewal',
+      },
+    });
+
+    res.json({ status: 'success', checkoutUrl: session.url });
+  } catch (error) {
+    console.error('createOrgEventsRenewalSession error:', error);
+    res.status(500).json({ status: 'error', message: error.message || 'Failed to create renewal session' });
+  }
+};
+
 module.exports = {
   toggleAutoRenewal,
   cancelSubscription,
   reactivateSubscription,
   createBillingPortal,
+  createOrgEventsRenewalSession,
 };

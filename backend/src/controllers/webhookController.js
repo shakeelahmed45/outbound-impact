@@ -74,12 +74,82 @@ const handleStripeWebhook = async (req, res) => {
 };
 
 /**
+ * Handle storage add-on one-time payment
+ * Called from handleCheckoutCompleted when metadata.type === 'storage_addon'
+ */
+const handleStorageAddonCompleted = async (session) => {
+  console.log('💾 Processing storage_addon checkout:', session.id);
+
+  const { userId, addedGB, addedBytes } = session.metadata || {};
+  if (!userId || !addedBytes) {
+    console.error('❌ Missing metadata in storage_addon session:', session.metadata);
+    return;
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) { console.error('❌ User not found for storage addon:', userId); return; }
+
+    const currentLimit = Number(user.storageLimit || 2147483648);
+    const newLimit     = currentLimit + Number(addedBytes);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data:  { storageLimit: BigInt(newLimit) },
+    });
+
+    console.log(`✅ Storage increased: ${user.email} → +${addedGB}GB (new limit: ${(newLimit / 1024 / 1024 / 1024).toFixed(0)}GB)`);
+
+    const formatBytes = (b) => {
+      const k = 1024, sizes = ['Bytes','KB','MB','GB','TB'];
+      const i = Math.floor(Math.log(b) / Math.log(k));
+      return parseFloat((b / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+
+    // In-app notification
+    const { createNotification } = require('../services/notificationService');
+    await createNotification(userId, {
+      type:     'success',
+      category: 'storage',
+      title:    `✅ ${addedGB}GB Storage Added!`,
+      message:  `Your storage has been expanded. New total: ${formatBytes(newLimit)}.`,
+      metadata: { addedGB: Number(addedGB), newLimit: newLimit.toString() },
+    });
+
+    // Confirmation email
+    const amount   = session.amount_total ? (session.amount_total / 100).toFixed(2) : null;
+    const currency = (session.currency || 'aud').toUpperCase();
+    const { sendStorageConfirmationEmail } = require('../services/storageEmailTemplates');
+    await sendStorageConfirmationEmail({
+      email:                  user.email,
+      name:                   user.name,
+      type:                   'addon',
+      addedGB:                Number(addedGB),
+      newStorageLimitFormatted: formatBytes(newLimit),
+      amountCharged:          amount,
+      currency,
+    });
+
+    console.log('✅ Storage addon fully processed for:', user.email);
+  } catch (err) {
+    console.error('❌ handleStorageAddonCompleted error:', err.message);
+  }
+};
+
+/**
  * ✅ COMPLETE FIX: Handle checkout.session.completed
  * Handles BOTH new signups AND existing user subscriptions
  * WITH EMAIL DELAYS to respect Resend rate limits
  */
 const handleCheckoutCompleted = async (session) => {
   console.log('💳 Processing checkout.session.completed:', session.id);
+
+  // ── STORAGE ADD-ON: early-exit branch ─────────────────────
+  if (session.metadata?.type === 'storage_addon') {
+    await handleStorageAddonCompleted(session);
+    return;
+  }
+  // ──────────────────────────────────────────────────────────
 
   const customerEmail = session.customer_email || session.customer_details?.email;
   const customerId = session.customer;
@@ -103,48 +173,128 @@ const handleCheckoutCompleted = async (session) => {
       where: { email: normalizedEmail }
     });
 
-    // ✅ STEP 2: If user doesn't exist, check for pending signup
+    // ✅ STEP 2: If user doesn't exist, check for pending signup or enterprise lead
     if (!user) {
-      console.log('👤 User not found, checking for pending signup...');
-      
-      const signupData = global.pendingSignups?.[session.id];
-      
-      if (!signupData) {
-        console.error('❌ No pending signup data found for session:', session.id);
-        console.error('❌ User must register before subscribing!');
-        return;
-      }
+      console.log('👤 User not found, checking for pending signup or enterprise lead...');
 
-      console.log('✅ Found pending signup data, creating user...');
+      const sessionMeta = session.metadata || {};
 
-      let subscriptionData = {};
-      if (subscriptionId) {
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-        subscriptionData = {
-          currentPeriodStart: new Date(subscription.current_period_start * 1000),
-          currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-          priceId: subscription.items.data[0].price.id,
-        };
-      }
+      // ── Enterprise lead checkout (no signup form needed) ─────
+      if (sessionMeta.leadId) {
+        console.log('🏢 Enterprise lead checkout in webhook, leadId:', sessionMeta.leadId);
 
-      user = await prisma.user.create({
-        data: {
-          email: normalizedEmail,
-          name: signupData.name,
-          password: signupData.password,
-          role: signupData.role,
-          storageLimit: signupData.storageLimit,
-          stripeCustomerId: customerId,
-          subscriptionId: subscriptionId || null,
-          subscriptionStatus: 'active',
-          emailVerified: true,  // ✅ Verified — completed Stripe payment
-          ...subscriptionData,
+        let leadName = 'Enterprise Customer';
+        let leadPasswordHash = null;
+        try {
+          const lead = await prisma.enterpriseLead.findUnique({
+            where: { id: sessionMeta.leadId },
+            select: { name: true, signupPasswordHash: true }
+          });
+          if (lead) {
+            leadName = lead.name;
+            leadPasswordHash = lead.signupPasswordHash;
+          }
+        } catch (e) { console.error('⚠️ Could not fetch lead data:', e.message); }
+
+        const storageGB    = parseInt(sessionMeta.storageGB) || 1500;
+        const storageLimit = BigInt(storageGB) * BigInt(1024 * 1024 * 1024);
+
+        let subscriptionData = {};
+        if (subscriptionId) {
+          const sub = await stripe.subscriptions.retrieve(subscriptionId);
+          subscriptionData = {
+            currentPeriodStart: new Date(sub.current_period_start * 1000),
+            currentPeriodEnd:   new Date(sub.current_period_end   * 1000),
+            priceId:            sub.items.data[0].price.id,
+          };
         }
-      });
 
-      console.log('✅ User created successfully:', user.email, 'ID:', user.id);
+        // Use saved hashed password from signup form — or generate a temp one
+        // if the prospect somehow didn't go through the signup form
+        let passwordToUse = leadPasswordHash;
+        if (!passwordToUse) {
+          const crypto2   = require('crypto');
+          const bcryptLib = require('bcryptjs');
+          passwordToUse   = await bcryptLib.hash(crypto2.randomBytes(16).toString('hex'), 10);
+        }
 
-      delete global.pendingSignups[session.id];
+        user = await prisma.user.create({
+          data: {
+            email:              normalizedEmail,
+            name:               leadName,
+            password:           passwordToUse,
+            role:               'ORG_ENTERPRISE',
+            storageLimit,
+            stripeCustomerId:   customerId,
+            subscriptionId:     subscriptionId || null,
+            subscriptionStatus: 'active',
+            emailVerified:      true,
+            ...subscriptionData,
+          }
+        });
+
+        // Mark lead converted
+        try {
+          await prisma.enterpriseLead.update({
+            where: { id: sessionMeta.leadId },
+            data:  { status: 'converted' }
+          });
+        } catch (e) {}
+
+        console.log('✅ Enterprise user created from webhook:', user.email);
+
+        // Send welcome email only — user already set password via signup form
+        setImmediate(async () => {
+          try {
+            const emailService = require('../services/emailService');
+            await emailService.sendWelcomeEmail(user.email, user.name, 'ORG_ENTERPRISE');
+            console.log('✅ Enterprise welcome email sent to:', user.email);
+          } catch (e) {
+            console.error('⚠️ Enterprise welcome email error:', e.message);
+          }
+        });
+
+      // ── Normal signup flow (pendingSignups entry exists) ──────
+      } else {
+        const signupData = global.pendingSignups?.[session.id];
+
+        if (!signupData) {
+          console.error('❌ No pending signup data found for session:', session.id);
+          console.error('❌ User must register before subscribing!');
+          return;
+        }
+
+        console.log('✅ Found pending signup data, creating user...');
+
+        let subscriptionData = {};
+        if (subscriptionId) {
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          subscriptionData = {
+            currentPeriodStart: new Date(subscription.current_period_start * 1000),
+            currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+            priceId: subscription.items.data[0].price.id,
+          };
+        }
+
+        user = await prisma.user.create({
+          data: {
+            email: normalizedEmail,
+            name: signupData.name,
+            password: signupData.password,
+            role: signupData.role,
+            storageLimit: signupData.storageLimit,
+            stripeCustomerId: customerId,
+            subscriptionId: subscriptionId || null,
+            subscriptionStatus: 'active',
+            emailVerified: true,
+            ...subscriptionData,
+          }
+        });
+
+        console.log('✅ User created successfully:', user.email, 'ID:', user.id);
+
+        delete global.pendingSignups[session.id];
+      }
     } else {
       console.log('✅ Found existing user:', user.email, 'ID:', user.id);
     }
@@ -159,9 +309,12 @@ const handleCheckoutCompleted = async (session) => {
       priceId = subscription.items.data[0].price.id;
       
       const priceIdMap = {
-        [process.env.STRIPE_INDIVIDUAL_PRICE]: 'Individual',
-        [process.env.STRIPE_SMALL_ORG_PRICE]: 'Small Org',
-        [process.env.STRIPE_MEDIUM_ORG_PRICE]: 'Medium Org',
+        [process.env.STRIPE_INDIVIDUAL_PRICE]: 'Personal Single Use',
+        [process.env.STRIPE_PERSONAL_LIFE_PRICE]: 'Personal Life Events',
+        [process.env.STRIPE_ORG_EVENTS_PRICE]: 'Org Events',
+        [process.env.STRIPE_SMALL_ORG_PRICE]: 'Starter',
+        [process.env.STRIPE_MEDIUM_ORG_PRICE]: 'Growth',
+        [process.env.STRIPE_SCALE_ORG_PRICE]: 'Pro',
         [process.env.STRIPE_ENTERPRISE_PRICE]: 'Enterprise',
       };
       
@@ -180,6 +333,26 @@ const handleCheckoutCompleted = async (session) => {
       updateData.priceId = priceId;
       updateData.currentPeriodStart = new Date(subscription.current_period_start * 1000);
       updateData.currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+    }
+
+    // ── ORG_EVENTS: set 1-year expiry from today on initial purchase ──
+    if (user.role === 'ORG_EVENTS' && !user.orgEventsExpiresAt) {
+      const expiresAt = new Date();
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+      updateData.orgEventsExpiresAt = expiresAt;
+      console.log('📅 ORG_EVENTS: expiry set to', expiresAt.toISOString());
+    }
+
+    // ── ORG_EVENTS renewal: if this is the $65 renewal price, extend by 1 year ──
+    if (user.role === 'ORG_EVENTS' && session.amount_total &&
+        process.env.STRIPE_ORG_EVENTS_RENEWAL_PRICE &&
+        session.metadata?.priceId === process.env.STRIPE_ORG_EVENTS_RENEWAL_PRICE) {
+      const currentExpiry = user.orgEventsExpiresAt ? new Date(user.orgEventsExpiresAt) : new Date();
+      // Extend from current expiry (not today) so they don't lose time
+      currentExpiry.setFullYear(currentExpiry.getFullYear() + 1);
+      updateData.orgEventsExpiresAt = currentExpiry;
+      updateData.subscriptionStatus = 'active';
+      console.log('🔄 ORG_EVENTS renewal: extended to', currentExpiry.toISOString());
     }
 
     await prisma.user.update({
@@ -279,9 +452,12 @@ const handleSubscriptionCreated = async (subscription) => {
     }
 
     const priceIdMap = {
-      [process.env.STRIPE_INDIVIDUAL_PRICE]: 'Individual',
-      [process.env.STRIPE_SMALL_ORG_PRICE]: 'Small Org',
-      [process.env.STRIPE_MEDIUM_ORG_PRICE]: 'Medium Org',
+      [process.env.STRIPE_INDIVIDUAL_PRICE]: 'Personal Single Use',
+      [process.env.STRIPE_PERSONAL_LIFE_PRICE]: 'Personal Life Events',
+      [process.env.STRIPE_ORG_EVENTS_PRICE]: 'Org Events',
+      [process.env.STRIPE_SMALL_ORG_PRICE]: 'Starter',
+      [process.env.STRIPE_MEDIUM_ORG_PRICE]: 'Growth',
+      [process.env.STRIPE_SCALE_ORG_PRICE]: 'Pro',
       [process.env.STRIPE_ENTERPRISE_PRICE]: 'Enterprise',
     };
     
@@ -332,9 +508,12 @@ const handleSubscriptionUpdated = async (subscription) => {
     }
 
     const priceIdMap = {
-      [process.env.STRIPE_INDIVIDUAL_PRICE]: 'Individual',
-      [process.env.STRIPE_SMALL_ORG_PRICE]: 'Small Org',
-      [process.env.STRIPE_MEDIUM_ORG_PRICE]: 'Medium Org',
+      [process.env.STRIPE_INDIVIDUAL_PRICE]: 'Personal Single Use',
+      [process.env.STRIPE_PERSONAL_LIFE_PRICE]: 'Personal Life Events',
+      [process.env.STRIPE_ORG_EVENTS_PRICE]: 'Org Events',
+      [process.env.STRIPE_SMALL_ORG_PRICE]: 'Starter',
+      [process.env.STRIPE_MEDIUM_ORG_PRICE]: 'Growth',
+      [process.env.STRIPE_SCALE_ORG_PRICE]: 'Pro',
       [process.env.STRIPE_ENTERPRISE_PRICE]: 'Enterprise',
     };
     
@@ -486,9 +665,12 @@ const handlePaymentSucceeded = async (invoice) => {
         const emailService = require('../services/emailService');
         
         const priceIdMap = {
-          [process.env.STRIPE_INDIVIDUAL_PRICE]: 'Individual',
-          [process.env.STRIPE_SMALL_ORG_PRICE]: 'Small Org',
-          [process.env.STRIPE_MEDIUM_ORG_PRICE]: 'Medium Org',
+          [process.env.STRIPE_INDIVIDUAL_PRICE]: 'Personal Single Use',
+          [process.env.STRIPE_PERSONAL_LIFE_PRICE]: 'Personal Life Events',
+          [process.env.STRIPE_ORG_EVENTS_PRICE]: 'Org Events',
+          [process.env.STRIPE_SMALL_ORG_PRICE]: 'Starter',
+          [process.env.STRIPE_MEDIUM_ORG_PRICE]: 'Growth',
+          [process.env.STRIPE_SCALE_ORG_PRICE]: 'Pro',
           [process.env.STRIPE_ENTERPRISE_PRICE]: 'Enterprise',
         };
         const planName = priceIdMap[subscription.items.data[0].price.id] || 'Individual';

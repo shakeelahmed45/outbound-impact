@@ -28,13 +28,22 @@ const sendWelcomeEmail = async (userEmail, userName, userRole) => {
     }
 
     const planNames = {
-      INDIVIDUAL: 'Individual',
-      ORG_SMALL: 'Small Organization',
-      ORG_MEDIUM: 'Medium Organization',
+      INDIVIDUAL: 'Personal Single Use',
+      PERSONAL_LIFE: 'Personal Life Events',
+      ORG_EVENTS: 'Org Events',
+      ORG_SMALL: 'Starter',
+      ORG_MEDIUM: 'Growth',
+      ORG_SCALE: 'Pro',
       ORG_ENTERPRISE: 'Enterprise',
-      'Individual': 'Individual',
-      'Small Org': 'Small Organization',
-      'Medium Org': 'Medium Organization',
+      'Individual': 'Personal Single Use',
+      'Personal Single Use': 'Personal Single Use',
+      'Personal Life Events': 'Personal Life Events',
+      'Org Events': 'Org Events',
+      'Small Org': 'Starter',
+      'Starter': 'Starter',
+      'Medium Org': 'Growth',
+      'Growth': 'Growth',
+      'Pro': 'Pro',
       'Enterprise': 'Enterprise'
     };
 
@@ -148,13 +157,22 @@ const sendAdminNotification = async (userData) => {
     const adminEmail = process.env.ADMIN_EMAIL || 'business.shakeelahmed@gmail.com';
 
     const planNames = {
-      INDIVIDUAL: 'Individual',
-      ORG_SMALL: 'Small Organization',
-      ORG_MEDIUM: 'Medium Organization',
+      INDIVIDUAL: 'Personal Single Use',
+      PERSONAL_LIFE: 'Personal Life Events',
+      ORG_EVENTS: 'Org Events',
+      ORG_SMALL: 'Starter',
+      ORG_MEDIUM: 'Growth',
+      ORG_SCALE: 'Pro',
       ORG_ENTERPRISE: 'Enterprise',
-      'Individual': 'Individual',
-      'Small Org': 'Small Organization',
-      'Medium Org': 'Medium Organization',
+      'Individual': 'Personal Single Use',
+      'Personal Single Use': 'Personal Single Use',
+      'Personal Life Events': 'Personal Life Events',
+      'Org Events': 'Org Events',
+      'Small Org': 'Starter',
+      'Starter': 'Starter',
+      'Medium Org': 'Growth',
+      'Growth': 'Growth',
+      'Pro': 'Pro',
       'Enterprise': 'Enterprise'
     };
 
@@ -201,11 +219,11 @@ const sendAdminNotification = async (userData) => {
               </div>
               
               <div class="info-row">
-                <span class="label">Amount:</span> ${userData.amount ? '$' + userData.amount : 'N/A'}
+                <span class="label">Amount:</span> ${userData.amount ? '$' + Number(userData.amount).toFixed(2) : 'N/A'}
               </div>
               
               <div class="info-row">
-                <span class="label">Subscription ID:</span> ${userData.subscriptionId || 'N/A'}
+                <span class="label">Subscription ID:</span> ${userData.subscriptionId || (userData.paymentType === 'one-time' ? 'One-time payment (no subscription)' : 'N/A')}
               </div>
               
               <div class="info-row">

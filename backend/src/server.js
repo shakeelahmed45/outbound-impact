@@ -41,6 +41,7 @@ const subscriptionRoutes = require('./routes/subscriptionRoutes');
 
 // 🔔 Notification routes
 const notificationRoutes = require('./routes/notificationRoutes');
+const storageAlertRoutes = require('./routes/storageAlertRoutes');
 
 // 🔄 Refund routes (NEW)
 // const refundRoutes = require('./routes/refundRoutes'); //
@@ -221,6 +222,113 @@ app.get('/api/health', (req, res) => {
 // 📋 Audit middleware — auto-logs all successful write operations
 app.use(auditMiddleware);
 
+// ══════════════════════════════════════════════════════════════
+// OG META TAGS ENDPOINT
+// Called by Vercel edge rewrite when a social media crawler
+// requests /l/:slug. Returns pre-rendered HTML with Open Graph
+// meta tags so platforms show a rich preview card.
+// Real users are served the React app as normal via Vercel.
+// ══════════════════════════════════════════════════════════════
+app.get('/og/:slug', async (req, res) => {
+  const { slug } = req.params;
+  const FRONTEND = process.env.FRONTEND_URL || 'https://outboundimpact.net';
+
+  try {
+    const item = await prisma.item.findUnique({
+      where: { slug },
+      select: {
+        title: true, description: true, type: true,
+        mediaUrl: true, thumbnailUrl: true,
+        sharingEnabled: true, status: true,
+        user: { select: { name: true } },
+      },
+    });
+
+    // Fall back to a generic page if not found / private
+    if (!item || !item.sharingEnabled || item.status === 'PENDING_APPROVAL') {
+      return res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Outbound Impact</title>
+  <meta property="og:title" content="Outbound Impact"/>
+  <meta property="og:description" content="Share content. Track analytics. Grow your reach."/>
+  <meta property="og:image" content="${FRONTEND}/og-default.png"/>
+  <meta property="og:url" content="${FRONTEND}"/>
+  <meta name="robots" content="noindex">
+  <meta http-equiv="refresh" content="0;url=${FRONTEND}/l/${slug}">
+</head>
+<body></body>
+</html>`);
+    }
+
+    const pageUrl     = `${FRONTEND}/l/${slug}`;
+    const title       = item.title || 'Outbound Impact';
+    const description = item.description
+      || (item.type === 'VIDEO' ? 'Watch this video on Outbound Impact'
+        : item.type === 'AUDIO' ? 'Listen on Outbound Impact'
+        : item.type === 'IMAGE' ? 'View this image on Outbound Impact'
+        : 'View on Outbound Impact');
+
+    // Best image: thumbnail → mediaUrl for images → default
+    const image = item.thumbnailUrl
+      || (item.type === 'IMAGE' ? item.mediaUrl : null)
+      || `${FRONTEND}/og-default.png`;
+
+    const ogType = item.type === 'VIDEO' ? 'video.other' : 'website';
+
+    res.set('Cache-Control', 'public, max-age=3600'); // cache 1 hour
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(title)} | Outbound Impact</title>
+
+  <!-- Primary meta -->
+  <meta name="description" content="${escapeHtml(description)}">
+
+  <!-- Open Graph (Facebook, WhatsApp, LinkedIn) -->
+  <meta property="og:type"        content="${ogType}">
+  <meta property="og:url"         content="${pageUrl}">
+  <meta property="og:title"       content="${escapeHtml(title)}">
+  <meta property="og:description" content="${escapeHtml(description)}">
+  <meta property="og:image"       content="${image}">
+  <meta property="og:image:width"  content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:site_name"   content="Outbound Impact">
+
+  <!-- Twitter / X card -->
+  <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:title"       content="${escapeHtml(title)}">
+  <meta name="twitter:description" content="${escapeHtml(description)}">
+  <meta name="twitter:image"       content="${image}">
+
+  <!-- Redirect real users to the React app immediately -->
+  <meta http-equiv="refresh" content="0;url=${pageUrl}">
+</head>
+<body>
+  <p>Redirecting to <a href="${pageUrl}">${escapeHtml(title)}</a>…</p>
+</body>
+</html>`);
+  } catch (err) {
+    console.error('OG endpoint error:', err.message);
+    res.redirect(`${FRONTEND}/l/${slug}`);
+  }
+});
+
+// Helper — prevent XSS in OG HTML output
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/user', userRoutes);
@@ -259,6 +367,8 @@ app.use('/api/subscription', subscriptionRoutes);
 
 // 🔔 Notification routes
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/storage-alerts', storageAlertRoutes);
+app.use('/api/enterprise-leads', require('./routes/enterpriseLeadRoutes'));
 const cohortRoutes = require('./routes/cohortRoutes');
 app.use('/api/cohorts', cohortRoutes);
 
@@ -296,6 +406,12 @@ if (process.env.VERCEL) {
 } else {
   // Start server for local development
   chatAutoCloseService.startAutoCloseJob();
+  const { startStorageAlertJob } = require('./services/storageAlertService');
+  startStorageAlertJob();
+  const { startOrgEventsRenewalCron } = require('./services/orgEventsRenewalService');
+  startOrgEventsRenewalCron();
+  const { checkConfig: checkR2Config } = require('./services/cloudflareService');
+  checkR2Config();
   initializeEnforcementColumns().catch(e => console.error('Column init error:', e));
   app.listen(PORT, () => {
     console.log('\n═══════════════════════════════════════════════');

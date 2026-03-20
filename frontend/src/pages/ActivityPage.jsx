@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Activity, Download, Search, ChevronLeft, ChevronRight,
-  Eye, QrCode, Wifi, Globe, FileText, TrendingUp, BarChart3, Folder
+  Eye, QrCode, Wifi, Globe, FileText, TrendingUp, BarChart3, Folder, Zap
 } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import useAuthStore from '../store/authStore';
@@ -18,6 +18,7 @@ const ActivityPage = () => {
   const [filterType, setFilterType] = useState('all');
   const [activeTab, setActiveTab] = useState('items');
   const [page, setPage] = useState(1);
+  const [amplifyTotal, setAmplifyTotal] = useState(0);
   const perPage = 15;
 
   useEffect(() => {
@@ -28,15 +29,21 @@ const ActivityPage = () => {
   const fetchAllData = async () => {
     try {
       setLoading(true);
-      const [itemsRes, campaignsRes] = await Promise.all([
+      const [itemsRes, campaignsRes, analyticsRes] = await Promise.all([
         api.get('/items').catch(() => ({ data: { items: [] } })),
         api.get('/campaigns').catch(() => ({ data: { campaigns: [] } })),
+        api.get('/analytics').catch(() => ({ data: {} })),
       ]);
 
-      const itemsList = itemsRes.data?.items || [];
+      const itemsList     = itemsRes.data?.items || [];
       const campaignsList = campaignsRes.data?.campaigns || [];
+      // Amplify views per item from the Analytics table (source breakdown)
+      const analyticsData = analyticsRes.data || {};
       setCampaigns(campaignsList);
 
+      // Build a per-item amplify count from the analytics source breakdown
+      // The /analytics endpoint returns overall sourceBreakdown, not per-item.
+      // So we rely on item.viewsAmplify (from DB column) with a safe 0 fallback.
       setAnalyticsRecords(itemsList.map(item => ({
         id: item.id,
         name: item.title || 'Untitled',
@@ -45,10 +52,14 @@ const ActivityPage = () => {
         fileSize: item.fileSize ? formatSize(Number(item.fileSize)) : '—',
         campaign: campaignsList.find(c => c.id === item.campaignId)?.name || '—',
         campaignId: item.campaignId,
-        totalViews: item.views || 0,
-        directViews: item.viewsDirect || 0,
+        totalViews:   item.views       || 0,
+        directViews:  item.viewsDirect || 0,
+        amplifyViews: item.viewsAmplify || 0,
         uploaded: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '—',
       })));
+
+      // Store overall amplify total from Analytics table as a reliable fallback
+      setAmplifyTotal(analyticsData.sourceBreakdown?.amplify || analyticsData.amplifyViews || 0);
     } catch (err) {
       console.error('Failed to fetch activity data:', err);
     } finally {
@@ -81,6 +92,10 @@ const ActivityPage = () => {
   // ✅ Content views from items
   const totalContentViews = analyticsRecords.reduce((s, r) => s + r.totalViews, 0);
   const totalDirectViews = analyticsRecords.reduce((s, r) => s + r.directViews, 0);
+  const totalAmplifyViews = Math.max(
+    analyticsRecords.reduce((s, r) => s + r.amplifyViews, 0),
+    amplifyTotal  // fallback from Analytics table if viewsAmplify column not yet migrated
+  );
   const avgViews = analyticsRecords.length > 0 ? Math.round(totalContentViews / analyticsRecords.length) : 0;
 
   // ✅ QR/NFC from CAMPAIGNS (not items — QR codes are on streams, not individual content)
@@ -140,15 +155,16 @@ const ActivityPage = () => {
         </div>
 
         {/* Summary Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
           {[
-            { icon: FileText, color: 'text-blue-600', label: 'Assets', value: analyticsRecords.length },
-            { icon: Folder, color: 'text-indigo-600', label: isIndividual ? 'Streams' : 'Campaigns', value: campaigns.length },
-            { icon: Eye, color: 'text-green-600', label: 'Content Views', value: totalContentViews },
+            { icon: FileText,  color: 'text-blue-600',   label: 'Assets',        value: analyticsRecords.length },
+            { icon: Folder,    color: 'text-indigo-600', label: isIndividual ? 'Streams' : 'Campaigns', value: campaigns.length },
+            { icon: Eye,       color: 'text-green-600',  label: 'Content Views', value: totalContentViews },
             { icon: BarChart3, color: 'text-indigo-600', label: isIndividual ? 'Stream Views' : 'Campaign Views', value: totalStreamViews },
-            { icon: QrCode, color: 'text-purple-600', label: 'QR Scans', value: totalQrScans },
-            { icon: Wifi, color: 'text-orange-600', label: 'NFC Taps', value: totalNfcTaps },
-            { icon: TrendingUp, color: 'text-pink-600', label: 'Avg/Asset', value: avgViews },
+            { icon: QrCode,    color: 'text-purple-600', label: 'QR Scans',      value: totalQrScans },
+            { icon: Wifi,      color: 'text-orange-600', label: 'NFC Taps',      value: totalNfcTaps },
+            { icon: Zap,       color: 'text-teal-600',   label: '⚡ Amplify',    value: totalAmplifyViews },
+            { icon: TrendingUp,color: 'text-pink-600',   label: 'Avg/Asset',     value: avgViews },
           ].map((stat) => (
             <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-4">
               <div className="flex items-center gap-2 mb-1">
@@ -226,6 +242,9 @@ const ActivityPage = () => {
                         <th className="text-center py-3 px-4 text-xs font-semibold text-gray-600 uppercase hidden lg:table-cell">
                           <span className="flex items-center justify-center gap-1"><Globe size={12} /> Direct</span>
                         </th>
+                        <th className="text-center py-3 px-4 text-xs font-semibold text-gray-600 uppercase hidden lg:table-cell">
+                          <span className="flex items-center justify-center gap-1"><Zap size={12} /> Amplify</span>
+                        </th>
                         <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase hidden md:table-cell">Uploaded</th>
                       </tr>
                     </thead>
@@ -242,6 +261,11 @@ const ActivityPage = () => {
                           <td className="py-3 px-4 text-sm text-gray-600 hidden md:table-cell">{item.campaign}</td>
                           <td className="py-3 px-4 text-center"><span className="text-sm font-bold text-gray-900">{item.totalViews.toLocaleString()}</span></td>
                           <td className="py-3 px-4 text-center hidden lg:table-cell"><span className="text-sm font-semibold text-teal-600">{item.directViews.toLocaleString()}</span></td>
+                          <td className="py-3 px-4 text-center hidden lg:table-cell">
+                            {item.amplifyViews > 0
+                              ? <span className="text-sm font-bold text-violet-600">⚡ {item.amplifyViews.toLocaleString()}</span>
+                              : <span className="text-sm text-gray-400">—</span>}
+                          </td>
                           <td className="py-3 px-4 text-sm text-gray-500 hidden md:table-cell">{item.uploaded}</td>
                         </tr>
                       ))}
@@ -343,23 +367,24 @@ const ActivityPage = () => {
           </div>
         )}
 
-        {/* Source Breakdown - uses STREAM-level QR/NFC data */}
-        {(totalContentViews > 0 || totalQrScans > 0) && (
+        {/* Source Breakdown */}
+        {(totalContentViews > 0 || totalQrScans > 0 || totalAmplifyViews > 0) && (
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h3 className="text-lg font-bold text-gray-900 mb-4">Stream Source Breakdown</h3>
             <p className="text-xs text-gray-500 mb-4">How people find your streams (QR scans and NFC taps are tracked at the stream level)</p>
             <div className="space-y-3">
               {[
-                { label: 'QR Code Scans', value: totalQrScans, color: 'bg-purple-500', icon: QrCode },
-                { label: 'NFC Taps', value: totalNfcTaps, color: 'bg-orange-500', icon: Wifi },
+                { label: '⚡ Amplify (Social)',  value: totalAmplifyViews, color: 'bg-gradient-to-r from-teal-500 to-violet-600', icon: Zap,       iconColor: 'text-teal-600'   },
+                { label: 'QR Code Scans',        value: totalQrScans,      color: 'bg-purple-500',  icon: QrCode,     iconColor: 'text-purple-600' },
+                { label: 'NFC Taps',             value: totalNfcTaps,      color: 'bg-orange-500',  icon: Wifi,       iconColor: 'text-orange-600' },
               ].map((source) => {
-                const total = totalQrScans + totalNfcTaps + totalStreamViews;
+                const total = totalAmplifyViews + totalQrScans + totalNfcTaps + totalStreamViews;
                 const percent = total > 0 ? Math.round((source.value / total) * 100) : 0;
                 return (
                   <div key={source.label}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                        <source.icon size={14} className="text-gray-500" /> {source.label}
+                        <source.icon size={14} className={source.iconColor} /> {source.label}
                       </span>
                       <span className="text-sm font-bold text-gray-900">{source.value.toLocaleString()} ({percent}%)</span>
                     </div>

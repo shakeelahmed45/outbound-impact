@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, Eye, Users, Folder, QrCode } from 'lucide-react';
+import { Upload, Eye, Users, Folder, QrCode, Activity } from 'lucide-react';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import useAuthStore from '../store/authStore';
 import api from '../services/api';
+import StorageAlertBanner from '../components/StorageAlertBanner';
 
 const OrganizationDashboard = () => {
   const navigate = useNavigate();
@@ -68,7 +69,7 @@ const OrganizationDashboard = () => {
       color: 'from-blue-500 to-blue-600',
     },
     {
-      title: 'Streams',
+      title: 'Campaigns',
       value: stats.campaigns,
       icon: Folder,
       color: 'from-pink-500 to-pink-600',
@@ -91,14 +92,24 @@ const OrganizationDashboard = () => {
     );
   }
 
+  const effectiveRole = user?.isTeamMember ? user?.organization?.role : user?.role;
+  const isOrgEvents = effectiveRole === 'ORG_EVENTS';
+  const isMedium    = effectiveRole === 'ORG_MEDIUM';
+  const isScale     = effectiveRole === 'ORG_SCALE';
+
   return (
     <DashboardLayout>
+      {/* ── STORAGE ALERT BANNER ── */}
+      <StorageAlertBanner storageUsed={stats.storageUsed} storageLimit={stats.storageLimit} />
+
       {/* Welcome Section */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-primary mb-2">
-          {user?.role === 'ORG_SMALL' && '🏢 Small Organization Dashboard'}
-          {user?.role === 'ORG_MEDIUM' && '🏛️ Medium Organization Dashboard'}
-          {user?.role === 'ORG_ENTERPRISE' && '🏢 Enterprise Dashboard'}
+          {isOrgEvents  && '🎪 Org Events Dashboard'}
+          {isMedium     && '🏛️ Growth Dashboard'}
+          {isScale      && '🚀 Pro Dashboard'}
+          {effectiveRole === 'ORG_SMALL'      && '🏢 Starter Dashboard'}
+          {effectiveRole === 'ORG_ENTERPRISE' && '🏢 Enterprise Dashboard'}
         </h1>
         <p className="text-secondary text-lg">
           Welcome back, {user?.name}!
@@ -165,34 +176,45 @@ const OrganizationDashboard = () => {
       <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
         <h3 className="text-xl font-bold text-primary mb-4">Quick Actions</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <button 
+          <button
             onClick={() => navigate('/dashboard/team')}
             className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center"
           >
             <Users className="mx-auto mb-2 text-primary" size={24} />
             <span className="text-sm font-semibold text-gray-700">Manage Team</span>
           </button>
-          <button 
+          <button
             onClick={() => navigate('/dashboard/campaigns')}
             className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center"
           >
             <Folder className="mx-auto mb-2 text-primary" size={24} />
-            <span className="text-sm font-semibold text-gray-700">Streams</span>
+            <span className="text-sm font-semibold text-gray-700">Campaigns</span>
           </button>
-          <button 
+          <button
             onClick={() => navigate('/dashboard/upload')}
             className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center"
           >
             <Upload className="mx-auto mb-2 text-primary" size={24} />
             <span className="text-sm font-semibold text-gray-700">Upload</span>
           </button>
-          <button 
-            onClick={() => navigate('/dashboard/advanced-analytics')}
-            className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center"
-          >
-            <Eye className="mx-auto mb-2 text-primary" size={24} />
-            <span className="text-sm font-semibold text-gray-700">Advanced Analytics</span>
-          </button>
+          {/* Org Events: All Activity | All other orgs: Advanced Analytics */}
+          {isOrgEvents ? (
+            <button
+              onClick={() => navigate('/dashboard/activity')}
+              className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center"
+            >
+              <Activity className="mx-auto mb-2 text-primary" size={24} />
+              <span className="text-sm font-semibold text-gray-700">All Activity</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate('/dashboard/advanced-analytics')}
+              className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary hover:bg-purple-50 transition-all text-center"
+            >
+              <Eye className="mx-auto mb-2 text-primary" size={24} />
+              <span className="text-sm font-semibold text-gray-700">Advanced Analytics</span>
+            </button>
+          )}
         </div>
       </div>
     </DashboardLayout>

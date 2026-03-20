@@ -72,12 +72,16 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
 
   // Role checks — use org owner's role for team members
   const effectiveRole = user?.isTeamMember ? user?.organization?.role : user?.role;
-  const isIndividual = effectiveRole === 'INDIVIDUAL';
+  const isIndividual = effectiveRole === 'INDIVIDUAL' || effectiveRole === 'PERSONAL_LIFE';
+  const isSingleUse = effectiveRole === 'INDIVIDUAL'; // Only Single Use gets Contributors (max 2)
+  const isOrgEvents = effectiveRole === 'ORG_EVENTS';
   const isSmall = effectiveRole === 'ORG_SMALL';
   const isMedium = effectiveRole === 'ORG_MEDIUM';
+  const isScale = effectiveRole === 'ORG_SCALE';
   const isEnterprise = effectiveRole === 'ORG_ENTERPRISE';
-  const isSmallOrAbove = isSmall || isMedium || isEnterprise;
-  const isMediumOrAbove = isMedium || isEnterprise;
+  const isSmallOrAbove = isOrgEvents || isSmall || isMedium || isScale || isEnterprise;
+  const isMediumOrAbove = isMedium || isScale || isEnterprise;
+  const isScaleOrAbove = isScale || isEnterprise;
   const isTeamViewer = user?.isTeamMember && user?.teamRole === 'VIEWER';
   const isTeamEditor = user?.isTeamMember && user?.teamRole === 'EDITOR';
 
@@ -110,8 +114,11 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
   const getPlanLabel = () => {
     switch (effectiveRole) {
       case 'INDIVIDUAL': return 'Personal';
-      case 'ORG_SMALL': return 'Small Business';
-      case 'ORG_MEDIUM': return 'Medium Business';
+      case 'PERSONAL_LIFE': return 'Life Events';
+      case 'ORG_EVENTS': return 'Org Events';
+      case 'ORG_SMALL': return 'Starter';
+      case 'ORG_MEDIUM': return 'Growth';
+      case 'ORG_SCALE': return 'Pro';
       case 'ORG_ENTERPRISE': return 'Enterprise';
       default: return 'Dashboard';
     }
@@ -219,8 +226,9 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
 
         {/* ═══════════════════════════════════
             ANALYTICS
-            Individual = basic, Medium/Enterprise = advanced
-            Small = hidden (no analytics page)
+            Individual/Life Events → full analytics
+            Org Events/Growth/Pro/Enterprise → advanced analytics
+            Starter → NO analytics (uses Activity Feed)
            ═══════════════════════════════════ */}
         {isIndividual && hasFeature('analytics') && (
           <NavItem
@@ -230,8 +238,8 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
             onClick={() => handleNavigate('/dashboard/analytics')}
           />
         )}
-        {/* Contributors - Individual (flat nav below Analytics) */}
-        {isIndividual && (
+        {/* Contributors - Personal Single Use only (max 2 contributors) */}
+        {isSingleUse && (
           <NavItem
             icon={Users}
             label="Contributors"
@@ -239,6 +247,7 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
             onClick={() => handleNavigate('/dashboard/team')}
           />
         )}
+        {/* Advanced Analytics — Growth, Pro, Enterprise only (NOT Org Events) */}
         {isMediumOrAbove && hasFeature('analytics') && (
           <NavItem
             icon={BarChart3}
@@ -261,8 +270,8 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
         )}
 
         {/* ═══════════════════════════════════
-            INBOX (Messages) - Small, Medium, Enterprise
-            Internal team + External email messaging
+            INBOX (Messages) - Growth, Pro, Enterprise only
+            Plans page: Messages available for Starter and above
            ═══════════════════════════════════ */}
         {isSmallOrAbove && hasFeature('messages') && (
           <NavItem
@@ -275,7 +284,84 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
 
         {/* ═══════════════════════════════════
             ENTERPRISE Section (Collapsible)
-            Only for Enterprise users
+            Enterprise-only: Cohorts, Workflows, Organizations, Audit, Compliance
+           ═══════════════════════════════════ */}
+        {/* ═══════════════════════════════════
+            GROWTH: Cohorts + Organizations
+           ═══════════════════════════════════ */}
+        {isMedium && (
+          <div className="mt-1">
+            <CollapsibleSection
+              icon={Shield}
+              label="Growth Features"
+              expanded={enterpriseExpanded}
+              onToggle={() => setEnterpriseExpanded(!enterpriseExpanded)}
+            >
+              {hasFeature('cohorts') && (
+                <SubNavItem
+                  icon={Users}
+                  label="Cohorts"
+                  active={isActive('/dashboard/cohorts')}
+                  onClick={() => handleNavigate('/dashboard/cohorts')}
+                />
+              )}
+              {canAccessContributors && hasFeature('organizations') && (
+                <SubNavItem
+                  icon={Building2}
+                  label="Organizations"
+                  active={isActive('/dashboard/organizations')}
+                  onClick={() => handleNavigate('/dashboard/organizations')}
+                />
+              )}
+            </CollapsibleSection>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════
+            ORG EVENTS: Cohorts + All Activity (no Advanced Analytics)
+           ═══════════════════════════════════ */}
+        {isOrgEvents && hasFeature('cohorts') && (
+          <NavItem
+            icon={Users}
+            label="Cohorts"
+            active={isActive('/dashboard/cohorts')}
+            onClick={() => handleNavigate('/dashboard/cohorts')}
+          />
+        )}
+
+        {/* ═══════════════════════════════════
+            PRO: Organizations + Workflows (in addition to Analytics/Activity)
+           ═══════════════════════════════════ */}
+        {isScale && (
+          <div className="mt-1">
+            <CollapsibleSection
+              icon={Shield}
+              label="Pro Features"
+              expanded={enterpriseExpanded}
+              onToggle={() => setEnterpriseExpanded(!enterpriseExpanded)}
+            >
+              {canAccessContributors && hasFeature('organizations') && (
+                <SubNavItem
+                  icon={Building2}
+                  label="Organizations"
+                  active={isActive('/dashboard/organizations')}
+                  onClick={() => handleNavigate('/dashboard/organizations')}
+                />
+              )}
+              {hasFeature('workflows') && (
+                <SubNavItem
+                  icon={GitBranch}
+                  label="Workflows"
+                  active={isActive('/dashboard/workflows')}
+                  onClick={() => handleNavigate('/dashboard/workflows')}
+                />
+              )}
+            </CollapsibleSection>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════
+            ENTERPRISE: All features
            ═══════════════════════════════════ */}
         {isEnterprise && (
           <div className="mt-1">
@@ -287,22 +373,21 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
               badge="PRO"
             >
               {hasFeature('cohorts') && (
-              <SubNavItem
-                icon={Users}
-                label="Cohorts"
-                active={isActive('/dashboard/cohorts')}
-                onClick={() => handleNavigate('/dashboard/cohorts')}
-              />
+                <SubNavItem
+                  icon={Users}
+                  label="Cohorts"
+                  active={isActive('/dashboard/cohorts')}
+                  onClick={() => handleNavigate('/dashboard/cohorts')}
+                />
               )}
               {hasFeature('workflows') && (
-              <SubNavItem
-                icon={GitBranch}
-                label="Workflows"
-                active={isActive('/dashboard/workflows')}
-                onClick={() => handleNavigate('/dashboard/workflows')}
-              />
+                <SubNavItem
+                  icon={GitBranch}
+                  label="Workflows"
+                  active={isActive('/dashboard/workflows')}
+                  onClick={() => handleNavigate('/dashboard/workflows')}
+                />
               )}
-              {/* ✅ Organizations — hidden for VIEWER+EDITOR (they can't manage orgs), feature-gated */}
               {canAccessContributors && hasFeature('organizations') && (
                 <SubNavItem
                   icon={Building2}

@@ -8,21 +8,27 @@ const DataExportsPage = () => {
 
   const handleExport = async (type) => {
     setExporting(type);
+
+    const EXPORT_MAP = {
+      customers: { url: '/admin/users/export',           filename: 'customers_export' },
+      geography: { url: '/admin/users/export-geography', filename: 'geography_export' },
+      revenue:   { url: '/admin/users/export-revenue',   filename: 'revenue_export' },
+      usage:     { url: '/admin/users/export-usage',     filename: 'usage_export' },
+    };
+
     try {
-      if (type === 'customers') {
-        // Use real existing export endpoint
-        const res = await api.get('/admin/users/export', { responseType: 'blob' });
-        const url = window.URL.createObjectURL(new Blob([res.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `customers_export_${new Date().toISOString().split('T')[0]}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
-      } else {
-        alert(`${type} export backend not yet implemented. The Customers CSV export works via /admin/users/export.`);
-      }
+      const config = EXPORT_MAP[type];
+      if (!config) { alert('Unknown export type'); return; }
+
+      const res = await api.get(config.url, { responseType: 'blob' });
+      const url  = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href  = url;
+      link.setAttribute('download', `${config.filename}_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Export error:', err);
       alert('Export failed. Check console for details.');

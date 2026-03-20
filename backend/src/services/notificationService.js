@@ -130,15 +130,18 @@ const notifyTeamMemberJoined = async (userId, memberName, memberEmail) => {
 const notifyStorageWarning = async (userId, percentUsed) => {
   if (percentUsed < 80) return null;
 
-  const level = percentUsed >= 95 ? 'alert' : 'warning';
-  const title = percentUsed >= 95 ? 'Storage Almost Full!' : 'Storage Running Low';
+  const level   = percentUsed >= 95 ? 'alert'   : 'warning';
+  const title   = percentUsed >= 95 ? '🚨 Storage Critical!' : '⚠️ Storage Running Low';
+  const message = percentUsed >= 95
+    ? `You've used ${percentUsed}% of your storage. Uploads will fail when full — upgrade or add storage now.`
+    : `You've used ${percentUsed}% of your storage. Upgrade your plan or add storage to avoid interruptions.`;
 
   return createNotification(userId, {
-    type: level,
+    type:     level,
     category: 'storage',
     title,
-    message: `You've used ${percentUsed}% of your storage. ${percentUsed >= 95 ? 'Upload may fail soon.' : 'Consider upgrading your plan.'} `,
-    metadata: { percentUsed },
+    message,
+    metadata: { percentUsed, showStorageAlert: true },
   });
 };
 

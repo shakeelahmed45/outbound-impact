@@ -112,6 +112,8 @@ const trackView = async (req, res) => {
         incrementData.viewsQr = { increment: 1 };
       } else if (viewSource === 'nfc') {
         incrementData.viewsNfc = { increment: 1 };
+      } else if (viewSource === 'amplify') {
+        incrementData.viewsAmplify = { increment: 1 };
       } else {
         incrementData.viewsDirect = { increment: 1 };
       }
@@ -227,7 +229,7 @@ const getAnalytics = async (req, res) => {
     }));
 
     // Source breakdown from Analytics table
-    let sourceBreakdown = { qr: 0, nfc: 0, direct: 0 };
+    let sourceBreakdown = { qr: 0, nfc: 0, direct: 0, amplify: 0 };
     try {
       const sourceCounts = await prisma.analytics.groupBy({
         by: ['source'],
@@ -237,10 +239,23 @@ const getAnalytics = async (req, res) => {
       sourceCounts.forEach(sc => {
         if (sc.source === 'qr') sourceBreakdown.qr = sc._count.source;
         else if (sc.source === 'nfc') sourceBreakdown.nfc = sc._count.source;
+        else if (sc.source === 'amplify') sourceBreakdown.amplify = sc._count.source;
         else sourceBreakdown.direct += sc._count.source;
       });
     } catch (e) {
       console.log('Source breakdown query failed:', e.message);
+    }
+
+    // Total amplify views from Item counters (fast, no join)
+    let amplifyViews = 0;
+    try {
+      const amplifyAgg = await prisma.item.aggregate({
+        where: { id: { in: itemIds } },
+        _sum: { viewsAmplify: true },
+      });
+      amplifyViews = amplifyAgg._sum?.viewsAmplify || 0;
+    } catch (e) {
+      amplifyViews = sourceBreakdown.amplify; // fallback to analytics table count
     }
 
     res.json({
@@ -251,6 +266,7 @@ const getAnalytics = async (req, res) => {
       recentItems,
       campaigns: campaignSummary,
       sourceBreakdown,
+      amplifyViews,
     });
   } catch (error) {
     console.error('Get analytics error:', error);

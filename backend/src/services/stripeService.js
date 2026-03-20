@@ -64,6 +64,9 @@ const createCheckoutSession = async (email, priceId, planName, couponCode = null
       priceId = price.id;
     }
 
+    // ✅ One-time plans use 'payment' mode, recurring plans use 'subscription' mode
+    const isOneTimePayment = planName === 'INDIVIDUAL' || planName === 'ORG_EVENTS';
+
     const sessionConfig = {
       payment_method_types: ['card'],
       line_items: [
@@ -72,7 +75,7 @@ const createCheckoutSession = async (email, priceId, planName, couponCode = null
           quantity: 1,
         },
       ],
-      mode: 'subscription',
+      mode: isOneTimePayment ? 'payment' : 'subscription',
       success_url: `${process.env.FRONTEND_URL}/auth/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.FRONTEND_URL}/plans`,
       customer_email: email,
@@ -80,6 +83,12 @@ const createCheckoutSession = async (email, priceId, planName, couponCode = null
         planName: planName,
       },
     };
+
+    // ✅ One-time payments need customer_creation so we get a stripeCustomerId for future upgrades
+    if (isOneTimePayment) {
+      sessionConfig.customer_creation = 'always';
+      sessionConfig.payment_intent_data = { metadata: { planName: planName } };
+    }
 
     // ✅ Add coupon to checkout session if provided and valid
     if (couponCode) {

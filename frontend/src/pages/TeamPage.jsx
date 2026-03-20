@@ -78,9 +78,13 @@ const TeamPage = () => {
   const isIndividual = effectiveUser?.role === 'INDIVIDUAL';
   const isSmall = effectiveUser?.role === 'ORG_SMALL';
   const isMedium = effectiveUser?.role === 'ORG_MEDIUM';
+  const isOrgEvents = effectiveUser?.role === 'ORG_EVENTS';
+  const isScale = effectiveUser?.role === 'ORG_SCALE';
   const isEnterprise = effectiveUser?.role === 'ORG_ENTERPRISE';
   const INDIVIDUAL_CONTRIBUTOR_LIMIT = 2;
+  const ORG_EVENTS_CONTRIBUTOR_LIMIT = 5;
   const individualLimitReached = isIndividual && teamMembers.length >= INDIVIDUAL_CONTRIBUTOR_LIMIT;
+  const orgEventsLimitReached = isOrgEvents && teamMembers.length >= ORG_EVENTS_CONTRIBUTOR_LIMIT;
 
   // ✅ Feature list per plan — these are the features the owner can grant to VIEWER/EDITOR
   const getAvailableFeatures = () => {
@@ -98,8 +102,26 @@ const TeamPage = () => {
       { key: 'activity', label: 'All Activity', desc: 'View activity log' },
       { key: 'messages', label: 'Messages', desc: 'Send and receive messages' },
     ];
-    if (isSmall || isMedium) return orgBase;
-    // Enterprise — add enterprise-only features
+    // Org Events: cohorts, no advanced analytics
+    if (isOrgEvents) return [
+      ...orgBase,
+      { key: 'cohorts', label: 'Cohorts', desc: 'Manage audience cohorts' },
+    ];
+    // Starter: base org features
+    if (isSmall) return orgBase;
+    // Growth: add cohorts + organizations
+    if (isMedium) return [
+      ...orgBase,
+      { key: 'cohorts', label: 'Cohorts', desc: 'Manage audience cohorts' },
+      { key: 'organizations', label: 'Organizations', desc: 'Multi-brand management' },
+    ];
+    // Pro: add organizations + workflows
+    if (isScale) return [
+      ...orgBase,
+      { key: 'organizations', label: 'Organizations', desc: 'Multi-brand management' },
+      { key: 'workflows', label: 'Workflows', desc: 'Content approval workflows' },
+    ];
+    // Enterprise — all features
     return [
       ...orgBase,
       { key: 'cohorts', label: 'Cohorts', desc: 'Manage user cohorts' },
@@ -391,15 +413,19 @@ const TeamPage = () => {
                 showToast('Contributor limit reached on Personal plan (2 max). Upgrade to invite more!', 'error');
                 return;
               }
+              if (orgEventsLimitReached) {
+                showToast('Contributor limit reached on Org Events plan (5 max). Upgrade to invite more!', 'error');
+                return;
+              }
               setShowInviteModal(true);
               setError('');
             }}
             className={`text-white px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:shadow-lg transition-all text-sm sm:text-base whitespace-nowrap ${
-              individualLimitReached ? 'bg-orange-500 hover:bg-orange-600' : 'gradient-btn'
+              (individualLimitReached || orgEventsLimitReached) ? 'bg-orange-500 hover:bg-orange-600' : 'gradient-btn'
             }`}
           >
             <UserPlus size={18} className="sm:w-5 sm:h-5" />
-            {individualLimitReached ? 'Upgrade to Add More' : 'Invite Contributor'}
+            {(individualLimitReached || orgEventsLimitReached) ? 'Upgrade to Add More' : 'Invite Contributor'}
           </button>
         </div>
 
@@ -412,6 +438,21 @@ const TeamPage = () => {
             </p>
             {individualLimitReached && (
               <button onClick={() => window.location.href = '/dashboard/settings'} className="text-sm font-medium text-purple-600 hover:text-purple-700">
+                Upgrade →
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Org Events plan limit info */}
+        {isOrgEvents && (
+          <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 mb-4">
+            <p className="text-sm text-amber-700">
+              <strong>{teamMembers.length}/{ORG_EVENTS_CONTRIBUTOR_LIMIT}</strong> contributors used on Org Events plan
+              {orgEventsLimitReached && <span className="ml-2 text-orange-600 font-medium">• Limit reached</span>}
+            </p>
+            {orgEventsLimitReached && (
+              <button onClick={() => window.location.href = '/dashboard/settings'} className="text-sm font-medium text-amber-600 hover:text-amber-700">
                 Upgrade →
               </button>
             )}

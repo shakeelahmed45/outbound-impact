@@ -21,18 +21,36 @@ const AdminLiveChatPage = () => {
   useEffect(() => {
     fetchConversations();
 
-    // Poll for new messages every 3 seconds
-    pollInterval.current = setInterval(() => {
-      fetchConversations();
-      if (selectedConversation) {
-        fetchConversationMessages(selectedConversation.id);
+    // ✅ FIX: Poll every 5s only when page is visible — stops hammering DB in background tabs
+    const startPolling = () => {
+      pollInterval.current = setInterval(() => {
+        if (!document.hidden) {
+          fetchConversations();
+          if (selectedConversation) {
+            fetchConversationMessages(selectedConversation.id);
+          }
+        }
+      }, 5000);
+    };
+
+    startPolling();
+
+    // Pause/resume polling on tab visibility change
+    const handleVisibility = () => {
+      if (document.hidden) {
+        clearInterval(pollInterval.current);
+      } else {
+        fetchConversations();
+        startPolling();
       }
-    }, 3000);
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       if (pollInterval.current) {
         clearInterval(pollInterval.current);
       }
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [filterStatus]);
 

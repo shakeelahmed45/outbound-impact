@@ -137,7 +137,7 @@ const AuthPage = () => {
   };
 
   // ─── Sign Up Handler (matches original: localStorage → /plans) ───
-  const handleSignUp = (e) => {
+  const handleSignUp = async (e) => {
     e.preventDefault(); setSignUpError('');
     if (!signUpData.name || !signUpData.email || !signUpData.password || !signUpData.confirmPassword) { setSignUpError('All fields are required'); return; }
     if (signUpData.password !== signUpData.confirmPassword) { setSignUpError('Passwords do not match'); return; }
@@ -145,12 +145,46 @@ const AuthPage = () => {
     if (!isOver18) { setSignUpError('You must be 18 years or older to create an account'); return; }
     if (!agreeTerms) { setSignUpError('You must agree to the Terms & Conditions'); return; }
 
-    // ✅ Save to localStorage and navigate to plans (matches original SignUp.jsx exactly)
+    // ✅ Save signup data to localStorage
     localStorage.setItem('signupData', JSON.stringify({
       name: signUpData.name,
       email: signUpData.email,
       password: signUpData.password,
     }));
+
+    // ✅ NEW FLOW: If user selected a plan before signing up, go to checkout directly
+    const savedPlan = localStorage.getItem('selectedPlan');
+    if (savedPlan) {
+      try {
+        const planData = JSON.parse(savedPlan);
+        const requestData = {
+          name: signUpData.name,
+          email: signUpData.email,
+          password: signUpData.password,
+          plan: planData.planId,
+        };
+        if (planData.couponCode) requestData.couponCode = planData.couponCode;
+        if (planData.enterpriseConfig) requestData.enterpriseConfig = planData.enterpriseConfig;
+
+        const response = await api.post('/auth/checkout', requestData);
+        if (response.data.status === 'success') {
+          localStorage.removeItem('selectedPlan');
+          window.location.href = response.data.url;
+          return;
+        }
+      } catch (error) {
+        console.error('Direct checkout error:', error);
+        const msg = error.response?.data?.message || 'Checkout failed';
+        if (msg.toLowerCase().includes('email already')) {
+          setSignUpError(msg);
+          return;
+        }
+        // For other errors, fall through to plans page
+        localStorage.removeItem('selectedPlan');
+      }
+    }
+
+    // ✅ FALLBACK: No plan selected — go to plans page
     navigate('/plans');
   };
 

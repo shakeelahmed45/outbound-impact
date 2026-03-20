@@ -20,6 +20,7 @@ import CampaignsPage from './pages/CampaignsPage';
 import SettingsPage from './pages/SettingsPage';
 import SupportPage from './pages/SupportPage';
 import ActivityPage from './pages/ActivityPage';
+import ShareReceivePage from './pages/ShareReceivePage';
 import InboxPage from './pages/InboxPage';
 import ProfilePage from './pages/ProfilePage';
 import PublicViewer from './pages/PublicViewer';
@@ -34,6 +35,8 @@ import AdminFeedbackPage from './pages/admin/AdminFeedbackPage';
 import AdminLiveChatPage from './pages/admin/AdminLiveChatPage';
 import UserDetailPage from './pages/admin/UserDetailPage';
 import TeamManagementPage from './pages/admin/TeamManagementPage';
+import EnterpriseLeadsPage from './pages/admin/EnterpriseLeadsPage';
+import EnterpriseSignup from './pages/EnterpriseSignup';
 // ═══ NEW: Pablo Admin Pages ═══
 import GeographyPage from './pages/admin/GeographyPage';
 import RevenuePage from './pages/admin/RevenuePage';
@@ -50,6 +53,9 @@ import WorkflowsPage from './pages/enterprise/WorkflowsPage';
 import OrganizationsPage from './pages/enterprise/OrganizationsPage';
 import AuditLogPage from './pages/enterprise/AuditLogPage';
 import CompliancePage from './pages/enterprise/CompliancePage';
+import WhiteLabelPage from './pages/enterprise/WhiteLabelPage';
+import ApiAccessPage from './pages/enterprise/ApiAccessPage';
+import IntegrationsPage from './pages/enterprise/IntegrationsPage';
 import AcceptInvitation from './pages/AcceptInvitation';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
@@ -81,6 +87,7 @@ function App() {
         <Route path="/plans" element={<Plans />} />
         <Route path="/enterprise" element={<EnterprisePage />} />
         <Route path="/auth/success" element={<AuthSuccess />} />
+        <Route path="/enterprise-signup" element={<EnterpriseSignup />} />
         
         {/* Public Routes */}
         <Route path="/l/:slug" element={<PublicViewer />} />
@@ -98,6 +105,9 @@ function App() {
         <Route path="/dashboard/items" element={<ProtectedRoute><RequireFeature feature="items"><ItemsPage /></RequireFeature></ProtectedRoute>} />
         <Route path="/dashboard/analytics" element={<ProtectedRoute><RequireFeature feature="analytics"><AnalyticsPage /></RequireFeature></ProtectedRoute>} />
         <Route path="/dashboard/team" element={<ProtectedRoute><TeamPage /></ProtectedRoute>} />
+
+        {/* PWA Share Target — receives content shared from phone share sheet */}
+        <Route path="/share-receive" element={<ShareReceivePage />} />
         <Route path="/dashboard/campaigns" element={<ProtectedRoute><RequireFeature feature="streams"><CampaignsPage /></RequireFeature></ProtectedRoute>} />
         <Route path="/dashboard/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/dashboard/support" element={<ProtectedRoute><SupportPage /></ProtectedRoute>} />
@@ -119,6 +129,9 @@ function App() {
         <Route path="/dashboard/organizations" element={<ProtectedRoute><RequireFeature feature="organizations"><OrganizationsPage /></RequireFeature></ProtectedRoute>} />
         <Route path="/dashboard/audit" element={<ProtectedRoute><RequireFeature feature="audit"><AuditLogPage /></RequireFeature></ProtectedRoute>} />
         <Route path="/dashboard/compliance" element={<ProtectedRoute><RequireFeature feature="compliance"><CompliancePage /></RequireFeature></ProtectedRoute>} />
+        <Route path="/dashboard/white-label" element={<ProtectedRoute><WhiteLabelPage /></ProtectedRoute>} />
+        <Route path="/dashboard/api-access" element={<ProtectedRoute><ApiAccessPage /></ProtectedRoute>} />
+        <Route path="/dashboard/integrations" element={<ProtectedRoute><IntegrationsPage /></ProtectedRoute>} />
         
         {/* ═══════════════════════════════════
             ADMIN ROUTES — Pablo OI Admin Panel
@@ -127,6 +140,8 @@ function App() {
         <Route path="/admin-panel" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
         <Route path="/admin-panel/users" element={<ProtectedRoute><AdminUsers /></ProtectedRoute>} />
         <Route path="/admin-panel/users/:userId" element={<ProtectedRoute><UserDetailPage /></ProtectedRoute>} />
+        <Route path="/admin-panel/enterprise-leads" element={<ProtectedRoute><EnterpriseLeadsPage /></ProtectedRoute>} />
+        <Route path="/admin-panel/enterprise-leads/:id" element={<ProtectedRoute><EnterpriseLeadsPage /></ProtectedRoute>} />
         <Route path="/admin-panel/geography" element={<ProtectedRoute><GeographyPage /></ProtectedRoute>} />
         <Route path="/admin-panel/revenue" element={<ProtectedRoute><RevenuePage /></ProtectedRoute>} />
         <Route path="/admin-panel/opportunities" element={<ProtectedRoute><OpportunitiesPage /></ProtectedRoute>} />

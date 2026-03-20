@@ -304,10 +304,50 @@ const changePassword = async (req, res) => {
   }
 };
 
+// ─── Submit user feedback / support request ───────────────────
+const submitFeedback = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { subject, message, category, type, contactEmail, contactName } = req.body;
+
+    if (!subject || !message) {
+      return res.status(400).json({ status: 'error', message: 'Subject and message are required' });
+    }
+
+    await prisma.feedback.create({
+      data: {
+        userId,
+        subject: subject.trim(),
+        message: `Category: ${category || 'general'}\nFrom: ${contactName || ''} <${contactEmail || ''}>\n\n${message.trim()}`,
+        status: 'PENDING',
+      },
+    });
+
+    // Notify admins via email (fire and forget)
+    try {
+      const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true } });
+      const { sendAdminNotification } = require('../services/emailService');
+      sendAdminNotification({
+        userEmail: contactEmail || user.email,
+        userName:  contactName  || user.name,
+        plan:      `Support Request — ${category || 'general'}`,
+        amount:    0,
+        subscriptionId: `FEEDBACK: ${subject}`,
+      }).catch(() => {});
+    } catch (_) {}
+
+    res.json({ status: 'success', message: 'Feedback submitted successfully' });
+  } catch (error) {
+    console.error('submitFeedback error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to submit feedback' });
+  }
+};
+
 module.exports = {
   uploadProfilePhoto,
   updateProfile,
   deleteAccount,
   changeEmail,
-  changePassword, // ✅ NEW: Export changePassword
+  changePassword,
+  submitFeedback,
 };

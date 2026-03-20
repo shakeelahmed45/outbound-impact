@@ -11,6 +11,7 @@ import {
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import useAuthStore from '../store/authStore';
 import api from '../services/api';
+import StorageAlertBanner from '../components/StorageAlertBanner';
 
 const getTypeIcon = (type) => {
   const icons = { VIDEO: Video, IMAGE: ImageIcon, AUDIO: Music, TEXT: FileText, EMBED: Code };
@@ -81,6 +82,9 @@ const IndividualDashboard = () => {
     <DashboardLayout>
       <div className="max-w-6xl mx-auto">
 
+        {/* ── STORAGE ALERT BANNER ── */}
+        <StorageAlertBanner storageUsed={stats?.storageUsed} storageLimit={stats?.storageLimit} />
+
         {/* 1. WELCOME BANNER */}
         <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 rounded-2xl p-6 sm:p-8 text-white mb-8 relative overflow-hidden">
           <div className="absolute inset-0 opacity-20">
@@ -99,7 +103,7 @@ const IndividualDashboard = () => {
 
         {/* 2. STAT CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Uploads — shows 5-item limit */}
+          {/* Uploads — unlimited, storage-based */}
           <div className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-lg transition-shadow">
             <div className="flex items-start justify-between mb-4">
               <div className="bg-blue-500 p-3 rounded-xl"><Upload size={24} className="text-white" /></div>
@@ -107,12 +111,7 @@ const IndividualDashboard = () => {
             </div>
             <p className="text-sm text-slate-600 mb-1">Uploads</p>
             <p className="text-3xl font-bold text-slate-900">{totalUploads}</p>
-            <p className="text-xs text-slate-500 mt-2">{totalUploads}/5 items</p>
-            <div className="mt-2">
-              <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 transition-all" style={{ width: `${Math.min((totalUploads / 5) * 100, 100)}%` }} />
-              </div>
-            </div>
+            <p className="text-xs text-slate-500 mt-2">Total items uploaded</p>
           </div>
 
           {/* Total Views */}
@@ -218,7 +217,7 @@ const IndividualDashboard = () => {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <h3 className="font-bold text-xl mb-1">Ready to grow?</h3>
-              <p className="text-blue-100 text-sm">Upgrade to Small Business for unlimited uploads, advanced analytics, and more!</p>
+              <p className="text-blue-100 text-sm">Upgrade to Starter for push notifications, team access, analytics, and more!</p>
             </div>
             <button onClick={() => navigate('/dashboard/settings')} className="px-6 py-3 bg-white text-purple-600 rounded-lg font-bold hover:bg-slate-100 transition-colors flex-shrink-0">Upgrade Now</button>
           </div>

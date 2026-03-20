@@ -122,17 +122,32 @@ const createCheckout = async (req, res) => {
       case 'INDIVIDUAL':
         priceId = process.env.STRIPE_INDIVIDUAL_PRICE;
         role = 'INDIVIDUAL';
-        storageLimit = 250 * 1024 * 1024 * 1024;
+        storageLimit = 25 * 1024 * 1024 * 1024; // 25GB — Personal Single Use
+        break;
+      case 'PERSONAL_LIFE':
+        priceId = process.env.STRIPE_PERSONAL_LIFE_PRICE;
+        role = 'PERSONAL_LIFE';
+        storageLimit = 100 * 1024 * 1024 * 1024; // 100GB — Personal Life Events
+        break;
+      case 'ORG_EVENTS':
+        priceId = process.env.STRIPE_ORG_EVENTS_PRICE;
+        role = 'ORG_EVENTS';
+        storageLimit = 250 * 1024 * 1024 * 1024; // 250GB — Org Events
         break;
       case 'ORG_SMALL':
         priceId = process.env.STRIPE_SMALL_ORG_PRICE;
         role = 'ORG_SMALL';
-        storageLimit = 250 * 1024 * 1024 * 1024;
+        storageLimit = 100 * 1024 * 1024 * 1024; // 100GB — Starter
         break;
       case 'ORG_MEDIUM':
         priceId = process.env.STRIPE_MEDIUM_ORG_PRICE;
         role = 'ORG_MEDIUM';
-        storageLimit = 500 * 1024 * 1024 * 1024;
+        storageLimit = 250 * 1024 * 1024 * 1024; // 250GB — Growth
+        break;
+      case 'ORG_SCALE':
+        priceId = process.env.STRIPE_SCALE_ORG_PRICE;
+        role = 'ORG_SCALE';
+        storageLimit = 500 * 1024 * 1024 * 1024; // 500GB — Pro
         break;
       case 'ORG_ENTERPRISE':
         role = 'ORG_ENTERPRISE';
@@ -266,7 +281,148 @@ const completeSignup = async (req, res) => {
       });
     }
 
-    // ✅ If user doesn't exist, create from pending signup (fallback)
+    // ✅ If user doesn't exist, check if this is an enterprise lead checkout
+    const sessionMetadata = session.metadata || {};
+    if (sessionMetadata.leadId) {
+      console.log('🏢 Enterprise lead checkout detected, leadId:', sessionMetadata.leadId);
+
+      // ── Re-check: webhook may have already created the user between our
+      //    first check above and now (race condition) ──────────────────────
+      const existingUser = await prisma.user.findUnique({ where: { email: customerEmail } });
+      if (existingUser) {
+        console.log('✅ Webhook already created enterprise user, logging in:', existingUser.email);
+        const accessToken  = generateAccessToken(existingUser.id, existingUser.email, existingUser.role);
+        const refreshToken = generateRefreshToken(existingUser.id);
+        return res.json({
+          status: 'success',
+          message: 'Account activated successfully!',
+          accessToken,
+          refreshToken,
+          user: {
+            id:           existingUser.id,
+            email:        existingUser.email,
+            name:         existingUser.name,
+            profilePicture: existingUser.profilePicture,
+            role:         existingUser.role,
+            storageUsed:  existingUser.storageUsed.toString(),
+            storageLimit: existingUser.storageLimit.toString(),
+          }
+        });
+      }
+
+      // Fetch lead data — use saved hashed password from signup form
+      let leadName = 'Enterprise Customer';
+      let leadPasswordHash = null;
+      try {
+        const leadData = await prisma.enterpriseLead.findUnique({
+          where: { id: sessionMetadata.leadId },
+          select: { name: true, signupPasswordHash: true }
+        });
+        if (leadData) {
+          leadName         = leadData.name;
+          leadPasswordHash = leadData.signupPasswordHash;
+        }
+      } catch (e) {
+        console.error('⚠️ Could not fetch lead data:', e.message);
+      }
+
+      // Use saved password hash — or temp if somehow missing
+      let hashedPassword = leadPasswordHash;
+      if (!hashedPassword) {
+        const crypto = require('crypto');
+        const bcrypt = require('bcryptjs');
+        hashedPassword = await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 10);
+      }
+
+      // Calculate storage limit from metadata
+      const storageGB = parseInt(sessionMetadata.storageGB) || 1500;
+      const storageLimit = BigInt(storageGB) * BigInt(1024 * 1024 * 1024);
+
+      let subscriptionData = {};
+      if (session.subscription) {
+        const stripeLib = require('stripe')(process.env.STRIPE_SECRET_KEY);
+        const subscription = await stripeLib.subscriptions.retrieve(session.subscription);
+        subscriptionData = {
+          currentPeriodStart: new Date(subscription.current_period_start * 1000),
+          currentPeriodEnd:   new Date(subscription.current_period_end   * 1000),
+          priceId:            subscription.items.data[0].price.id,
+        };
+      }
+
+      // Track if we created vs fetched (to avoid double welcome email)
+      let justCreated = true;
+      try {
+        user = await prisma.user.create({
+          data: {
+            email:            customerEmail,
+            name:             leadName,
+            password:         hashedPassword,
+            role:             'ORG_ENTERPRISE',
+            storageLimit,
+            stripeCustomerId: session.customer,
+            subscriptionId:   session.subscription || null,
+            subscriptionStatus: 'active',
+            emailVerified:    true,
+            ...subscriptionData,
+          }
+        });
+      } catch (createErr) {
+        // P2002 = unique constraint — webhook already created the user
+        if (createErr.code === 'P2002') {
+          console.log('ℹ️ User already created by webhook (race condition), fetching...');
+          user = await prisma.user.findUnique({ where: { email: customerEmail } });
+          if (!user) throw createErr;
+          justCreated = false; // webhook already sent welcome email
+        } else {
+          throw createErr;
+        }
+      }
+
+      // Update lead status to converted
+      try {
+        await prisma.enterpriseLead.update({
+          where: { id: sessionMetadata.leadId },
+          data:  { status: 'converted' }
+        });
+      } catch (e) {}
+
+      console.log(`${justCreated ? '✅ Enterprise user created' : 'ℹ️ Enterprise user already existed'}: ${user.email}`);
+
+      // Only send welcome email if we created the user here —
+      // webhook already sent it if it won the race
+      if (justCreated) {
+        setImmediate(async () => {
+          try {
+            const emailService = require('../services/emailService');
+            await emailService.sendWelcomeEmail(user.email, user.name, 'ORG_ENTERPRISE');
+            console.log('✅ Enterprise welcome email sent to:', user.email);
+          } catch (e) {
+            console.error('⚠️ Enterprise welcome email error:', e.message);
+          }
+        });
+      }
+
+      const accessToken  = generateAccessToken(user.id, user.email, user.role);
+      const refreshToken = generateRefreshToken(user.id);
+
+      return res.json({
+        status: 'success',
+        message: 'Enterprise account created! Check your email to set your password.',
+        accessToken,
+        refreshToken,
+        user: {
+          id:           user.id,
+          email:        user.email,
+          name:         user.name,
+          profilePicture: user.profilePicture,
+          role:         user.role,
+          storageUsed:  user.storageUsed.toString(),
+          storageLimit: user.storageLimit.toString(),
+        }
+      });
+    }
+
+    // ✅ Regular signup fallback — check pendingSignups
     const signupData = global.pendingSignups?.[sessionId];
 
     if (!signupData) {
@@ -327,9 +483,12 @@ const completeSignup = async (req, res) => {
           const currency = session.currency ? session.currency.toUpperCase() : 'USD';
           
           const planNames = {
-            INDIVIDUAL: 'Individual',
-            ORG_SMALL: 'Small Organization',
-            ORG_MEDIUM: 'Medium Organization',
+            INDIVIDUAL: 'Personal Single Use',
+            PERSONAL_LIFE: 'Personal Life Events',
+            ORG_EVENTS: 'Org Events',
+            ORG_SMALL: 'Starter',
+            ORG_MEDIUM: 'Growth',
+            ORG_SCALE: 'Pro',
             ORG_ENTERPRISE: 'Enterprise',
           };
           const planName = planNames[user.role] || user.role || 'Individual';
@@ -355,11 +514,14 @@ const completeSignup = async (req, res) => {
 
         try {
           if (await isNotificationEnabled('new_customer')) {
+            const isOneTimePayment = user.role === 'INDIVIDUAL' || user.role === 'ORG_EVENTS';
             await emailService.sendAdminNotification({
               userName: user.name,
               userEmail: user.email,
               userRole: user.role,
-              subscriptionId: session.subscription
+              amount: session.amount_total ? (session.amount_total / 100) : 0,
+              subscriptionId: session.subscription,
+              paymentType: isOneTimePayment ? 'one-time' : 'subscription'
             });
             console.log('✅ Admin notification sent');
           } else {
@@ -521,11 +683,14 @@ const signIn = async (req, res) => {
     if (needs2FA) {
       if (!twoFactorCode) {
         const code = Math.floor(100000 + Math.random() * 900000).toString();
+        // ✅ FIX: Store expiry INSIDE twoFactorSecret as "code|expiry" to avoid
+        // colliding with resetTokenExpiry (used by the password reset flow).
+        const twoFAExpiry = Date.now() + 10 * 60 * 1000; // 10 min
         await prisma.user.update({
           where: { id: user.id },
           data: {
-            twoFactorSecret: code,
-            resetTokenExpiry: new Date(Date.now() + 10 * 60 * 1000)
+            twoFactorSecret: `${code}|${twoFAExpiry}`,
+            // ✅ DO NOT touch resetTokenExpiry here
           }
         });
         await send2FALoginEmail(user.email, user.name, code);
@@ -536,14 +701,20 @@ const signIn = async (req, res) => {
         });
       }
 
-      if (user.twoFactorSecret !== twoFactorCode) {
+      // ✅ FIX: Parse code and expiry from twoFactorSecret field
+      const storedSecret = user.twoFactorSecret || '';
+      const [storedCode, storedExpiry] = storedSecret.includes('|')
+        ? storedSecret.split('|')
+        : [storedSecret, null];
+
+      if (storedCode !== twoFactorCode) {
         return res.status(401).json({
           status: 'error',
           message: 'Invalid 2FA code'
         });
       }
 
-      if (user.resetTokenExpiry && new Date() > user.resetTokenExpiry) {
+      if (storedExpiry && Date.now() > Number(storedExpiry)) {
         return res.status(401).json({
           status: 'error',
           message: '2FA code expired. Please sign in again.'
@@ -552,7 +723,8 @@ const signIn = async (req, res) => {
 
       await prisma.user.update({
         where: { id: user.id },
-        data: { twoFactorSecret: null, resetTokenExpiry: null }
+        data: { twoFactorSecret: null }
+        // ✅ DO NOT touch resetTokenExpiry here
       });
     }
 
@@ -793,12 +965,24 @@ const handleUpgradePlan = async (req, res) => {
     let newPriceId, newStorageLimit;
     
     switch (newPlan) {
+      case 'PERSONAL_LIFE':
+        newPriceId = process.env.STRIPE_PERSONAL_LIFE_PRICE;
+        newStorageLimit = 100 * 1024 * 1024 * 1024;
+        break;
+      case 'ORG_EVENTS':
+        newPriceId = process.env.STRIPE_ORG_EVENTS_PRICE;
+        newStorageLimit = 250 * 1024 * 1024 * 1024;
+        break;
       case 'ORG_SMALL':
         newPriceId = process.env.STRIPE_SMALL_ORG_PRICE;
-        newStorageLimit = 250 * 1024 * 1024 * 1024;
+        newStorageLimit = 100 * 1024 * 1024 * 1024;
         break;
       case 'ORG_MEDIUM':
         newPriceId = process.env.STRIPE_MEDIUM_ORG_PRICE;
+        newStorageLimit = 250 * 1024 * 1024 * 1024;
+        break;
+      case 'ORG_SCALE':
+        newPriceId = process.env.STRIPE_SCALE_ORG_PRICE;
         newStorageLimit = 500 * 1024 * 1024 * 1024;
         break;
       case 'ORG_ENTERPRISE':
@@ -831,9 +1015,12 @@ const handleUpgradePlan = async (req, res) => {
 
     // ═══ Send upgrade receipt + admin notification emails ═══
     const planNames = {
-      INDIVIDUAL: 'Individual',
-      ORG_SMALL: 'Small Organization',
-      ORG_MEDIUM: 'Medium Organization',
+      INDIVIDUAL: 'Personal Single Use',
+      PERSONAL_LIFE: 'Personal Life Events',
+      ORG_EVENTS: 'Org Events',
+      ORG_SMALL: 'Starter',
+      ORG_MEDIUM: 'Growth',
+      ORG_SCALE: 'Pro',
       ORG_ENTERPRISE: 'Enterprise',
     };
 
@@ -935,7 +1122,7 @@ const forgotPassword = async (req, res) => {
 
     const resetToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-    const resetTokenExpiry = new Date(Date.now() + 3600000);
+    const resetTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // ✅ 24 hours (was 1 hour)
 
     await prisma.user.update({
       where: { id: user.id },
@@ -982,19 +1169,36 @@ const verifyResetToken = async (req, res) => {
     }
 
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    console.log(`🔑 Verifying reset token (hash prefix: ${hashedToken.slice(0, 12)}...)`);
+
+    // Check without expiry first, to give a clearer error message
+    const userAny = await prisma.user.findFirst({
+      where: { resetToken: hashedToken },
+      select: { id: true, email: true, resetTokenExpiry: true }
+    });
+
+    if (!userAny) {
+      console.log('❌ Reset token not found in DB — token is invalid or already used');
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid or expired reset token'
+      });
+    }
+
+    if (!userAny.resetTokenExpiry || new Date() > userAny.resetTokenExpiry) {
+      console.log(`❌ Reset token expired for ${userAny.email} — expired at ${userAny.resetTokenExpiry}`);
+      return res.status(400).json({
+        status: 'error',
+        message: 'This reset link has expired. Please request a new one.'
+      });
+    }
 
     const user = await prisma.user.findFirst({
       where: {
         resetToken: hashedToken,
-        resetTokenExpiry: {
-          gte: new Date()
-        }
+        resetTokenExpiry: { gte: new Date() }
       },
-      select: {
-        id: true,
-        email: true,
-        name: true
-      }
+      select: { id: true, email: true, name: true }
     });
 
     if (!user) {
@@ -1003,6 +1207,8 @@ const verifyResetToken = async (req, res) => {
         message: 'Invalid or expired reset token'
       });
     }
+
+    console.log(`✅ Reset token valid for: ${user.email}`);
 
     res.json({
       status: 'success',

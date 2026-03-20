@@ -1,6 +1,6 @@
 const prisma = require('../lib/prisma');
 const { buildOrgFilter } = require("../helpers/orgScope");
-const { deleteFromBunny, uploadToBunny, generateFileName } = require('../services/bunnyService');
+const { deleteFromCloudflare, uploadToCloudflare, generateFileName } = require('../services/cloudflareService');
 
 const getUserItems = async (req, res) => {
   try {
@@ -41,6 +41,7 @@ const getUserItems = async (req, res) => {
         viewsQr: item.viewsQr || 0,
         viewsNfc: item.viewsNfc || 0,
         viewsDirect: item.viewsDirect || 0,
+        viewsAmplify: item.viewsAmplify || 0,
         createdAt: item.createdAt,
         publicUrl: `${process.env.FRONTEND_URL}/l/${item.slug}`,
         buttonText: item.buttonText || null,
@@ -89,6 +90,10 @@ const getItemById = async (req, res) => {
         qrCodeUrl: item.qrCodeUrl || null,
         fileSize: item.fileSize.toString(),
         views: item.views || 0,
+        viewsQr: item.viewsQr || 0,
+        viewsNfc: item.viewsNfc || 0,
+        viewsDirect: item.viewsDirect || 0,
+        viewsAmplify: item.viewsAmplify || 0,
         createdAt: item.createdAt,
         publicUrl: `${process.env.FRONTEND_URL}/l/${item.slug}`,
         buttonText: item.buttonText || null,
@@ -291,10 +296,10 @@ const uploadThumbnail = async (req, res) => {
       });
     }
 
-    if (item.thumbnailUrl && item.thumbnailUrl !== item.mediaUrl && item.thumbnailUrl.includes('b-cdn.net')) {
+    if (item.thumbnailUrl && item.thumbnailUrl !== item.mediaUrl && item.thumbnailUrl.startsWith('http')) {
       try {
         const urlPath = new URL(item.thumbnailUrl).pathname;
-        await deleteFromBunny(urlPath);
+        await deleteFromCloudflare(item.thumbnailUrl);
       } catch (err) {
         console.log('Could not delete old thumbnail:', err.message);
       }
@@ -304,7 +309,7 @@ const uploadThumbnail = async (req, res) => {
     const base64Data = thumbnailData.split(',')[1] || thumbnailData;
     const fileBuffer = Buffer.from(base64Data, 'base64');
 
-    const uploadResult = await uploadToBunny(
+    const uploadResult = await uploadToCloudflare(
       fileBuffer,
       uniqueFileName,
       'thumbnails'
@@ -364,10 +369,10 @@ const removeThumbnail = async (req, res) => {
       });
     }
 
-    if (item.thumbnailUrl && item.thumbnailUrl !== item.mediaUrl && item.thumbnailUrl.includes('b-cdn.net')) {
+    if (item.thumbnailUrl && item.thumbnailUrl !== item.mediaUrl && item.thumbnailUrl.startsWith('http')) {
       try {
         const urlPath = new URL(item.thumbnailUrl).pathname;
-        await deleteFromBunny(urlPath);
+        await deleteFromCloudflare(item.thumbnailUrl);
       } catch (err) {
         console.log('Could not delete thumbnail:', err.message);
       }
@@ -425,21 +430,19 @@ const deleteItem = async (req, res) => {
       });
     }
 
-    if (item.type !== 'TEXT' && item.mediaUrl && item.mediaUrl.includes('b-cdn.net')) {
+    if (item.type !== 'TEXT' && item.mediaUrl && item.mediaUrl.startsWith('http')) {
       try {
-        const urlPath = new URL(item.mediaUrl).pathname;
-        await deleteFromBunny(urlPath);
+        await deleteFromCloudflare(item.mediaUrl);
       } catch (err) {
-        console.log('Could not delete from CDN:', err.message);
+        console.log('Could not delete media from R2:', err.message);
       }
     }
 
-    if (item.thumbnailUrl && item.thumbnailUrl !== item.mediaUrl && item.thumbnailUrl.includes('b-cdn.net')) {
+    if (item.thumbnailUrl && item.thumbnailUrl !== item.mediaUrl && item.thumbnailUrl.startsWith('http')) {
       try {
-        const urlPath = new URL(item.thumbnailUrl).pathname;
-        await deleteFromBunny(urlPath);
+        await deleteFromCloudflare(item.thumbnailUrl);
       } catch (err) {
-        console.log('Could not delete thumbnail:', err.message);
+        console.log('Could not delete thumbnail from R2:', err.message);
       }
     }
 

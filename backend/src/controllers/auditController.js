@@ -4,8 +4,8 @@
 // FIXED: Removed raw SQL, all queries use safe Prisma ORM
 // ═══════════════════════════════════════════════════════════
 
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+
+const prisma = require('../lib/prisma');
 
 /**
  * GET /audit/logs

@@ -348,7 +348,7 @@ What can I help you with today?`,
     return (
       <button
         onClick={openWidget}
-        className="fixed bottom-24 right-0 z-[9999] bg-gradient-to-r from-purple-600 to-violet-600 text-white px-3 py-3 rounded-l-xl shadow-2xl hover:pr-5 transition-all duration-300 group flex items-center gap-2"
+        className="fixed bottom-6 right-0 z-[9999] bg-gradient-to-r from-purple-600 to-violet-600 text-white px-3 py-3 rounded-l-xl shadow-2xl hover:pr-5 transition-all duration-300 group flex items-center gap-2"
         title="Open AI Assistant"
       >
         <span className="font-semibold text-sm group-hover:-translate-x-1 transition-transform">Hide</span>
@@ -362,7 +362,7 @@ What can I help you with today?`,
     return (
       <button
         onClick={openWidget}
-        className="fixed bottom-24 right-6 z-[9999] group"
+        className="fixed bottom-6 right-6 z-[9999] group"
         title="Open AI Assistant"
       >
         {/* ✅ SMALLER Pulsing rings */}
@@ -383,7 +383,7 @@ What can I help you with today?`,
 
   // Full Chat Widget (Open state)
   return (
-    <div className="fixed bottom-24 right-6 z-[9999] w-96 h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200">
+    <div className="fixed bottom-6 right-6 z-[9999] w-96 h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200">
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-600 to-violet-600 text-white p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">

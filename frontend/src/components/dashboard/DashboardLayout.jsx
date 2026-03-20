@@ -16,7 +16,7 @@ const PAGE_META = {
   '/dashboard/analytics': { title: 'Analytics', subtitle: 'View performance metrics' },
   '/dashboard/advanced-analytics': { title: 'Advanced Analytics', subtitle: 'Detailed performance insights' },
   '/dashboard/team': { title: 'Contributors', subtitle: 'Manage team members and permissions' },
-  '/dashboard/campaigns': { title: 'Streams', subtitle: 'Manage your content streams' },
+  '/dashboard/campaigns': { title: 'Campaigns', subtitle: 'Manage your campaigns' },
   '/dashboard/settings': { title: 'Settings', subtitle: 'Account and app settings' },
   '/dashboard/support': { title: 'Help & Support', subtitle: 'Get help with using Outbound Impact' },
   '/dashboard/activity': { title: 'All Activity', subtitle: 'Complete history of views and engagement' },
@@ -74,7 +74,7 @@ const DashboardLayout = ({ children }) => {
 
   // Individual plan → profile icon goes to Settings, not Profile
   const effectiveUser = user?.isTeamMember ? user?.organization : user;
-  const isIndividual = effectiveUser?.role === 'INDIVIDUAL';
+  const isIndividual = effectiveUser?.role === 'INDIVIDUAL' || effectiveUser?.role === 'PERSONAL_LIFE';
   const profileIconTarget = isIndividual ? '/dashboard/settings' : '/dashboard/profile';
 
   // ✅ NEW: Get page meta from current route
@@ -177,8 +177,8 @@ const DashboardLayout = ({ children }) => {
       {/* AI Chat Widget */}
       <GlobalAiChatWidget showBlinkingPrompt={true} />
 
-      {/* Push Notification Prompt */}
-      <PushNotificationPrompt />
+      {/* Push Notification Prompt — not shown for Personal Single Use plan */}
+      {effectiveUser?.role !== 'INDIVIDUAL' && <PushNotificationPrompt />}
     </div>
   );
 };

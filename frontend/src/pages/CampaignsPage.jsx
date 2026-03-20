@@ -4,6 +4,7 @@ import DashboardLayout from '../components/dashboard/DashboardLayout';
 import NFCWriter from '../components/NFCWriter';
 import ShareModal from '../components/share/ShareModal';
 import EditItemModal from '../components/EditItemModal';
+import CampaignUploadModal from '../components/CampaignUploadModal';
 import Tooltip from '../components/common/Tooltip';
 import Toast from '../components/common/Toast';
 import api from '../services/api';
@@ -55,6 +56,10 @@ const CampaignsPage = () => {
   const [shareSelectedCampaign, setShareSelectedCampaign] = useState(null);
   const [showEditItemModal, setShowEditItemModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+
+  // Direct upload from campaign card
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadTargetCampaign, setUploadTargetCampaign] = useState(null);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   const showToast = (message, type = 'success') => {
@@ -65,21 +70,24 @@ const CampaignsPage = () => {
     setToast({ show: false, message: '', type: 'success' });
   };
 
-  // ═══ Stream limits per plan ═══
+  // ═══ Stream/Campaign limits per plan ═══
   const { user } = useAuthStore();
   const effectiveUser = user?.isTeamMember ? user.organization : user;
   const STREAM_LIMITS = {
-    INDIVIDUAL: 2,
-    ORG_SMALL: 5,
-    ORG_MEDIUM: 20,
-    ORG_ENTERPRISE: null, // unlimited
+    INDIVIDUAL: 1,            // Personal Single Use — 1 stream
+    PERSONAL_LIFE: 10,        // Personal Life Events — 10 streams
+    ORG_EVENTS: 80,           // Org Events — 80 campaigns
+    ORG_SMALL: 20,            // Starter — 20 campaigns
+    ORG_MEDIUM: 30,           // Growth — 30 campaigns
+    ORG_SCALE: 50,            // Pro — 50 campaigns
+    ORG_ENTERPRISE: null,     // Enterprise — unlimited
   };
   const planRole = effectiveUser?.role || 'INDIVIDUAL';
-  const streamLimit = STREAM_LIMITS[planRole];
-  const isIndividual = planRole === 'INDIVIDUAL';
+  const streamLimit = STREAM_LIMITS[planRole] !== undefined ? STREAM_LIMITS[planRole] : null;
+  const isIndividual = planRole === 'INDIVIDUAL' || planRole === 'PERSONAL_LIFE';
   const isUnlimited = streamLimit === null;
 
-  // ✅ Dynamic label: Individual = "Streams", Org plans = "Campaigns"
+  // ✅ Dynamic label: Personal plans = "Streams", Org plans = "Campaigns"
   const label = isIndividual ? 'Streams' : 'Campaigns';
   const labelLower = isIndividual ? 'streams' : 'campaigns';
   const labelSingle = isIndividual ? 'stream' : 'campaign';
@@ -777,6 +785,16 @@ const CampaignsPage = () => {
                     >
                       Manage
                     </button>
+                    {/* ✅ Direct Upload — hidden for VIEWER */}
+                    {canEdit() && (
+                    <button
+                      onClick={() => { setUploadTargetCampaign(campaign); setShowUploadModal(true); }}
+                      className="p-2 bg-gradient-to-r from-primary to-secondary text-white rounded-lg transition-all hover:opacity-90"
+                      title={`Upload content to ${campaign.name}`}
+                    >
+                      <UploadIcon size={18} />
+                    </button>
+                    )}
                     {/* ✅ Edit — hidden for VIEWER */}
                     {canEdit() && (
                     <button
@@ -1380,6 +1398,16 @@ const CampaignsPage = () => {
               </div>
             </div>
           </div>
+        )}
+
+        {/* DIRECT UPLOAD MODAL */}
+        {showUploadModal && uploadTargetCampaign && (
+          <CampaignUploadModal
+            campaign={uploadTargetCampaign}
+            labelSingle={labelSingle}
+            onClose={() => { setShowUploadModal(false); setUploadTargetCampaign(null); }}
+            onSuccess={() => { fetchData(); showToast('Item uploaded and added to ' + uploadTargetCampaign.name + '!', 'success'); }}
+          />
         )}
 
         {/* NFC WRITER MODAL */}

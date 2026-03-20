@@ -273,29 +273,32 @@ const getAdvancedAnalytics = async (req, res) => {
       .map(([date, views]) => ({ date, views }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    // --- Source Breakdown (QR / NFC / Direct) ---
-    const sourceMap = { qr: 0, nfc: 0, direct: 0 };
+    // --- Source Breakdown (QR / NFC / Direct / Amplify) ---
+    const sourceMap = { qr: 0, nfc: 0, direct: 0, amplify: 0 };
     analyticsEvents.forEach(a => {
       const s = (a.source || 'direct').toLowerCase();
       if (s === 'qr') sourceMap.qr++;
       else if (s === 'nfc') sourceMap.nfc++;
+      else if (s === 'amplify') sourceMap.amplify++;
       else sourceMap.direct++;
     });
-    const totalSourceViews = sourceMap.qr + sourceMap.nfc + sourceMap.direct;
+    const totalSourceViews = sourceMap.qr + sourceMap.nfc + sourceMap.direct + sourceMap.amplify;
     const deliverySources = {
-      qr: { count: sourceMap.qr, percentage: totalSourceViews > 0 ? Math.round((sourceMap.qr / totalSourceViews) * 100) : 0 },
-      nfc: { count: sourceMap.nfc, percentage: totalSourceViews > 0 ? Math.round((sourceMap.nfc / totalSourceViews) * 100) : 0 },
-      direct: { count: sourceMap.direct, percentage: totalSourceViews > 0 ? Math.round((sourceMap.direct / totalSourceViews) * 100) : 0 },
+      qr:      { count: sourceMap.qr,      percentage: totalSourceViews > 0 ? Math.round((sourceMap.qr      / totalSourceViews) * 100) : 0 },
+      nfc:     { count: sourceMap.nfc,     percentage: totalSourceViews > 0 ? Math.round((sourceMap.nfc     / totalSourceViews) * 100) : 0 },
+      direct:  { count: sourceMap.direct,  percentage: totalSourceViews > 0 ? Math.round((sourceMap.direct  / totalSourceViews) * 100) : 0 },
+      amplify: { count: sourceMap.amplify, percentage: totalSourceViews > 0 ? Math.round((sourceMap.amplify / totalSourceViews) * 100) : 0 },
     };
 
     // --- Daily Source Trend ---
     const dailySourceMap = {};
     analyticsEvents.forEach(a => {
       const day = new Date(a.createdAt).toISOString().split('T')[0];
-      if (!dailySourceMap[day]) dailySourceMap[day] = { qr: 0, nfc: 0, direct: 0 };
+      if (!dailySourceMap[day]) dailySourceMap[day] = { qr: 0, nfc: 0, direct: 0, amplify: 0 };
       const s = (a.source || 'direct').toLowerCase();
       if (s === 'qr') dailySourceMap[day].qr++;
       else if (s === 'nfc') dailySourceMap[day].nfc++;
+      else if (s === 'amplify') dailySourceMap[day].amplify++;
       else dailySourceMap[day].direct++;
     });
     const dailySourceTrend = Object.entries(dailySourceMap)

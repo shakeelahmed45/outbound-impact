@@ -25,6 +25,9 @@ const requireBillingAccess = (req, res, next) => {
 // ✅ Toggle auto-renewal (set cancel_at_period_end)
 router.post('/toggle-renewal', authMiddleware, resolveEffectiveUserId, requireBillingAccess, subscriptionController.toggleAutoRenewal);
 
+// ✅ ORG_EVENTS: Create a $65/year renewal checkout session
+router.post('/create-renewal-session', authMiddleware, subscriptionController.createOrgEventsRenewalSession);
+
 // ✅ Cancel subscription with 7-day refund logic
 router.post('/cancel', authMiddleware, resolveEffectiveUserId, requireBillingAccess, subscriptionController.cancelSubscription);
 
