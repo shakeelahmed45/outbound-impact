@@ -355,6 +355,25 @@ const handleCheckoutCompleted = async (session) => {
       console.log('🔄 ORG_EVENTS renewal: extended to', currentExpiry.toISOString());
     }
 
+    // ── INDIVIDUAL: set 1-year expiry from today on initial purchase ──
+    if (user.role === 'INDIVIDUAL' && !user.individualExpiresAt) {
+      const expiresAt = new Date();
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+      updateData.individualExpiresAt = expiresAt;
+      console.log('📅 INDIVIDUAL: expiry set to', expiresAt.toISOString());
+    }
+
+    // ── INDIVIDUAL renewal: if this is the $10 renewal price, extend by 1 year ──
+    if (user.role === 'INDIVIDUAL' && session.amount_total &&
+        process.env.STRIPE_INDIVIDUAL_RENEWAL_PRICE &&
+        session.metadata?.priceId === process.env.STRIPE_INDIVIDUAL_RENEWAL_PRICE) {
+      const currentExpiry = user.individualExpiresAt ? new Date(user.individualExpiresAt) : new Date();
+      currentExpiry.setFullYear(currentExpiry.getFullYear() + 1);
+      updateData.individualExpiresAt = currentExpiry;
+      updateData.subscriptionStatus = 'active';
+      console.log('🔄 INDIVIDUAL renewal: extended to', currentExpiry.toISOString());
+    }
+
     await prisma.user.update({
       where: { id: user.id },
       data: updateData

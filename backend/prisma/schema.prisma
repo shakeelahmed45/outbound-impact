@@ -39,6 +39,9 @@ model User {
   // ORG EVENTS annual renewal tracking
   orgEventsExpiresAt DateTime?  // null = never expires (for non-ORG_EVENTS) | date = when their 1-year lapses
 
+  // INDIVIDUAL (Personal Single Use) annual renewal tracking
+  individualExpiresAt DateTime?  // null = never expires (for non-INDIVIDUAL) | date = when their 1-year lapses
+
   // REFUND TRACKING FIELDS
   refundRequested    Boolean?   @default(false)
   refundRequestedAt  DateTime?

@@ -410,6 +410,9 @@ if (process.env.VERCEL) {
   startStorageAlertJob();
   const { startOrgEventsRenewalCron } = require('./services/orgEventsRenewalService');
   startOrgEventsRenewalCron();
+
+  const { startIndividualRenewalCron } = require('./services/individualRenewalService');
+  startIndividualRenewalCron();
   const { checkConfig: checkR2Config } = require('./services/cloudflareService');
   checkR2Config();
   initializeEnforcementColumns().catch(e => console.error('Column init error:', e));
