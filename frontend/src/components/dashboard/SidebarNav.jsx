@@ -238,8 +238,8 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
             onClick={() => handleNavigate('/dashboard/analytics')}
           />
         )}
-        {/* Contributors - Personal Single Use only (max 2 contributors) */}
-        {isSingleUse && (
+        {/* Contributors - Personal plans (max 2 contributors each) */}
+        {isIndividual && (
           <NavItem
             icon={Users}
             label="Contributors"

@@ -85,7 +85,7 @@ const SettingsPage = () => {
       case 'INDIVIDUAL':
         return { name: 'Personal Single Use', price: '$69', period: 'one-time (12 months)', contributors: 2, storage: '25 GB', qrCodes: '1', qrNote: '1 stream allowed', analytics: 'Basic' };
       case 'PERSONAL_LIFE':
-        return { name: 'Personal Life Events', price: '$15', period: '/month', contributors: 0, storage: '100 GB', qrCodes: '10', qrNote: 'Up to 10 streams', analytics: 'Full' };
+        return { name: 'Personal Life Events', price: '$15', period: '/month', contributors: 2, storage: '100 GB', qrCodes: '10', qrNote: 'Up to 10 streams', analytics: 'Full' };
       case 'ORG_EVENTS':
         return { name: 'Org Events', price: '$199', period: 'one-time', contributors: 5, storage: '250 GB', qrCodes: '80', qrNote: '80 campaigns', analytics: 'Advanced' };
       case 'ORG_SMALL':
@@ -520,6 +520,7 @@ const SettingsPage = () => {
               {effectiveRole === 'PERSONAL_LIFE' && (
                 <>
                   <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> Up to 10 streams</div>
+                  <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> Team collaboration (2 contributors)</div>
                   <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> Push notifications</div>
                   <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> NFC tag support</div>
                   <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> Password-protected streams</div>

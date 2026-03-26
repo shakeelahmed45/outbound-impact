@@ -112,6 +112,17 @@ const inviteTeamMember = async (req, res) => {
       }
     }
 
+    // ✅ STRICT: Personal Life Events plan → 2 contributors max
+    if (user.role === 'PERSONAL_LIFE') {
+      const teamCount = await prisma.teamMember.count({ where: { userId } });
+      if (teamCount >= 2) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'Contributor limit reached (2/2) on Personal Life Events plan. Please upgrade your plan to invite more team members.'
+        });
+      }
+    }
+
     // ✅ ORG_EVENTS plan → 5 contributors max
     if (user.role === 'ORG_EVENTS') {
       const teamCount = await prisma.teamMember.count({ where: { userId } });
@@ -119,6 +130,17 @@ const inviteTeamMember = async (req, res) => {
         return res.status(403).json({
           status: 'error',
           message: 'Contributor limit reached (5/5) on Org Events plan. Please upgrade to invite more team members.'
+        });
+      }
+    }
+
+    // ✅ STRICT: Starter plan → 3 contributors max
+    if (user.role === 'ORG_SMALL') {
+      const teamCount = await prisma.teamMember.count({ where: { userId } });
+      if (teamCount >= 3) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'Contributor limit reached (3/3) on Starter plan. Please upgrade to Growth or Pro for unlimited team members.'
         });
       }
     }
@@ -863,7 +885,7 @@ module.exports = {
   getInvitationDetails,
   removeTeamMember,
   updateTeamMember,
-  updateTeamMemberRole, // ✅ NEW: Export the new function
+  updateTeamMemberRole, 
   requestRoleChange,
   dismissRoleRequest,
   updateFeatures,
