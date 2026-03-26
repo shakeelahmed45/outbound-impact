@@ -555,7 +555,7 @@ const createTextPost = async (req, res) => {
         title,
         description: description || null,
         type: 'TEXT',
-        content,
+        mediaUrl: content,
         qrCodeUrl,
         fileSize: BigInt(0),
         buttonText: buttonText || null,
