@@ -422,9 +422,9 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
         <div className="my-3 border-t border-gray-200"></div>
 
         {/* ═══════════════════════════════════
-            SETTINGS — Individual = flat NavItem, others = collapsible
+            SETTINGS — Personal Single Use = flat NavItem, others = collapsible
            ═══════════════════════════════════ */}
-        {isIndividual ? (
+        {isSingleUse ? (
           <NavItem
             icon={Settings}
             label="Settings"
@@ -481,9 +481,9 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
         )}
 
         {/* ═══════════════════════════════════
-            HELP & SUPPORT (Non-Individual only)
+            HELP & SUPPORT (Hidden for Personal Single Use only)
            ═══════════════════════════════════ */}
-        {!isIndividual && (
+        {!isSingleUse && (
         <NavItem
           icon={HelpCircle}
           label="Help & Support"
@@ -520,7 +520,7 @@ const SidebarNav = ({ mobileMenuOpen, setMobileMenuOpen }) => {
         </div>
 
         {/* User Profile — ✅ Clicks to Profile for VIEWER/EDITOR, Settings for owner/ADMIN */}
-        <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 transition-colors mb-2 cursor-pointer" onClick={() => handleNavigate(isIndividual ? '/dashboard/settings' : (canAccessBilling ? '/dashboard/settings' : '/dashboard/profile'))}>
+        <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 transition-colors mb-2 cursor-pointer" onClick={() => handleNavigate(isSingleUse ? '/dashboard/settings' : (canAccessBilling ? '/dashboard/settings' : '/dashboard/profile'))}>
           {user?.profilePicture ? (
             <img
               src={user.profilePicture}

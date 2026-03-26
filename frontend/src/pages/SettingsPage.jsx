@@ -170,7 +170,7 @@ const SettingsPage = () => {
   };
 
   // ═══ Individual plan → Pablo-style simple settings ═══
-  if (isIndividual) {
+  if (effectiveRole === 'INDIVIDUAL') {
     const handleSaveProfile = async () => {
       setSavingProfile(true);
       try {
@@ -517,6 +517,14 @@ const SettingsPage = () => {
               <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> QR code generation</div>
               <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> {planLimits.analytics} analytics</div>
               <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> {planLimits.storage} storage</div>
+              {effectiveRole === 'PERSONAL_LIFE' && (
+                <>
+                  <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> Up to 10 streams</div>
+                  <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> Push notifications</div>
+                  <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> NFC tag support</div>
+                  <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> Password-protected streams</div>
+                </>
+              )}
               {(effectiveRole === 'ORG_EVENTS' || effectiveRole === 'ORG_SMALL' || effectiveRole === 'ORG_MEDIUM' || effectiveRole === 'ORG_SCALE' || effectiveRole === 'ORG_ENTERPRISE') && (
                 <>
                   <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-3 rounded-lg text-sm"><Check className="text-green-500 flex-shrink-0" size={16} /> Team collaboration ({planLimits.contributors} members)</div>

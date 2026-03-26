@@ -72,10 +72,11 @@ const DashboardLayout = ({ children }) => {
     return name.substring(0, 2).toUpperCase();
   };
 
-  // Individual plan → profile icon goes to Settings, not Profile
+  // Individual plan routing: Single Use → Settings, Life Events → Profile (has collapsible settings)
   const effectiveUser = user?.isTeamMember ? user?.organization : user;
+  const isSingleUse = effectiveUser?.role === 'INDIVIDUAL';
   const isIndividual = effectiveUser?.role === 'INDIVIDUAL' || effectiveUser?.role === 'PERSONAL_LIFE';
-  const profileIconTarget = isIndividual ? '/dashboard/settings' : '/dashboard/profile';
+  const profileIconTarget = isSingleUse ? '/dashboard/settings' : '/dashboard/profile';
 
   // ✅ NEW: Get page meta from current route
   const currentPath = location.pathname;
