@@ -15,6 +15,17 @@
       "destination": "https://outbound-impact-production.up.railway.app/og/:slug"
     },
     {
+      "source": "/c/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|Slackbot|TelegramBot|Discordbot|baiduspider|Googlebot|Bingbot|redditbot|pinterest|vkShare|Embedly|quora|outbrain|W3C_Validator|preview).*"
+        }
+      ],
+      "destination": "https://outbound-impact-production.up.railway.app/og/c/:slug"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

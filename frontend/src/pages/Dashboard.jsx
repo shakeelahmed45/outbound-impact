@@ -163,8 +163,8 @@ const Dashboard = () => {
 
   const isOrganization = effectiveRole === 'ORG_EVENTS' || effectiveRole === 'ORG_SMALL' || effectiveRole === 'ORG_MEDIUM' || effectiveRole === 'ORG_SCALE' || effectiveRole === 'ORG_ENTERPRISE';
 
-  // Individual plan → clean personal dashboard
-  if (!isOrganization && !isTeamMember) {
+  // Individual/Personal plan → clean personal dashboard (includes team members on personal plans)
+  if (!isOrganization) {
     return <IndividualDashboard />;
   }
 

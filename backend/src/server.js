@@ -270,10 +270,13 @@ app.get('/og/:slug', async (req, res) => {
         : item.type === 'IMAGE' ? 'View this image on Outbound Impact'
         : 'View on Outbound Impact');
 
-    // Best image: thumbnail → mediaUrl for images → default
+    // Best image: thumbnail → mediaUrl for images → dynamic OG card
+    const BACKEND = process.env.RAILWAY_PUBLIC_DOMAIN 
+      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` 
+      : 'https://outbound-impact-production.up.railway.app';
     const image = item.thumbnailUrl
       || (item.type === 'IMAGE' ? item.mediaUrl : null)
-      || `${FRONTEND}/og-default.png`;
+      || `${BACKEND}/api/og-image/${slug}`;
 
     const ogType = item.type === 'VIDEO' ? 'video.other' : 'website';
 
@@ -318,6 +321,81 @@ app.get('/og/:slug', async (req, res) => {
   }
 });
 
+// ══════════════════════════════════════════════════════════════
+// OG META TAGS — CAMPAIGNS (/c/:slug)
+// Same pattern as item OG but for campaign/stream pages.
+// ══════════════════════════════════════════════════════════════
+app.get('/og/c/:slug', async (req, res) => {
+  const { slug } = req.params;
+  const FRONTEND = process.env.FRONTEND_URL || 'https://outboundimpact.net';
+
+  try {
+    const campaign = await prisma.campaign.findUnique({
+      where: { slug },
+      select: {
+        name: true, description: true, logoUrl: true,
+        user: { select: { name: true } },
+        items: { take: 1, select: { thumbnailUrl: true, mediaUrl: true, type: true } },
+      },
+    });
+
+    if (!campaign) {
+      return res.send(`<!DOCTYPE html>
+<html><head>
+  <meta charset="utf-8"><title>Outbound Impact</title>
+  <meta property="og:title" content="Outbound Impact"/>
+  <meta property="og:description" content="Share content. Track analytics. Grow your reach."/>
+  <meta property="og:image" content="${FRONTEND}/og-default.png"/>
+  <meta name="robots" content="noindex">
+  <meta http-equiv="refresh" content="0;url=${FRONTEND}/c/${slug}">
+</head><body></body></html>`);
+    }
+
+    const pageUrl     = `${FRONTEND}/c/${slug}`;
+    const title       = campaign.name || 'Outbound Impact';
+    const description = campaign.description || `View ${title} on Outbound Impact`;
+
+    // Best image: campaign logo → first item thumbnail → first image item → default
+    const BACKEND = process.env.RAILWAY_PUBLIC_DOMAIN 
+      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` 
+      : 'https://outbound-impact-production.up.railway.app';
+    let image = campaign.logoUrl;
+    if (!image && campaign.items.length > 0) {
+      const firstItem = campaign.items[0];
+      image = firstItem.thumbnailUrl || (firstItem.type === 'IMAGE' ? firstItem.mediaUrl : null);
+    }
+    if (!image) image = `${FRONTEND}/og-default.png`;
+
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.send(`<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(title)} | Outbound Impact</title>
+  <meta name="description" content="${escapeHtml(description)}">
+  <meta property="og:type"        content="website">
+  <meta property="og:url"         content="${pageUrl}">
+  <meta property="og:title"       content="${escapeHtml(title)}">
+  <meta property="og:description" content="${escapeHtml(description)}">
+  <meta property="og:image"       content="${image}">
+  <meta property="og:image:width"  content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:site_name"   content="Outbound Impact">
+  <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:title"       content="${escapeHtml(title)}">
+  <meta name="twitter:description" content="${escapeHtml(description)}">
+  <meta name="twitter:image"       content="${image}">
+  <meta http-equiv="refresh" content="0;url=${pageUrl}">
+</head><body>
+  <p>Redirecting to <a href="${pageUrl}">${escapeHtml(title)}</a>…</p>
+</body></html>`);
+  } catch (err) {
+    console.error('Campaign OG error:', err.message);
+    res.redirect(`${FRONTEND}/c/${slug}`);
+  }
+});
+
 // Helper — prevent XSS in OG HTML output
 function escapeHtml(str) {
   if (!str) return '';
@@ -328,6 +406,90 @@ function escapeHtml(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 }
+
+// ══════════════════════════════════════════════════════════════
+// DYNAMIC OG IMAGE ENDPOINT
+// Generates a real branded 1200x630 PNG card for any item.
+// Social platforms fetch this URL when og:image points here.
+// Uses sharp (npm install sharp --save).
+// ══════════════════════════════════════════════════════════════
+app.get('/api/og-image/:slug', async (req, res) => {
+  const { slug } = req.params;
+  try {
+    let sharp;
+    try { sharp = require('sharp'); } catch (_) {
+      console.warn('⚠️ sharp not installed — run: npm install sharp --save');
+      return res.redirect(`${process.env.FRONTEND_URL || 'https://outboundimpact.net'}/og-default.png`);
+    }
+
+    const item = await prisma.item.findUnique({
+      where: { slug },
+      select: { title: true, type: true, description: true, thumbnailUrl: true, mediaUrl: true, user: { select: { name: true } } },
+    });
+
+    // If item has a real thumbnail, redirect to it
+    if (item?.thumbnailUrl) return res.redirect(item.thumbnailUrl);
+    if (item?.type === 'IMAGE' && item?.mediaUrl) return res.redirect(item.mediaUrl);
+    if (!item) return res.redirect(`${process.env.FRONTEND_URL || 'https://outboundimpact.net'}/og-default.png`);
+
+    // Type label + icon
+    const typeInfo = {
+      VIDEO: { label: '▶  Video', color: '#FF4E4E', bg: '#FFF0F0' },
+      AUDIO: { label: '♫  Audio', color: '#7B4FD6', bg: '#F5F0FF' },
+      TEXT:  { label: '✎  Text',  color: '#00C49A', bg: '#F0FFF8' },
+      EMBED: { label: '🔗  Link', color: '#3AABF7', bg: '#F0F8FF' },
+    }[item.type] || { label: '📄  Content', color: '#800080', bg: '#FDF0FD' };
+
+    // Truncate title to fit
+    const title = (item.title || 'Untitled').substring(0, 60) + (item.title?.length > 60 ? '…' : '');
+    const desc = (item.description || '').substring(0, 90) + (item.description?.length > 90 ? '…' : '');
+    const author = item.user?.name || 'Outbound Impact';
+
+    const svg = `<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#800080"/>
+      <stop offset="50%" style="stop-color:#9B30FF"/>
+      <stop offset="100%" style="stop-color:#EE82EE"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF"/>
+      <stop offset="100%" style="stop-color:#FAFAFF"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <!-- Card -->
+  <rect x="60" y="50" width="1080" height="530" rx="24" fill="url(#card)" opacity="0.97"/>
+  <!-- Type badge -->
+  <rect x="100" y="90" width="${typeInfo.label.length * 16 + 40}" height="44" rx="22" fill="${typeInfo.bg}"/>
+  <text x="120" y="120" font-family="Arial,sans-serif" font-size="22" font-weight="bold" fill="${typeInfo.color}">${typeInfo.label}</text>
+  <!-- Title -->
+  <text x="100" y="200" font-family="Arial,sans-serif" font-size="52" font-weight="bold" fill="#1a1a2e">${escapeHtml(title)}</text>
+  <!-- Description -->
+  <text x="100" y="270" font-family="Arial,sans-serif" font-size="24" fill="#6B7280">${escapeHtml(desc)}</text>
+  <!-- Divider -->
+  <line x1="100" y1="340" x2="1100" y2="340" stroke="#E5E7EB" stroke-width="2"/>
+  <!-- Author -->
+  <circle cx="130" cy="400" r="28" fill="${typeInfo.color}" opacity="0.15"/>
+  <text x="130" y="408" text-anchor="middle" font-family="Arial,sans-serif" font-size="22" font-weight="bold" fill="${typeInfo.color}">${escapeHtml(author.charAt(0).toUpperCase())}</text>
+  <text x="175" y="395" font-family="Arial,sans-serif" font-size="20" fill="#6B7280">Shared by</text>
+  <text x="175" y="425" font-family="Arial,sans-serif" font-size="24" font-weight="bold" fill="#1a1a2e">${escapeHtml(author)}</text>
+  <!-- Footer branding -->
+  <rect x="60" y="480" width="1080" height="100" rx="0" fill="#800080" opacity="0.06"/>
+  <text x="600" y="535" text-anchor="middle" font-family="Arial,sans-serif" font-size="20" fill="#800080" font-weight="bold">outboundimpact.net</text>
+  <text x="600" y="562" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#9CA3AF">Physical connection. Digital depth.</text>
+</svg>`;
+
+    const pngBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
+    res.set('Content-Type', 'image/png');
+    res.set('Cache-Control', 'public, max-age=86400'); // Cache 24 hours
+    res.send(pngBuffer);
+  } catch (err) {
+    console.error('OG image generation error:', err.message);
+    res.redirect(`${process.env.FRONTEND_URL || 'https://outboundimpact.net'}/og-default.png`);
+  }
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
@@ -396,10 +558,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ═══════════════════════════════════════════════
-// 🚀 SERVER STARTUP
-// ═══════════════════════════════════════════════
-
 // Export for Vercel serverless function
 if (process.env.VERCEL) {
   module.exports = app;
@@ -437,7 +595,7 @@ if (process.env.VERCEL) {
     console.log('🔄 Refund system enabled! (7-day policy)');
     console.log('🛍️ Multi-platform e-commerce integration ready!');
     console.log('🔍 Debug routes active at /api/debug');
-    console.log('👥 Admin team management enabled!');  // 🆕 NEW
+    console.log('👥 Admin team management enabled!');  
     console.log('═══════════════════════════════════════════════\n');
   });
 }
