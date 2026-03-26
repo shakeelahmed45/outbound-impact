@@ -75,16 +75,23 @@ const TeamPage = () => {
 
   // Individual plan: 2-contributor limit
   const effectiveUser = user?.isTeamMember ? user.organization : user;
-  const isIndividual = effectiveUser?.role === 'INDIVIDUAL';
+  const isIndividual = effectiveUser?.role === 'INDIVIDUAL' || effectiveUser?.role === 'PERSONAL_LIFE';
+  const isSingleUse = effectiveUser?.role === 'INDIVIDUAL';
+  const isPersonalLife = effectiveUser?.role === 'PERSONAL_LIFE';
   const isSmall = effectiveUser?.role === 'ORG_SMALL';
   const isMedium = effectiveUser?.role === 'ORG_MEDIUM';
   const isOrgEvents = effectiveUser?.role === 'ORG_EVENTS';
   const isScale = effectiveUser?.role === 'ORG_SCALE';
   const isEnterprise = effectiveUser?.role === 'ORG_ENTERPRISE';
   const INDIVIDUAL_CONTRIBUTOR_LIMIT = 2;
+  const PERSONAL_LIFE_CONTRIBUTOR_LIMIT = 2;
   const ORG_EVENTS_CONTRIBUTOR_LIMIT = 5;
-  const individualLimitReached = isIndividual && teamMembers.length >= INDIVIDUAL_CONTRIBUTOR_LIMIT;
+  const STARTER_CONTRIBUTOR_LIMIT = 3;
+  const individualLimitReached = isSingleUse && teamMembers.length >= INDIVIDUAL_CONTRIBUTOR_LIMIT;
+  const personalLifeLimitReached = isPersonalLife && teamMembers.length >= PERSONAL_LIFE_CONTRIBUTOR_LIMIT;
   const orgEventsLimitReached = isOrgEvents && teamMembers.length >= ORG_EVENTS_CONTRIBUTOR_LIMIT;
+  const starterLimitReached = isSmall && teamMembers.length >= STARTER_CONTRIBUTOR_LIMIT;
+  const anyLimitReached = individualLimitReached || personalLifeLimitReached || orgEventsLimitReached || starterLimitReached;
 
   // ✅ Feature list per plan — these are the features the owner can grant to VIEWER/EDITOR
   const getAvailableFeatures = () => {
@@ -409,34 +416,47 @@ const TeamPage = () => {
           </div>
           <button
             onClick={() => {
-              if (individualLimitReached) {
-                showToast('Contributor limit reached on Personal plan (2 max). Upgrade to invite more!', 'error');
-                return;
-              }
-              if (orgEventsLimitReached) {
-                showToast('Contributor limit reached on Org Events plan (5 max). Upgrade to invite more!', 'error');
+              if (anyLimitReached) {
+                const planLabel = isSingleUse ? 'Personal Single Use' : isPersonalLife ? 'Personal Life Events' : isOrgEvents ? 'Org Events' : isSmall ? 'Starter' : '';
+                const maxNum = isSingleUse ? 2 : isPersonalLife ? 2 : isOrgEvents ? 5 : isSmall ? 3 : 0;
+                showToast(`Contributor limit reached on ${planLabel} plan (${maxNum} max). Upgrade to invite more!`, 'error');
                 return;
               }
               setShowInviteModal(true);
               setError('');
             }}
             className={`text-white px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:shadow-lg transition-all text-sm sm:text-base whitespace-nowrap ${
-              (individualLimitReached || orgEventsLimitReached) ? 'bg-orange-500 hover:bg-orange-600' : 'gradient-btn'
+              anyLimitReached ? 'bg-orange-500 hover:bg-orange-600' : 'gradient-btn'
             }`}
           >
             <UserPlus size={18} className="sm:w-5 sm:h-5" />
-            {(individualLimitReached || orgEventsLimitReached) ? 'Upgrade to Add More' : 'Invite Contributor'}
+            {anyLimitReached ? 'Upgrade to Add More' : 'Invite Contributor'}
           </button>
         </div>
 
-        {/* Individual plan limit info */}
-        {isIndividual && (
+        {/* Personal Single Use plan limit info */}
+        {isSingleUse && (
           <div className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-xl px-5 py-3 mb-4">
             <p className="text-sm text-purple-700">
-              <strong>{teamMembers.length}/{INDIVIDUAL_CONTRIBUTOR_LIMIT}</strong> contributors used on Personal plan
+              <strong>{teamMembers.length}/{INDIVIDUAL_CONTRIBUTOR_LIMIT}</strong> contributors used on Personal Single Use plan
               {individualLimitReached && <span className="ml-2 text-orange-600 font-medium">• Limit reached</span>}
             </p>
             {individualLimitReached && (
+              <button onClick={() => window.location.href = '/dashboard/settings'} className="text-sm font-medium text-purple-600 hover:text-purple-700">
+                Upgrade →
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Personal Life Events plan limit info */}
+        {isPersonalLife && (
+          <div className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-xl px-5 py-3 mb-4">
+            <p className="text-sm text-purple-700">
+              <strong>{teamMembers.length}/{PERSONAL_LIFE_CONTRIBUTOR_LIMIT}</strong> contributors used on Personal Life Events plan
+              {personalLifeLimitReached && <span className="ml-2 text-orange-600 font-medium">• Limit reached</span>}
+            </p>
+            {personalLifeLimitReached && (
               <button onClick={() => window.location.href = '/dashboard/settings'} className="text-sm font-medium text-purple-600 hover:text-purple-700">
                 Upgrade →
               </button>
@@ -453,6 +473,21 @@ const TeamPage = () => {
             </p>
             {orgEventsLimitReached && (
               <button onClick={() => window.location.href = '/dashboard/settings'} className="text-sm font-medium text-amber-600 hover:text-amber-700">
+                Upgrade →
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Starter plan limit info */}
+        {isSmall && (
+          <div className="flex items-center justify-between bg-teal-50 border border-teal-200 rounded-xl px-5 py-3 mb-4">
+            <p className="text-sm text-teal-700">
+              <strong>{teamMembers.length}/{STARTER_CONTRIBUTOR_LIMIT}</strong> contributors used on Starter plan
+              {starterLimitReached && <span className="ml-2 text-orange-600 font-medium">• Limit reached</span>}
+            </p>
+            {starterLimitReached && (
+              <button onClick={() => window.location.href = '/dashboard/settings'} className="text-sm font-medium text-teal-600 hover:text-teal-700">
                 Upgrade →
               </button>
             )}
@@ -883,7 +918,7 @@ const TeamPage = () => {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <h3 className="font-bold text-xl mb-1">Ready to grow?</h3>
-                <p className="text-blue-100 text-sm">Upgrade to Small Business for more contributors, team messaging, advanced analytics, and more!</p>
+                <p className="text-blue-100 text-sm">Upgrade to Starter for more contributors, team messaging, activity feed, and more!</p>
               </div>
               <button onClick={() => window.location.href = '/dashboard/settings'} className="px-6 py-3 bg-white text-purple-600 rounded-lg font-bold hover:bg-slate-100 transition-colors flex-shrink-0">Upgrade Now</button>
             </div>
