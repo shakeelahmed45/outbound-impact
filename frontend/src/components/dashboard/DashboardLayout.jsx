@@ -5,6 +5,7 @@ import NotificationsPanel from '../NotificationsPanel';
 import SubscriptionBlockedModal from '../SubscriptionBlockedModal';
 import GlobalAiChatWidget from '../GlobalAiChatWidget';
 import PushNotificationPrompt from '../PushNotificationPrompt';
+import PwaInstallPrompt from '../PwaInstallPrompt';
 import useAuthStore from '../../store/authStore';
 import { Menu, Search } from 'lucide-react';
 
@@ -180,6 +181,7 @@ const DashboardLayout = ({ children }) => {
 
       {/* Push Notification Prompt — not shown for Personal Single Use plan */}
       {effectiveUser?.role !== 'INDIVIDUAL' && <PushNotificationPrompt />}
+      <PwaInstallPrompt />
     </div>
   );
 };
