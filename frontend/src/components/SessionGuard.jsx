@@ -100,7 +100,7 @@ const SessionGuard = () => {
       } catch {
         // api.js interceptor handles 401/403 — we don't do anything here
       }
-    }, 3 * 60 * 1000); // Every 3 minutes
+    }, 5 * 1000); // Every 5 seconds — near-instant kick on suspension
 
     // Initialize after a brief delay
     const initTimer = setTimeout(init, 3000);
