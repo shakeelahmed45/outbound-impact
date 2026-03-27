@@ -96,7 +96,7 @@ const authMiddleware = async (req, res, next) => {
       userLastActivity.set(decoded.userId, Date.now());
     }
 
-    // ─── CHECK 2: Is user suspended? (DB lookup) ───
+    // ─── CHECK 2: Is user suspended/banned/removed? (DB lookup) ───
     // ✅ FIX: Use decoded.userId (matches JWT payload), not decoded.id
     try {
       const dbUser = await prisma.user.findUnique({
@@ -113,6 +113,16 @@ const authMiddleware = async (req, res, next) => {
           message: isBanned
             ? 'Your account has been permanently banned. Please contact support@outboundimpact.org.'
             : 'Your account has been suspended. Please contact support@outboundimpact.org for assistance.'
+        });
+      }
+
+      // ✅ KICK FIX: Removed contributors get status='removed' — kick them out immediately
+      if (dbUser && dbUser.status === 'removed') {
+        console.log(`🚫 Removed contributor attempting access: ${decoded.email || decoded.userId}`);
+        return res.status(401).json({
+          status: 'error',
+          code: 'REMOVED_FROM_TEAM',
+          message: 'You have been removed from this account. Please contact the account owner if you believe this is a mistake.'
         });
       }
     } catch (dbErr) {
@@ -262,11 +272,6 @@ const getUserPermissions = (role) => {
   return permissions[role] || {};
 };
 
-// ═══════════════════════════════════════════════════════════
-// Helper: Force-clear maintenance mode cache
-// Now delegates to settingsHelper.clearCache() for unified caching.
-// Kept as named export for backward compatibility with adminSettingsController.
-// ═══════════════════════════════════════════════════════════
 const clearMaintenanceCache = () => {
   clearCache();
 };

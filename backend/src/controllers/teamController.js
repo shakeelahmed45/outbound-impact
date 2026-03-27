@@ -586,23 +586,34 @@ const removeTeamMember = async (req, res) => {
 
     if (teamMember.memberUserId) {
       try {
-        await prisma.user.delete({
-          where: { id: teamMember.memberUserId }
+        // ✅ KICK FIX: Set status='removed' so auth middleware blocks them on their
+        // very next API request — instant kick-off without needing to invalidate the JWT.
+        // We also delete the TeamMember record so they can't sign back in as a contributor.
+        await prisma.user.update({
+          where: { id: teamMember.memberUserId },
+          data:  { status: 'removed' },
         });
-        console.log(`✅ Team member removed and user account deleted: ${teamMember.email}`);
-        console.log(`   Email is now available for new registration`);
-      } catch (deleteError) {
+
         await prisma.teamMember.delete({
           where: { id },
         });
-        console.log(`✅ Team member removed: ${teamMember.email}`);
-        console.log(`   (User account could not be deleted - may have dependencies)`);
+
+        console.log(`✅ Team member removed and kicked: ${teamMember.email}`);
+        console.log(`   status=removed set — their next API call will be blocked immediately`);
+      } catch (updateError) {
+        // Fallback: if user update fails, at least delete the TeamMember record
+        console.error(`⚠️ Could not set status=removed for ${teamMember.email}:`, updateError.message);
+        await prisma.teamMember.delete({
+          where: { id },
+        });
+        console.log(`✅ Team member record deleted: ${teamMember.email}`);
       }
     } else {
+      // Pending invite (no user account yet) — just delete the TeamMember record
       await prisma.teamMember.delete({
         where: { id },
       });
-      console.log(`✅ Team member removed: ${teamMember.email}`);
+      console.log(`✅ Pending team member invitation removed: ${teamMember.email}`);
     }
 
     res.json({

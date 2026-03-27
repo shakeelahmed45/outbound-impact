@@ -662,6 +662,15 @@ const signIn = async (req, res) => {
       });
     }
 
+    // ✅ KICK FIX: Removed contributors cannot sign back in
+    if (user.status === 'removed') {
+      return res.status(403).json({
+        status: 'error',
+        code: 'REMOVED_FROM_TEAM',
+        message: 'You have been removed from this account by the account owner. Please contact them if you believe this is a mistake.'
+      });
+    }
+
     // ═══ ENFORCEMENT: Email Verification ═══
     if (platformSettings.requireEmailVerification) {
       try {
@@ -1289,9 +1298,6 @@ const resetPassword = async (req, res) => {
   }
 };
 
-// ═══════════════════════════════════════════════════════════
-// SESSION STATUS — Lightweight endpoint for frontend SessionGuard
-// Protected by authMiddleware → returns 401 if expired, 403 if suspended
 // ═══════════════════════════════════════════════════════════
 const getSessionStatus = async (req, res) => {
   try {

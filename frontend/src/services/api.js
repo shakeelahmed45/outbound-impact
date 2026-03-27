@@ -141,6 +141,34 @@ api.interceptors.response.use(
     const message = error.response?.data?.message;
 
     // ═══════════════════════════════════════════
+    // 401: REMOVED_FROM_TEAM — contributor was kicked
+    // ═══════════════════════════════════════════
+    if (status === 401 && code === 'REMOVED_FROM_TEAM') {
+      console.log('🚫 Removed from team — logging out');
+      clearAllAuth();
+      sessionStorage.setItem('logout_reason', message || 'You have been removed from this account. Please contact the account owner.');
+      const currentPath = window.location.pathname;
+      if (!currentPath.includes('/signin') && !currentPath.includes('/signup')) {
+        window.location.href = '/signin';
+      }
+      return Promise.reject(error);
+    }
+
+    // ═══════════════════════════════════════════
+    // 403: REMOVED_FROM_TEAM — blocked on sign in
+    // ═══════════════════════════════════════════
+    if (status === 403 && code === 'REMOVED_FROM_TEAM') {
+      console.log('🚫 Removed contributor tried to sign in');
+      clearAllAuth();
+      sessionStorage.setItem('suspended_message', message || 'You have been removed from this account. Please contact the account owner.');
+      const currentPath = window.location.pathname;
+      if (!currentPath.includes('/signin') && !currentPath.includes('/signup')) {
+        window.location.href = '/signin';
+      }
+      return Promise.reject(error);
+    }
+
+    // ═══════════════════════════════════════════
     // 403: ACCOUNT_SUSPENDED
     // ═══════════════════════════════════════════
     if (status === 403 && code === 'ACCOUNT_SUSPENDED') {
