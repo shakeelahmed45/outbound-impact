@@ -1,12 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// STORAGE ALERT CONTROLLER
-//
-// Endpoints:
-//   POST /api/storage-alerts/checkout   — create Stripe checkout for storage add-on
-//   POST /api/storage-alerts/run        — manually trigger alert job (admin only)
-//   GET  /api/storage-alerts/status     — get current user's storage status
-// ═══════════════════════════════════════════════════════════════
-
 const prisma  = require('../lib/prisma');
 const stripe  = require('stripe')(process.env.STRIPE_SECRET_KEY);
 

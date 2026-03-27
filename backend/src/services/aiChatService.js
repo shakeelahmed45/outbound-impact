@@ -1,24 +1,12 @@
 const prisma = require('../lib/prisma');
 
-// ═══════════════════════════════════════════════════════════
-// SMART AI CHATBOT SERVICE - PROFESSIONAL & INTELLIGENT
-// ═══════════════════════════════════════════════════════════
-
-// ═══════════════════════════════════════════════════════════
-// NORMALIZE TEXT FOR BETTER MATCHING
-// ═══════════════════════════════════════════════════════════
-
 const normalizeText = (text) => {
   return text
     .toLowerCase()
-    .replace(/[?!.,;]/g, '') // Remove punctuation
+    .replace(/[?!.,;]/g, '') 
     .replace(/\s+/g, ' ') // Multiple spaces to single
     .trim();
 };
-
-// ═══════════════════════════════════════════════════════════
-// EXTRACT KEY PHRASES
-// ═══════════════════════════════════════════════════════════
 
 const extractKeyPhrases = (text) => {
   const normalized = normalizeText(text);
@@ -40,10 +28,6 @@ const extractKeyPhrases = (text) => {
   
   return phrases;
 };
-
-// ═══════════════════════════════════════════════════════════
-// DETECT USER INTENT
-// ═══════════════════════════════════════════════════════════
 
 const detectIntent = async (message) => {
   const normalized = normalizeText(message);

@@ -1,19 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// VIDEO PROCESSING SERVICE
-// Uses FFmpeg to optimise videos before upload to Cloudflare R2.
-//
-// Key optimisation: -movflags +faststart
-//   Moves the moov atom to the BEGINNING of the MP4 container.
-//   This lets the browser start playing the video immediately
-//   without downloading the whole file first (no buffering).
-//
-// FFmpeg binary: provided by the "ffmpeg-static" npm package.
-// Railway setup: no system package install needed — the binary
-//   is bundled inside node_modules and works on any Linux host.
-//   Simply set NIXPACKS_PKGS= (empty) in Railway — ffmpeg-static
-//   handles everything.
-// ═══════════════════════════════════════════════════════════════
-
 const ffmpeg        = require('fluent-ffmpeg');
 const ffmpegStatic  = require('ffmpeg-static');
 const os            = require('os');

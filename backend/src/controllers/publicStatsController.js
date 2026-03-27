@@ -1,9 +1,3 @@
-// ═══════════════════════════════════════════════════════════
-// PUBLIC STATS ENDPOINT — SUPPORTS JSON + JSONP
-// JSON:  GET /api/public/stats          → returns JSON
-// JSONP: GET /api/public/stats.js       → returns <script> (bypasses CORS)
-// ═══════════════════════════════════════════════════════════
-
 const prisma = require('../lib/prisma');
 
 async function gatherStats() {

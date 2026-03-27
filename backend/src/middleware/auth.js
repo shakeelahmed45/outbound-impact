@@ -3,10 +3,6 @@ const prisma = require('../lib/prisma');
 const { getSettings, clearCache } = require('../services/settingsHelper');
 
 // ═══════════════════════════════════════════════════════════
-// MAINTENANCE MODE CACHE — Uses settingsHelper's unified cache
-// so admin settings saves clear both caches at once.
-// The clearMaintenanceCache export is kept for backward compat.
-// ═══════════════════════════════════════════════════════════
 const checkMaintenanceMode = async () => {
   try {
     const settings = await getSettings();
@@ -16,11 +12,6 @@ const checkMaintenanceMode = async () => {
   }
 };
 
-// ═══════════════════════════════════════════════════════════
-// IN-MEMORY ACTIVITY TRACKER
-// Tracks the last time each user made an API request.
-// Used for INACTIVITY-based session timeout (not token-age-based).
-// Lightweight — no DB writes on every request.
 // ═══════════════════════════════════════════════════════════
 const userLastActivity = new Map();
 

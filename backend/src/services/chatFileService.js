@@ -1,12 +1,6 @@
 const prisma = require('../lib/prisma');
 const { uploadToCloudflare, deleteFromCloudflare } = require('./cloudflareService');
 
-// ═══════════════════════════════════════════════════════════
-// CHAT FILE UPLOAD SERVICE
-// Handles document and image uploads in live chat.
-// Uses Cloudflare R2 for storage.
-// ═══════════════════════════════════════════════════════════
-
 const MAX_FILE_SIZE  = 10 * 1024 * 1024; // 10 MB
 const MAX_IMAGE_SIZE =  5 * 1024 * 1024; //  5 MB
 

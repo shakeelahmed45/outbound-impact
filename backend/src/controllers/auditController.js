@@ -1,10 +1,3 @@
-// ═══════════════════════════════════════════════════════════
-// controllers/auditController.js
-// Enterprise audit log endpoint — org-scoped, filterable
-// FIXED: Removed raw SQL, all queries use safe Prisma ORM
-// ═══════════════════════════════════════════════════════════
-
-
 const prisma = require('../lib/prisma');
 
 /**

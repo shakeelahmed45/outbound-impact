@@ -694,6 +694,7 @@ const handlePaymentSucceeded = async (invoice) => {
         };
         const planName = priceIdMap[subscription.items.data[0].price.id] || 'Individual';
         
+        // Send receipt to customer
         await emailService.sendPaymentReceiptEmail(
           user.email,
           user.name,
@@ -702,6 +703,40 @@ const handlePaymentSucceeded = async (invoice) => {
           planName
         );
         console.log('✅ Renewal receipt sent to:', user.email);
+
+        // ── Bug 3 Fix: Notify admin of every successful renewal ──
+        const adminEmail = process.env.ADMIN_EMAIL || 'shakeel@outboundimpact.org';
+        const { Resend } = require('resend');
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        const amount = (invoice.amount_paid / 100).toFixed(2);
+        const currency = invoice.currency.toUpperCase();
+        const nextRenewal = updateData.currentPeriodEnd
+          ? new Date(updateData.currentPeriodEnd).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
+          : 'N/A';
+
+        await resend.emails.send({
+          from:    'Outbound Impact <noreply@outboundimpact.org>',
+          to:      [adminEmail],
+          subject: `💰 Renewal: ${user.name} — ${planName} — ${currency} ${amount}`,
+          html: `<!DOCTYPE html>
+<html><body style="font-family:sans-serif;background:#f0f2f5;padding:30px 20px;">
+<div style="max-width:560px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.09);">
+  <div style="background:linear-gradient(135deg,#0B1220,#1E293B);padding:24px 32px;">
+    <h2 style="color:#fff;margin:0;font-size:18px;">💰 Subscription Renewed</h2>
+    <p style="color:rgba(255,255,255,.55);margin:4px 0 0;font-size:12px;">Outbound Impact Admin Notification</p>
+  </div>
+  <div style="padding:28px 32px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E5E7EB;border-radius:10px;overflow:hidden;">
+      <tr><td style="padding:11px 16px;background:#F9FAFB;font-size:12px;color:#6B7280;font-weight:600;text-transform:uppercase;border-bottom:1px solid #E5E7EB;">Customer</td><td style="padding:11px 16px;border-bottom:1px solid #E5E7EB;font-size:13px;font-weight:700;">${user.name}</td></tr>
+      <tr><td style="padding:11px 16px;background:#F9FAFB;font-size:12px;color:#6B7280;font-weight:600;text-transform:uppercase;border-bottom:1px solid #E5E7EB;">Email</td><td style="padding:11px 16px;border-bottom:1px solid #E5E7EB;font-size:13px;">${user.email}</td></tr>
+      <tr><td style="padding:11px 16px;background:#F9FAFB;font-size:12px;color:#6B7280;font-weight:600;text-transform:uppercase;border-bottom:1px solid #E5E7EB;">Plan</td><td style="padding:11px 16px;border-bottom:1px solid #E5E7EB;font-size:13px;font-weight:700;">${planName}</td></tr>
+      <tr><td style="padding:11px 16px;background:#F9FAFB;font-size:12px;color:#6B7280;font-weight:600;text-transform:uppercase;border-bottom:1px solid #E5E7EB;">Amount</td><td style="padding:11px 16px;border-bottom:1px solid #E5E7EB;font-size:14px;font-weight:800;color:#059669;">${currency} ${amount}</td></tr>
+      <tr><td style="padding:11px 16px;background:#F9FAFB;font-size:12px;color:#6B7280;font-weight:600;text-transform:uppercase;">Next Renewal</td><td style="padding:11px 16px;font-size:13px;">${nextRenewal}</td></tr>
+    </table>
+  </div>
+</div></body></html>`,
+        }).catch(e => console.error('❌ Admin renewal email failed:', e.message));
+
       } catch (emailError) {
         console.error('❌ Failed to send renewal receipt:', emailError.message);
       }

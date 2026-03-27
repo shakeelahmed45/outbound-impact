@@ -1,9 +1,3 @@
-// ═══════════════════════════════════════════════════════════
-// controllers/messageController.js
-// Internal team messaging + External email via Resend
-// ═══════════════════════════════════════════════════════════
-
-
 const prisma = require('../lib/prisma');
 const { logAudit, AUDIT_ACTIONS } = require('../helpers/auditLogger');
 

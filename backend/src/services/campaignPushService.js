@@ -1,13 +1,6 @@
 const webpush = require('web-push');
 const prisma = require('../lib/prisma');
 
-// ═══════════════════════════════════════════════════════════
-// CAMPAIGN PUSH SERVICE
-// Push notifications for PUBLIC viewers who saved a campaign
-// to their mobile home screen via "Add to Home Screen".
-// These are NOT authenticated users — just public visitors.
-// ═══════════════════════════════════════════════════════════
-
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 const pushConfigured = !!(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY);

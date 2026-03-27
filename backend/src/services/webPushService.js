@@ -1,14 +1,6 @@
 const webpush = require('web-push');
 const prisma = require('../lib/prisma');
 
-// ═══════════════════════════════════════════════════════════
-// WEB PUSH SERVICE
-// Sends real-time push notifications to user devices
-// Uses VAPID (Voluntary Application Server Identification)
-//
-// ✅ FIX: Added comprehensive 📱 logging for Railway debugging
-// ═══════════════════════════════════════════════════════════
-
 // Configure VAPID keys from environment
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;

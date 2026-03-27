@@ -3,10 +3,6 @@ const { sendChatNotificationToAdmin, sendChatReplyToUser } = require('../service
 const { handleUserMessageWithFreeAi, saveAiAnalytics } = require('../services/freeAiChatService');
 const { uploadChatAttachment, getMessageAttachments } = require('../services/chatFileService');
 
-// ═══════════════════════════════════════════════════════════
-// 🆕 NEW: AI CHATBOT WIDGET FUNCTIONS (FIXED - No isUser/isAi)
-// ═══════════════════════════════════════════════════════════
-
 // Create conversation (for widget)
 const createConversation = async (req, res) => {
   try {

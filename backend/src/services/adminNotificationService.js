@@ -1,15 +1,61 @@
 const prisma = require('../lib/prisma');
 const { createNotification } = require('./notificationService');
 
-// ═══════════════════════════════════════════════════════════
-// ADMIN NOTIFICATION SERVICE
-// Creates in-app notifications for ALL admin users
-// when platform-level events happen.
-//
-// ✅ FIX: Uses createNotification() (prisma.notification.create)
-//    instead of createMany() which SILENTLY FAILS because
-//    Prisma's createMany does NOT auto-set @updatedAt fields.
-// ═══════════════════════════════════════════════════════════
+// Admin email via Resend — lazy-loaded to avoid circular deps
+let _resend = null;
+const getResend = () => {
+  if (!_resend && process.env.RESEND_API_KEY) {
+    const { Resend } = require('resend');
+    _resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return _resend;
+};
+
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'shakeel@outboundimpact.org';
+const FRONTEND    = process.env.FRONTEND_URL || 'https://outboundimpact.net';
+
+// Categories that are important enough to also email the admin
+const EMAIL_CATEGORIES = new Set(['churn', 'revenue', 'account', 'system', 'churn_signal']);
+
+// Emoji map for subject lines
+const CATEGORY_EMOJI = {
+  churn:        '⚠️',
+  revenue:      '💰',
+  account:      '👤',
+  system:       '🔴',
+  platform:     '🟣',
+  team:         '👥',
+  churn_signal: '⚠️',
+  new_customer: '🎉',
+};
+
+const sendAdminEmail = async ({ type, category, title, message }) => {
+  const resend = getResend();
+  if (!resend) return; // Resend not configured
+
+  const emoji   = CATEGORY_EMOJI[category] || '🔔';
+  const bgColor = type === 'error' ? '#CC3333' : type === 'warning' ? '#FFB020' : '#0B1220';
+
+  const html = `<!DOCTYPE html>
+<html><body style="font-family:sans-serif;background:#f0f2f5;padding:30px 20px;">
+<div style="max-width:520px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.09);">
+  <div style="background:${bgColor};padding:22px 30px;">
+    <h2 style="color:#fff;margin:0;font-size:17px;">${emoji} ${title}</h2>
+    <p style="color:rgba(255,255,255,.6);margin:4px 0 0;font-size:12px;">Outbound Impact Admin · ${new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+  </div>
+  <div style="padding:24px 30px;">
+    <p style="color:#374151;font-size:14px;line-height:1.7;margin:0 0 20px;">${message}</p>
+    <a href="${FRONTEND}/admin" style="display:inline-block;padding:10px 24px;background:linear-gradient(135deg,#7B4FD6,#00C49A);color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:13px;">View Admin Dashboard →</a>
+  </div>
+</div></body></html>`;
+
+  await resend.emails.send({
+    from:    'Outbound Impact <noreply@outboundimpact.org>',
+    to:      [ADMIN_EMAIL],
+    subject: `${emoji} [OI Admin] ${title}`,
+    html,
+  }).catch(e => console.error('🔔 Admin email send failed:', e.message));
+};
 
 /**
  * Find all admin user IDs (cached 5 minutes).
@@ -63,6 +109,12 @@ const notifyAdmins = async ({ type = 'info', category = 'platform', title, messa
     }
 
     console.log(`🔔 ✅ Admin notification: "${title}" → ${created}/${adminIds.length} admin(s) [${category}]`);
+
+    // ── Bug 4 Fix: Also send email for important categories ──
+    if (EMAIL_CATEGORIES.has(category) || type === 'error' || type === 'warning') {
+      await sendAdminEmail({ type, category, title, message });
+      console.log(`🔔 📧 Admin email sent for: "${title}"`);
+    }
   } catch (error) {
     console.error(`🔔 ❌ notifyAdmins failed: "${title}" →`, error.message);
   }

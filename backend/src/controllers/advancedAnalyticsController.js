@@ -1,10 +1,3 @@
-// ═══════════════════════════════════════════════════════════
-// controllers/advancedAnalyticsController.js
-// Comprehensive analytics pulling from ALL data sources:
-// Items, Campaigns, Analytics, Organizations, Cohorts,
-// Workflows, TeamMembers, Messages, AuditLogs
-// ═══════════════════════════════════════════════════════════
-
 const prisma = require('../lib/prisma');
 const { buildOrgFilter } = require('../helpers/orgScope');
 

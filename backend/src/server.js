@@ -57,10 +57,6 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ═══════════════════════════════════════════════
-// 🛡️ PROTECTION SYSTEMS - PREVENTS 24-HOUR TIMEOUT
-// ═══════════════════════════════════════════════
-
 // 1. Database Connection Refresh (Every 2 hours)
 // Prevents stale connections from causing timeouts
 setInterval(async () => {
@@ -111,13 +107,6 @@ const gracefulShutdown = async (signal) => {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-// ═══════════════════════════════════════════════
-// 📡 EXPRESS CONFIGURATION
-// ═══════════════════════════════════════════════
-
-// ═══════════════════════════════════════════════
-// 🌐 PUBLIC STATS — BEFORE CORS middleware so .org site can access it
-// ═══════════════════════════════════════════════
 app.options('/api/public/stats', (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -163,10 +152,6 @@ app.use(cors({
   credentials: true
 }));
 
-// ═══════════════════════════════════════════════
-// 🎯 STRIPE WEBHOOK ENDPOINT
-// ═══════════════════════════════════════════════
-// ⚠️ CRITICAL: This MUST come BEFORE express.json()
 // Stripe webhooks need the raw body to verify signatures
 
 app.post(
@@ -175,9 +160,6 @@ app.post(
   webhookController.handleStripeWebhook
 );
 
-// ═══════════════════════════════════════════════
-// 📦 BODY PARSER MIDDLEWARE
-// ═══════════════════════════════════════════════
 // ⚠️ This comes AFTER the webhook endpoint
 
 app.use(express.json({ limit: '100mb' }));
@@ -215,20 +197,9 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// ═══════════════════════════════════════════════
-// 🛣️ API ROUTES
-// ═══════════════════════════════════════════════
-
 // 📋 Audit middleware — auto-logs all successful write operations
 app.use(auditMiddleware);
 
-// ══════════════════════════════════════════════════════════════
-// OG META TAGS ENDPOINT
-// Called by Vercel edge rewrite when a social media crawler
-// requests /l/:slug. Returns pre-rendered HTML with Open Graph
-// meta tags so platforms show a rich preview card.
-// Real users are served the React app as normal via Vercel.
-// ══════════════════════════════════════════════════════════════
 app.get('/og/:slug', async (req, res) => {
   const { slug } = req.params;
   const FRONTEND = process.env.FRONTEND_URL || 'https://outboundimpact.net';
@@ -321,10 +292,6 @@ app.get('/og/:slug', async (req, res) => {
   }
 });
 
-// ══════════════════════════════════════════════════════════════
-// OG META TAGS — CAMPAIGNS (/c/:slug)
-// Same pattern as item OG but for campaign/stream pages.
-// ══════════════════════════════════════════════════════════════
 app.get('/og/c/:slug', async (req, res) => {
   const { slug } = req.params;
   const FRONTEND = process.env.FRONTEND_URL || 'https://outboundimpact.net';
@@ -407,12 +374,6 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;');
 }
 
-// ══════════════════════════════════════════════════════════════
-// DYNAMIC OG IMAGE ENDPOINT
-// Generates a real branded 1200x630 PNG card for any item.
-// Social platforms fetch this URL when og:image points here.
-// Uses sharp (npm install sharp --save).
-// ══════════════════════════════════════════════════════════════
 app.get('/api/og-image/:slug', async (req, res) => {
   const { slug } = req.params;
   try {
@@ -503,10 +464,9 @@ app.use('/api/push', pushRoutes);
 
 
 
-// ✅ FIXED: teamInvitationRoutes MUST come BEFORE teamRoutes
 // Both have /invitation/:token route - admin uses AdminInvitation table, regular uses TeamMember table
-app.use('/api/team', teamInvitationRoutes);  // ✅ FIRST - Admin invitations (AdminInvitation table)
-app.use('/api/team', teamRoutes);             // ✅ SECOND - Regular team (TeamMember table)
+app.use('/api/team', teamInvitationRoutes);  
+app.use('/api/team', teamRoutes);             
 app.use('/api/team-invitation', teamInvitationRoutes);  // Alternative path for admin panel
 
 app.use('/api/analytics', analyticsRoutes);
@@ -571,6 +531,9 @@ if (process.env.VERCEL) {
 
   const { startIndividualRenewalCron } = require('./services/individualRenewalService');
   startIndividualRenewalCron();
+
+  const { startMonthlyRenewalReminderCron } = require('./services/monthlyRenewalReminderService');
+  startMonthlyRenewalReminderCron();
   const { checkConfig: checkR2Config } = require('./services/cloudflareService');
   checkR2Config();
   initializeEnforcementColumns().catch(e => console.error('Column init error:', e));

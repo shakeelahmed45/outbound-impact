@@ -1,10 +1,5 @@
 const { saveSubscription, removeSubscription, VAPID_PUBLIC_KEY, pushConfigured } = require('../services/webPushService');
 
-// ═══════════════════════════════════════════════════════════
-// PUSH NOTIFICATION CONTROLLER
-// ✅ FIX: Added comprehensive logging
-// ═══════════════════════════════════════════════════════════
-
 /**
  * GET /api/push/vapid-public-key
  * Returns the VAPID public key for client-side push subscription

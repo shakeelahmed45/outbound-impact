@@ -1,19 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// CLOUDFLARE R2 STORAGE SERVICE
-// Replaces Bunny.net for all file storage.
-//
-// Cloudflare R2 is fully S3-compatible so we use the AWS SDK.
-//
-// Required env vars:
-//   CF_ACCOUNT_ID          — Cloudflare account ID
-//   CF_R2_ACCESS_KEY_ID    — R2 API token (Access Key ID)
-//   CF_R2_SECRET_ACCESS_KEY — R2 API token (Secret Access Key)
-//   CF_R2_BUCKET_NAME      — R2 bucket name (e.g. "outbound-impact")
-//   CF_R2_PUBLIC_URL       — Public base URL for the bucket
-//                            e.g. https://media.outboundimpact.net
-//                            or   https://pub-xxxx.r2.dev
-// ═══════════════════════════════════════════════════════════════
-
 const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { v4: uuidv4 } = require('uuid');
 

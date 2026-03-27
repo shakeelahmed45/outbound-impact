@@ -1,8 +1,3 @@
-// ═══════════════════════════════════════════════════════════
-// EXCHANGE RATE SERVICE — Live rates, 1-hour cache
-// Base currency: USD (Stripe account currency)
-// ═══════════════════════════════════════════════════════════
-
 let ratesCache = { rates: null, lastFetched: 0 };
 const RATES_CACHE_TTL = 60 * 60 * 1000; // 1 hour
 

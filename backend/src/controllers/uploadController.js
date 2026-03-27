@@ -6,9 +6,6 @@ const QRCode = require('qrcode');
 const { notifyUpload, notifyStorageWarning, createNotification } = require('../services/notificationService');
 const { sendEditorUploadNotification } = require('../services/emailService');
 
-// ✅ FIX: Import push service to send push to actual uploader (team members)
-// When a team member uploads, notification goes to org owner (correct for in-app),
-// but push must ALSO go to the uploader since their push subscription is under their real ID.
 let _sendPushToUser = null;
 const getSendPush = () => {
   if (!_sendPushToUser) {
@@ -18,10 +15,7 @@ const getSendPush = () => {
   return _sendPushToUser;
 };
 
-// ═══════════════════════════════════════════════════════════
-// CONTENT APPROVAL LOGIC
-// Enterprise + EDITOR → PENDING_APPROVAL (Workflow auto-created)
-// All other plans + EDITOR → PUBLISHED (auto-publish + email notification)
+// ═════════════════════════════════
 // Owner or ADMIN uploads → always PUBLISHED, no notification
 // ═══════════════════════════════════════════════════════════
 const resolveContentApproval = (req, ownerRole) => {

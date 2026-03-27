@@ -1,10 +1,3 @@
-// ═══════════════════════════════════════════════════════════
-// controllers/complianceController.js
-// Compliance & Delivery Analytics — org-scoped
-// Calculates real compliance metrics from campaign + item data
-// ═══════════════════════════════════════════════════════════
-
-
 const prisma = require('../lib/prisma');
 
 /**

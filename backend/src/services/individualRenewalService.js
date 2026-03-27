@@ -1,21 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// INDIVIDUAL (PERSONAL SINGLE USE) RENEWAL SERVICE
-//
-// The Personal Single Use plan is a $69 payment that lasts 1 year.
-// From Year 2 onward, users pay $10/year for continued viewing.
-//
-// This service runs daily and:
-//  - 30 days before expiry: sends a "renewal coming up" email with payment link
-//  - 7 days before expiry:  sends an urgent reminder
-//  - On expiry day:         sends final notice, marks account as expired
-//  - 7 days after expiry:   if still unpaid, suspends access
-//
-// Required env vars:
-//   STRIPE_INDIVIDUAL_RENEWAL_PRICE — price_xxx for the $10/year renewal product
-//   FRONTEND_URL
-//   RESEND_API_KEY
-// ═══════════════════════════════════════════════════════════════
-
 const prisma  = require('../lib/prisma');
 const cron    = require('node-cron');
 const stripe  = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -162,18 +144,18 @@ const runRenewalCheck = async () => {
     console.log(`   ${user.email}: ${daysLeft} days until expiry`);
 
     try {
-      // ── 30-day reminder ──────────────────────────────────────
-      if (daysLeft === 30) {
+      // ── 30-day reminder (range 28–30 to survive missed cron runs) ──
+      if (daysLeft >= 28 && daysLeft <= 30) {
         const renewalUrl = await createRenewalPaymentLink(user);
-        await sendRenewalEmail({ to: user.email, name: user.name, daysLeft: 30, renewalUrl, expiresAt });
-        console.log(`   📧 30-day renewal reminder sent to ${user.email}`);
+        await sendRenewalEmail({ to: user.email, name: user.name, daysLeft, renewalUrl, expiresAt });
+        console.log(`   📧 30-day renewal reminder sent to ${user.email} (${daysLeft} days left)`);
       }
 
-      // ── 7-day urgent reminder ────────────────────────────────
-      else if (daysLeft === 7) {
+      // ── 7-day urgent reminder (range 6–8 to survive missed cron runs) ──
+      else if (daysLeft >= 6 && daysLeft <= 8) {
         const renewalUrl = await createRenewalPaymentLink(user);
-        await sendRenewalEmail({ to: user.email, name: user.name, daysLeft: 7, renewalUrl, expiresAt });
-        console.log(`   📧 7-day urgent reminder sent to ${user.email}`);
+        await sendRenewalEmail({ to: user.email, name: user.name, daysLeft, renewalUrl, expiresAt });
+        console.log(`   📧 7-day urgent reminder sent to ${user.email} (${daysLeft} days left)`);
       }
 
       // ── Expiry day ────────────────────────────────────────────

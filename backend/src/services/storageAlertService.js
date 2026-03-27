@@ -1,15 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// STORAGE ALERT SERVICE
-// Runs a daily cron job at 9:00 AM UTC.
-// Finds all users at ≥ 80% storage and:
-//   1. Creates / deduplicates an in-app notification
-//   2. Sends a daily email reminder
-//
-// DEDUPLICATION: We check if a 'storage' category notification
-// was already created for that user within the last 23 hours.
-// If yes → skip (prevents double-firing if server restarts).
-// ═══════════════════════════════════════════════════════════════
-
 const cron  = require('node-cron');
 const prisma = require('../lib/prisma');
 const { createNotification } = require('./notificationService');

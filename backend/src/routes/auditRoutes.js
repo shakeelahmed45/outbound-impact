@@ -1,7 +1,4 @@
 // ═══════════════════════════════════════════════════════════
-// routes/auditRoutes.js
-// Enterprise audit log endpoints
-// ═══════════════════════════════════════════════════════════
 
 const express = require('express');
 const router = express.Router();

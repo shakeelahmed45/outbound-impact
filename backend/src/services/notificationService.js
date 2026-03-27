@@ -1,14 +1,5 @@
 const prisma = require('../lib/prisma');
 
-// ═══════════════════════════════════════════════════════════
-// NOTIFICATION SERVICE
-// Creates in-app notifications AND sends push notifications
-//
-// ✅ PUSH INTEGRATION: After saving to DB, sends a Web Push
-//    to all subscribed devices for the user.
-// ✅ FIX: Added debug logging for push flow tracing
-// ═══════════════════════════════════════════════════════════
-
 // Lazy-loaded to avoid circular dependency with adminNotificationService
 let _pushService = null;
 const getPushService = () => {

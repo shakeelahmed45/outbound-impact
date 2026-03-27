@@ -1,10 +1,3 @@
-// ═══════════════════════════════════════════════════════════
-// middleware/auditMiddleware.js
-// Auto-logs all successful write operations (POST/PUT/PATCH/DELETE)
-// Drop this into server.js AFTER auth middleware
-// ═══════════════════════════════════════════════════════════
-
-
 const prisma = require('../lib/prisma');
 
 // Map route patterns → human-readable action names

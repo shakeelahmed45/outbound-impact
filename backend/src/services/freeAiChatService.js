@@ -5,11 +5,6 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY, // FREE API key - no credit card needed!
 });
 
-// ═══════════════════════════════════════════════════════════
-// OUTBOUND IMPACT PLATFORM KNOWLEDGE - COMPREHENSIVE A-Z
-// Updated: March 2026
-// ═══════════════════════════════════════════════════════════
-
 const OI_PLATFORM_KNOWLEDGE = `
 # OUTBOUND IMPACT (OI) — COMPLETE PLATFORM KNOWLEDGE BASE
 
