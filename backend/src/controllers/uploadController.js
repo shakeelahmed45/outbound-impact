@@ -154,9 +154,12 @@ const getYouTubeVideoId = (url) => {
 };
 
 // 🎬 Generate YouTube thumbnail URL
+// Uses hqdefault (480x360) — exists for ALL YouTube videos.
+// maxresdefault (1280x720) only exists for HD uploads and silently returns
+// a 120x90 grey placeholder for non-HD videos, which causes the "missing thumbnail" bug.
 const getYouTubeThumbnail = (videoId) => {
   if (!videoId) return null;
-  return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+  return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
 };
 
 // 🎬 Extract Vimeo video ID
@@ -669,7 +672,12 @@ const createEmbedPost = async (req, res) => {
     const qrCodeUrl = qrUploadResult.success ? qrUploadResult.url : qrCodeDataUrl;
 
     let thumbnailUrl = null;
-    if (embedType === 'YouTube') {
+    // Detect YouTube from the URL itself — don't rely solely on embedType
+    // because CampaignUploadModal and other callers may not send embedType
+    const isYouTubeUrl = embedUrl && (
+      embedUrl.includes('youtube.com') || embedUrl.includes('youtu.be')
+    );
+    if (embedType === 'YouTube' || isYouTubeUrl) {
       const videoId = getYouTubeVideoId(embedUrl);
       if (videoId) {
         thumbnailUrl = getYouTubeThumbnail(videoId);

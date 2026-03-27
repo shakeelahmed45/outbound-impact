@@ -379,6 +379,16 @@ const ItemsPage = () => {
                       src={item.thumbnailUrl} 
                       alt={item.title}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // maxresdefault silently fails for non-HD YouTube videos —
+                        // fall back to hqdefault which exists for every video
+                        if (e.target.src.includes('maxresdefault')) {
+                          e.target.src = e.target.src.replace('maxresdefault', 'hqdefault');
+                        } else {
+                          // If hqdefault also fails, hide the broken image
+                          e.target.style.display = 'none';
+                        }
+                      }}
                     />
                   ) : (
                     <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center">
