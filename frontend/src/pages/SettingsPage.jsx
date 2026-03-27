@@ -48,7 +48,7 @@ const SettingsPage = () => {
   const userIsTeamMember = user?.isTeamMember === true;
   const effectiveRole = effectiveUser?.role;
   const isIndividual = effectiveRole === 'INDIVIDUAL' || effectiveRole === 'PERSONAL_LIFE';
-  const isOneTime = effectiveRole === 'INDIVIDUAL' || effectiveRole === 'ORG_EVENTS'; // One-time plans — no subscription management
+  const isOneTime = false; // Individual and Org Events both have their own billing sections now
 
   // Individual settings — profile fields
   const [profileName, setProfileName] = useState(user?.name || '');
@@ -169,7 +169,7 @@ const SettingsPage = () => {
     }
   };
 
-  // ═══ Individual plan → Pablo-style simple settings ═══
+  // ═══ Individual plan → Full Settings + Billing page ═══
   if (effectiveRole === 'INDIVIDUAL') {
     const handleSaveProfile = async () => {
       setSavingProfile(true);
@@ -188,101 +188,272 @@ const SettingsPage = () => {
 
     const getInitial = (name) => name ? name.charAt(0).toUpperCase() : 'U';
 
+    // Renewal expiry info
+    const expiresAt       = effectiveUser?.individualExpiresAt ? new Date(effectiveUser.individualExpiresAt) : null;
+    const now             = new Date();
+    const daysLeft        = expiresAt ? Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24)) : null;
+    const isExpired       = daysLeft !== null && daysLeft <= 0;
+    const isExpiringSoon  = daysLeft !== null && daysLeft <= 30 && !isExpired;
+    const isSuspended     = effectiveUser?.subscriptionStatus === 'suspended';
+
+    const handleRenew = async () => {
+      try {
+        const res = await api.post('/subscription/create-individual-renewal-session');
+        if (res.data?.checkoutUrl) window.location.href = res.data.checkoutUrl;
+      } catch (err) {
+        showToast(err.response?.data?.message || 'Failed to create renewal session', 'error');
+      }
+    };
+
+    const handleCancelPlan = async () => {
+      if (!confirm('Are you sure you want to cancel your plan? Your account will be suspended immediately and you will lose access to your content. This cannot be undone.')) return;
+      try {
+        await api.post('/subscription/cancel-one-time');
+        showToast('Plan cancelled. Your account has been suspended.');
+        // Force reload so DashboardLayout shows the blocked modal
+        setTimeout(() => window.location.reload(), 1500);
+      } catch (err) {
+        showToast(err.response?.data?.message || 'Failed to cancel plan', 'error');
+      }
+    };
+
     return (
       <DashboardLayout>
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-3xl mx-auto">
           {/* Toast */}
           {toast && (
             <div className={`fixed top-4 right-4 z-50 border-2 rounded-lg shadow-lg p-4 min-w-[300px] max-w-md ${
               toast.type === 'error' ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
             }`}>
-              <p className="text-gray-800 font-medium text-sm">{toast.message}</p>
+              <div className="flex items-start gap-3">
+                <Check size={20} className={toast.type === 'error' ? 'text-red-500' : 'text-green-500'} />
+                <p className="flex-1 text-gray-800 font-medium text-sm">{toast.message}</p>
+                <button onClick={() => setToast(null)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+              </div>
             </div>
           )}
 
-          <div className="bg-white rounded-xl border border-slate-200 p-6">
-            <h2 className="text-2xl font-bold text-slate-900 mb-6">Settings</h2>
+          <div className="mb-8">
+            <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">Billing & Account</h1>
+            <p className="text-gray-600">Manage your plan, renewal, and profile</p>
+          </div>
 
-            {/* Profile Section */}
-            <div className="mb-8">
-              <h3 className="text-lg font-bold text-slate-900 mb-4">Profile</h3>
-              <div className="flex items-center gap-6 mb-6">
-                <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                  {user?.profilePicture ? (
-                    <img src={user.profilePicture} alt={user.name} className="w-20 h-20 rounded-full object-cover" />
-                  ) : (
-                    getInitial(user?.name)
+          {/* ── Suspension banner ── */}
+          {isSuspended && (
+            <div className="bg-red-50 border-2 border-red-400 rounded-2xl p-5 mb-6 flex items-start gap-3">
+              <AlertTriangle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
+              <div className="flex-1">
+                <h4 className="font-bold text-red-900 mb-1">Account Suspended</h4>
+                <p className="text-sm text-red-700 mb-3">Your account has been suspended due to non-renewal. Renew now to restore full access.</p>
+                <button onClick={handleRenew}
+                  className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm transition-all">
+                  Renew Now — $10/year
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Expiry card ── */}
+          {expiresAt && !isSuspended && (
+            <div className={`border-2 rounded-2xl p-5 mb-6 ${
+              isExpired       ? 'bg-red-50 border-red-400'
+              : isExpiringSoon ? 'bg-amber-50 border-amber-400'
+              : 'bg-teal-50 border-teal-300'
+            }`}>
+              <div className="flex items-start gap-3">
+                <CalendarClock size={20} className={`flex-shrink-0 mt-0.5 ${
+                  isExpired ? 'text-red-600' : isExpiringSoon ? 'text-amber-600' : 'text-teal-600'
+                }`} />
+                <div className="flex-1">
+                  <h4 className={`font-bold mb-1 ${
+                    isExpired ? 'text-red-900' : isExpiringSoon ? 'text-amber-900' : 'text-teal-900'
+                  }`}>
+                    {isExpired ? 'Plan Expired — Renew to Keep Access'
+                      : isExpiringSoon ? `Expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`
+                      : 'Plan Active'}
+                  </h4>
+                  <p className={`text-sm mb-3 ${
+                    isExpired ? 'text-red-700' : isExpiringSoon ? 'text-amber-700' : 'text-teal-700'
+                  }`}>
+                    {isExpired
+                      ? `Your plan expired on ${expiresAt.toLocaleDateString()}. Renew at $10/year to restore viewing access.`
+                      : `Your plan ${isExpiringSoon ? 'expires' : 'is active until'} ${expiresAt.toLocaleDateString()}. Renewal is $10/year from Year 2.`}
+                  </p>
+                  {(isExpired || isExpiringSoon) && (
+                    <button onClick={handleRenew}
+                      className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white text-sm transition-all ${
+                        isExpired ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-500 hover:bg-amber-600'
+                      }`}>
+                      <RefreshCw size={14} /> Renew Now — $10/year
+                    </button>
                   )}
                 </div>
-                <div>
-                  <p className="font-bold text-slate-900">{user?.name}</p>
-                  <p className="text-slate-600">{user?.email}</p>
-                  <button
-                    onClick={() => navigate('/dashboard/profile')}
-                    className="text-purple-600 text-sm font-medium hover:text-purple-700 mt-1"
-                  >
-                    Change Photo
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Full Name</label>
-                  <input
-                    type="text"
-                    value={profileName}
-                    onChange={(e) => setProfileName(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
-                  <input
-                    type="email"
-                    value={profileEmail}
-                    disabled
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-500 cursor-not-allowed"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Current Plan Section */}
-            <div className="mb-8 pb-8 border-b border-slate-200">
-              <h3 className="text-lg font-bold text-slate-900 mb-4">Current Plan</h3>
-              <div className="bg-slate-50 rounded-xl p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-bold text-slate-900">{planLimits.name}</p>
-                    <p className="text-sm text-slate-600">
-                      {planLimits.price} {planLimits.period} · {formatStorage(storageUsed)}/{formatStorage(storageLimit)} storage
-                    </p>
+                {!isExpired && daysLeft !== null && (
+                  <div className="flex-shrink-0 text-right">
+                    <p className={`text-2xl font-bold ${isExpiringSoon ? 'text-amber-700' : 'text-teal-700'}`}>{daysLeft}</p>
+                    <p className="text-xs text-gray-500">days left</p>
                   </div>
-                  <button
-                    onClick={() => setShowUpgradeModal(true)}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700"
-                  >
-                    Upgrade
-                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Plan card ── */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl gradient-btn flex items-center justify-center">
+                <CreditCard className="text-white" size={20} />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800">Subscription Details</h3>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-5">
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">Current Plan</p>
+                  <p className="text-xl font-bold text-gray-900">Personal Single Use</p>
+                  <p className="text-sm text-gray-600 mt-1">$69 one-time · $10/year from Year 2 · 25GB storage</p>
                 </div>
+                <div className="text-right">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">Status</p>
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${
+                    isSuspended || isExpired
+                      ? 'bg-red-100 text-red-700'
+                      : isExpiringSoon
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-green-100 text-green-700'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${
+                      isSuspended || isExpired ? 'bg-red-500' : isExpiringSoon ? 'bg-amber-500' : 'bg-green-500'
+                    }`}/>
+                    {isSuspended ? 'Suspended' : isExpired ? 'Expired' : isExpiringSoon ? 'Expiring Soon' : 'Active'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-gray-200">
+                {[
+                  { label: 'Storage', value: '25 GB' },
+                  { label: 'Streams', value: '1' },
+                  { label: 'QR Codes', value: '1' },
+                  { label: 'Analytics', value: 'Basic' },
+                ].map(item => (
+                  <div key={item.label} className="text-center">
+                    <p className="text-lg font-bold text-gray-900">{item.value}</p>
+                    <p className="text-xs text-gray-500">{item.label}</p>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Save Button */}
-            <div className="flex justify-end">
-              <button
-                onClick={handleSaveProfile}
-                disabled={savingProfile}
-                className="px-6 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50"
-              >
-                {savingProfile ? 'Saving...' : 'Save Changes'}
+            {/* Upgrade */}
+            <div className="mt-4 flex gap-3 flex-wrap">
+              <button onClick={() => setShowUpgradeModal(true)}
+                className="flex items-center gap-2 px-4 py-2.5 gradient-btn text-white rounded-xl font-semibold text-sm hover:opacity-90 transition-all">
+                <TrendingUp size={16} /> Upgrade Plan
+              </button>
+              {expiresAt && (
+                <button onClick={handleRenew}
+                  className="flex items-center gap-2 px-4 py-2.5 border-2 border-primary text-primary rounded-xl font-semibold text-sm hover:bg-purple-50 transition-all">
+                  <RefreshCw size={16} /> Renew ($10/year)
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* ── Auto-renewal toggle for Individual ── */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl gradient-btn flex items-center justify-center">
+                <ToggleRight className="text-white" size={20} />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800">Annual Renewal</h3>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+              <p className="text-sm text-amber-800 leading-relaxed">
+                <strong>$10/year from Year 2</strong> — Your content remains viewable through your QR codes as long as your plan is active. If you disable renewal and your plan expires, your account will be <strong>suspended immediately</strong> and viewers will no longer be able to access your content.
+              </p>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">Auto-renewal at expiry</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {expiresAt
+                    ? `Next renewal: ${expiresAt.toLocaleDateString()} — $10/year`
+                    : 'Keeps your account active after Year 1'}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={`text-xs font-semibold ${isSuspended || isExpired ? 'text-red-600' : 'text-green-600'}`}>
+                  {isSuspended || isExpired ? 'Suspended' : 'Active'}
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mt-3">
+              To cancel your plan and stop the $10/year renewal, use the Cancel Plan option in the Danger Zone below. Once cancelled, your account will be suspended immediately.
+            </p>
+          </div>
+
+          {/* ── Profile ── */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl gradient-btn flex items-center justify-center">
+                <UserCheck className="text-white" size={20} />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800">Profile</h3>
+            </div>
+            <div className="flex items-center gap-5 mb-5">
+              <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
+                {user?.profilePicture
+                  ? <img src={user.profilePicture} alt={user.name} className="w-16 h-16 rounded-full object-cover" />
+                  : getInitial(user?.name)}
+              </div>
+              <div>
+                <p className="font-bold text-gray-900">{user?.name}</p>
+                <p className="text-sm text-gray-500">{user?.email}</p>
+                <button onClick={() => navigate('/dashboard/profile')} className="text-primary text-sm font-medium hover:underline mt-0.5">
+                  Change Photo
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name</label>
+                <input type="text" value={profileName} onChange={(e) => setProfileName(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Email</label>
+                <input type="email" value={profileEmail} disabled
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl bg-gray-50 text-gray-500 cursor-not-allowed" />
+              </div>
+            </div>
+            <button onClick={handleSaveProfile} disabled={savingProfile}
+              className="px-6 py-2.5 gradient-btn text-white rounded-xl font-semibold text-sm hover:opacity-90 disabled:opacity-50 transition-all">
+              {savingProfile ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+
+          {/* ── Danger Zone ── */}
+          <div className="bg-white rounded-2xl border-2 border-red-200 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+                <ShieldAlert className="text-red-600" size={20} />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800">Danger Zone</h3>
+            </div>
+            <div className="flex items-center justify-between gap-4 p-4 bg-red-50 rounded-xl border border-red-200">
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">Cancel Plan</p>
+                <p className="text-xs text-gray-500 mt-0.5">Your account will be suspended after your current period ends. This cannot be undone.</p>
+              </div>
+              <button onClick={handleCancelPlan}
+                className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 border-2 border-red-500 text-red-500 rounded-xl font-semibold text-sm hover:bg-red-50 transition-all">
+                <Trash2 size={15} /> Cancel Plan
               </button>
             </div>
           </div>
         </div>
 
-        {/* Upgrade Modal */}
         <UpgradePlanModal
           isOpen={showUpgradeModal}
           onClose={() => setShowUpgradeModal(false)}

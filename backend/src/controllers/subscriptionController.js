@@ -649,6 +649,104 @@ const createBillingPortal = async (req, res) => {
 };
 
 /**
+ * ✅ CREATE INDIVIDUAL (PERSONAL SINGLE USE) RENEWAL CHECKOUT SESSION ($10/year)
+ */
+/**
+ * ✅ CANCEL ONE-TIME PLAN (INDIVIDUAL / ORG_EVENTS)
+ * Immediately suspends the account — no subscription to cancel in Stripe.
+ * Used when user explicitly requests account cancellation.
+ */
+const cancelOneTimePlan = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true, role: true, subscriptionStatus: true },
+    });
+
+    if (!user) return res.status(404).json({ status: 'error', message: 'User not found' });
+    if (!['INDIVIDUAL', 'ORG_EVENTS'].includes(user.role)) {
+      return res.status(400).json({ status: 'error', message: 'This endpoint is only for one-time plans.' });
+    }
+
+    // Mark suspended immediately — they are choosing to opt out
+    await prisma.user.update({
+      where: { id: user.id },
+      data:  { subscriptionStatus: 'suspended' },
+    });
+
+    console.log(`🔒 One-time plan cancelled & suspended: ${user.email} (${user.role})`);
+
+    // Send cancellation email to user
+    try {
+      const emailService = require('../services/emailService');
+      await emailService.sendCancellationEmail(user.email, user.name);
+    } catch (e) { console.error('Cancel email failed:', e.message); }
+
+    // Notify admin
+    const { notifyAdmins } = require('../services/adminNotificationService');
+    await notifyAdmins({
+      type:     'warning',
+      category: 'churn',
+      title:    'One-Time Plan Cancelled',
+      message:  `${user.name} (${user.email}) cancelled their ${user.role === 'INDIVIDUAL' ? 'Personal Single Use' : 'Org Events'} plan. Account suspended.`,
+    });
+
+    res.json({ status: 'success', message: 'Your plan has been cancelled and your account has been suspended.' });
+  } catch (error) {
+    console.error('cancelOneTimePlan error:', error);
+    res.status(500).json({ status: 'error', message: error.message || 'Failed to cancel plan' });
+  }
+};
+
+/**
+ * ✅ CREATE INDIVIDUAL RENEWAL CHECKOUT SESSION ($10/year)
+ */
+const createIndividualRenewalSession = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const renewalPriceId = process.env.STRIPE_INDIVIDUAL_RENEWAL_PRICE;
+
+    if (!renewalPriceId) {
+      return res.status(503).json({
+        status: 'error',
+        message: 'Renewal not configured. Please contact support@outboundimpact.org',
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, role: true, individualExpiresAt: true },
+    });
+
+    if (!user || user.role !== 'INDIVIDUAL') {
+      return res.status(403).json({ status: 'error', message: 'This renewal is only for Personal Single Use plans.' });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items:           [{ price: renewalPriceId, quantity: 1 }],
+      mode:                 'payment',
+      customer_email:       user.email,
+      success_url:          `${process.env.FRONTEND_URL}/dashboard?renewed=true`,
+      cancel_url:           `${process.env.FRONTEND_URL}/dashboard/settings`,
+      metadata: {
+        userId:   user.id,
+        planName: 'INDIVIDUAL',
+        priceId:  renewalPriceId,
+        type:     'renewal',
+      },
+    });
+
+    res.json({ status: 'success', checkoutUrl: session.url });
+  } catch (error) {
+    console.error('createIndividualRenewalSession error:', error);
+    res.status(500).json({ status: 'error', message: error.message || 'Failed to create renewal session' });
+  }
+};
+
+/**
  * ✅ CREATE ORG EVENTS RENEWAL CHECKOUT SESSION ($65/year)
  */
 const createOrgEventsRenewalSession = async (req, res) => {
@@ -700,4 +798,6 @@ module.exports = {
   reactivateSubscription,
   createBillingPortal,
   createOrgEventsRenewalSession,
+  createIndividualRenewalSession,
+  cancelOneTimePlan,
 };

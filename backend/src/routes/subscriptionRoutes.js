@@ -28,6 +28,12 @@ router.post('/toggle-renewal', authMiddleware, resolveEffectiveUserId, requireBi
 // ✅ ORG_EVENTS: Create a $65/year renewal checkout session
 router.post('/create-renewal-session', authMiddleware, subscriptionController.createOrgEventsRenewalSession);
 
+// ✅ INDIVIDUAL: Create a $10/year renewal checkout session
+router.post('/create-individual-renewal-session', authMiddleware, subscriptionController.createIndividualRenewalSession);
+
+// ✅ Cancel one-time plan (INDIVIDUAL / ORG_EVENTS) — suspends account immediately
+router.post('/cancel-one-time', authMiddleware, requireBillingAccess, subscriptionController.cancelOneTimePlan);
+
 // ✅ Cancel subscription with 7-day refund logic
 router.post('/cancel', authMiddleware, resolveEffectiveUserId, requireBillingAccess, subscriptionController.cancelSubscription);
 
