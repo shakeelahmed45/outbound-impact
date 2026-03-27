@@ -350,6 +350,9 @@ const PublicCampaignViewer = () => {
   const [draggedItem, setDraggedItem] = useState(null);
   const [savingOrder, setSavingOrder] = useState(false);
 
+  // 🔤 SORT STATE — available to all visitors
+  const [sortOrder, setSortOrder] = useState('default'); // default | newest | oldest | az | za | views
+
   // 📊 VIEW TRACKING
   const hasTrackedCampaign = useRef(false);
 
@@ -390,9 +393,24 @@ const PublicCampaignViewer = () => {
 
   // 🎨 DRAG-AND-DROP HELPER FUNCTIONS
   
-  // Get ordered items - now just returns campaign.items (backend handles sorting)
+  // ✨ NEW TAG — show "New" badge if item was uploaded within 2 days
+  const isNewItem = (item) => {
+    if (!item?.createdAt) return false;
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    return new Date(item.createdAt) > twoDaysAgo;
+  };
+
+  // Get ordered items - applies custom drag order then sort override
   const getOrderedItems = () => {
-    return campaign?.items || [];
+    const base = campaign?.items || [];
+    if (sortOrder === 'default') return base; // respect custom drag order
+    const sorted = [...base];
+    if (sortOrder === 'newest') sorted.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    if (sortOrder === 'oldest') sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    if (sortOrder === 'az')     sorted.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    if (sortOrder === 'za')     sorted.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+    if (sortOrder === 'views')  sorted.sort((a, b) => (b.views || 0) - (a.views || 0));
+    return sorted;
   };
 
   // Save order to backend - only for account holder
@@ -1491,6 +1509,41 @@ const PublicCampaignViewer = () => {
               </div>
             )}
 
+            {/* 🔤 Sort Controls — visible to all visitors */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+              <p className="text-sm text-gray-500 font-medium">
+                {campaign.items.length} item{campaign.items.length !== 1 ? 's' : ''}
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider hidden sm:inline">Sort:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { key: 'default', label: 'Default' },
+                    { key: 'newest',  label: 'Newest' },
+                    { key: 'oldest',  label: 'Oldest' },
+                    { key: 'az',      label: 'A → Z' },
+                    { key: 'za',      label: 'Z → A' },
+                    { key: 'views',   label: 'Most Viewed' },
+                  ].map(opt => (
+                    <button
+                      key={opt.key}
+                      onClick={() => setSortOrder(opt.key)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        sortOrder === opt.key
+                          ? 'text-white shadow-md'
+                          : 'bg-white text-gray-600 border border-gray-200 hover:border-primary hover:text-primary'
+                      }`}
+                      style={sortOrder === opt.key
+                        ? { background: 'linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))' }
+                        : {}}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             {/* 🎨 Items Grid with Drag-and-Drop */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {getOrderedItems().map((item) => (
@@ -1513,6 +1566,15 @@ const PublicCampaignViewer = () => {
                       <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
                       </svg>
+                    </div>
+                  )}
+
+                  {/* ✨ NEW badge — shown for 48 hours after upload */}
+                  {isNewItem(item) && !isCustomizeMode && (
+                    <div className="absolute top-3 left-3 z-40 flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-[10px] font-extrabold uppercase tracking-wider shadow-lg"
+                      style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse inline-block" />
+                      New
                     </div>
                   )}
 
