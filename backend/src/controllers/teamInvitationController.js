@@ -620,6 +620,8 @@ const deleteInvitation = async (req, res) => {
 // ═══════════════════════════════════════════════════════════
 const getAllTeamMembers = async (req, res) => {
   try {
+    const currentUserId = req.user.userId;
+
     const teamMembers = await prisma.user.findMany({
       where: {
         AND: [
@@ -641,7 +643,12 @@ const getAllTeamMembers = async (req, res) => {
             NOT: {
               email: { contains: '@deleted.local' }
             }
-          }
+          },
+          // ✅ FIXED: Exclude the currently logged-in admin so they
+          // cannot accidentally remove their own account
+          {
+            NOT: { id: currentUserId }
+          },
         ],
       },
       select: {
