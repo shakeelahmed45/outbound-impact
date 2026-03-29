@@ -13,7 +13,10 @@ const AcceptInvitation = () => {
   const [declining, setDeclining] = useState(false);
   const [actionComplete, setActionComplete] = useState(false);
   const [actionType, setActionType] = useState('');
-  
+
+  // ✅ FIX: track whether this is an admin or regular team invitation
+  const [isAdminInvitation, setIsAdminInvitation] = useState(false);
+
   // Password setup state
   const [showPasswordSetup, setShowPasswordSetup] = useState(false);
   const [userExists, setUserExists] = useState(false);
@@ -28,16 +31,35 @@ const AcceptInvitation = () => {
     fetchInvitationDetails();
   }, [token]);
 
-  // Team invitations always use regular sign-in (not admin panel)
-  const getSignInUrl = () => '/signin';
-  const getSignInButtonText = () => 'Sign In to Continue';
+  const getSignInUrl = () => isAdminInvitation ? '/admin-login' : '/signin';
+  const getSignInButtonText = () => isAdminInvitation ? 'Go to Admin Login' : 'Sign In to Continue';
 
   const fetchInvitationDetails = async () => {
     try {
+      // ✅ FIX: First try the admin invitation endpoint
+      try {
+        const response = await api.get(`/team-invitation/admin-invitation/${token}`);
+        if (response.data.status === 'success') {
+          setInvitation(response.data.invitation);
+          setUserExists(response.data.userExists || false);
+          setIsAdminInvitation(true); // ✅ Mark as admin invitation
+          setLoading(false);
+          return;
+        }
+      } catch (adminErr) {
+        // Not an admin invitation — fall through to regular team invitation
+        if (adminErr.response?.status !== 404) {
+          // Real error (not just 404) — surface it
+          throw adminErr;
+        }
+      }
+
+      // ✅ Fall back to regular team invitation endpoint
       const response = await api.get(`/team/invitation/${token}`);
       if (response.data.status === 'success') {
         setInvitation(response.data.invitation);
         setUserExists(response.data.userExists);
+        setIsAdminInvitation(false);
       }
     } catch (error) {
       setError(error.response?.data?.message || 'Invalid or expired invitation');
@@ -54,7 +76,12 @@ const AcceptInvitation = () => {
 
     setAccepting(true);
     try {
-      const response = await api.post(`/team/invitation/${token}/accept`, {});
+      // ✅ FIX: use correct endpoint based on invitation type
+      const endpoint = isAdminInvitation
+        ? `/team-invitation/admin-invitation/${token}/accept`
+        : `/team/invitation/${token}/accept`;
+
+      const response = await api.post(endpoint, {});
       if (response.data.status === 'success') {
         setActionComplete(true);
         setActionType('accepted');
@@ -69,30 +96,20 @@ const AcceptInvitation = () => {
   const handlePasswordSetup = async (e) => {
     e.preventDefault();
 
-    if (!name.trim()) {
-      setError('Please enter your name');
-      return;
-    }
-
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
+    if (!name.trim()) { setError('Please enter your name'); return; }
+    if (password.length < 6) { setError('Password must be at least 6 characters'); return; }
+    if (password !== confirmPassword) { setError('Passwords do not match'); return; }
 
     setSettingPassword(true);
     setError('');
 
     try {
-      const response = await api.post(`/team/invitation/${token}/accept`, {
-        name: name.trim(),
-        password,
-      });
+      // ✅ FIX: use correct endpoint based on invitation type
+      const endpoint = isAdminInvitation
+        ? `/team-invitation/admin-invitation/${token}/accept`
+        : `/team/invitation/${token}/accept`;
 
+      const response = await api.post(endpoint, { name: name.trim(), password });
       if (response.data.status === 'success') {
         setActionComplete(true);
         setActionType('accepted');
@@ -106,10 +123,15 @@ const AcceptInvitation = () => {
 
   const handleDecline = async () => {
     if (!confirm('Are you sure you want to decline this invitation?')) return;
-    
+
     setDeclining(true);
     try {
-      const response = await api.post(`/team/invitation/${token}/decline`);
+      // ✅ FIX: use correct endpoint based on invitation type
+      const endpoint = isAdminInvitation
+        ? `/team-invitation/admin-invitation/${token}/decline`
+        : `/team/invitation/${token}/decline`;
+
+      const response = await api.post(endpoint);
       if (response.data.status === 'success') {
         setActionComplete(true);
         setActionType('declined');
@@ -153,7 +175,7 @@ const AcceptInvitation = () => {
   }
 
   if (actionComplete) {
-    const isAdmin = false; // Team invitations always use regular flow
+    const isAdmin = isAdminInvitation;
     
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center p-4">
@@ -226,7 +248,7 @@ const AcceptInvitation = () => {
   }
 
   if (showPasswordSetup) {
-    const isAdmin = false; // Team invitations always use regular flow
+    const isAdmin = isAdminInvitation;
     
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center p-4">
@@ -377,7 +399,7 @@ const AcceptInvitation = () => {
   const isExpired = invitation.isExpired;
   const alreadyAccepted = invitation.status === 'ACCEPTED';
   const alreadyDeclined = invitation.status === 'DECLINED';
-  const isAdmin = false; // Team invitations always use regular flow
+  const isAdmin = isAdminInvitation;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center p-4">
