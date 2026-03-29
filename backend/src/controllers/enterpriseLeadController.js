@@ -224,6 +224,25 @@ const sendCheckoutLink = async (req, res) => {
       ? 'Unlimited audience members'
       : `${Number(audienceSize).toLocaleString()} audience members`;
 
+    // ── DATA MIGRATION: Check if this is an EXISTING user upgrading ──
+    // If they already have an account, reuse their Stripe customer so we
+    // don't create a duplicate, and pass their old subscriptionId so the
+    // webhook can cancel it cleanly after they upgrade.
+    const existingUser = await prisma.user.findUnique({
+      where:  { email: lead.email.toLowerCase().trim() },
+      select: { id: true, stripeCustomerId: true, subscriptionId: true, role: true },
+    });
+
+    const isExistingUser         = !!existingUser;
+    const existingStripeCustomer = existingUser?.stripeCustomerId || null;
+    const existingSubscriptionId = existingUser?.subscriptionId   || null;
+
+    if (isExistingUser) {
+      console.log(`🔄 Enterprise upgrade for EXISTING user: ${lead.email} | old role: ${existingUser.role} | old sub: ${existingSubscriptionId}`);
+    } else {
+      console.log(`🆕 Enterprise checkout for NEW user: ${lead.email}`);
+    }
+
     // ── Create Stripe product + price for this prospect ───────
     const product = await stripe.products.create({
       name:        `Enterprise Plan — ${formatBytes(storageGB)} / ${audienceLabel}`,
@@ -239,19 +258,23 @@ const sendCheckoutLink = async (req, res) => {
       metadata:    { leadId: lead.id, storageGB: String(storageGB), audienceSize: String(audienceSize) },
     });
 
-    // ── Create Stripe Checkout session ────────────────────────
-    const session = await stripe.checkout.sessions.create({
+    // ── Build checkout session params ─────────────────────────
+    // For existing users: use their Stripe customer (prevents duplicate customers)
+    // For new users: use customer_email so Stripe creates a new customer
+    const sessionParams = {
       payment_method_types: ['card'],
       line_items:           [{ price: price.id, quantity: 1 }],
       mode:                 'subscription',
-      customer_email:       lead.email,
       success_url:          `${FRONTEND_URL}/auth/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url:           `${FRONTEND_URL}/plans`,
       metadata: {
-        planName:     'ORG_ENTERPRISE',
-        leadId:       lead.id,
-        storageGB:    String(storageGB),
-        audienceSize: String(audienceSize),
+        planName:               'ORG_ENTERPRISE',
+        leadId:                 lead.id,
+        storageGB:              String(storageGB),
+        audienceSize:           String(audienceSize),
+        // Pass existing account info so webhook can migrate the user
+        existingUserId:         existingUser?.id        || '',
+        existingSubscriptionId: existingSubscriptionId  || '',
       },
       subscription_data: {
         metadata: {
@@ -261,7 +284,17 @@ const sendCheckoutLink = async (req, res) => {
           audienceSize: String(audienceSize),
         },
       },
-    });
+    };
+
+    if (existingStripeCustomer) {
+      // Reuse the existing Stripe customer — preserves payment history
+      sessionParams.customer = existingStripeCustomer;
+    } else {
+      sessionParams.customer_email = lead.email;
+    }
+
+    // ── Create Stripe Checkout session ────────────────────────
+    const session = await stripe.checkout.sessions.create(sessionParams);
 
     // ── Save plan config + checkout URL on the lead ───────────
     await prisma.enterpriseLead.update({

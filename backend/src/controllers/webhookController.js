@@ -297,6 +297,55 @@ const handleCheckoutCompleted = async (session) => {
       }
     } else {
       console.log('✅ Found existing user:', user.email, 'ID:', user.id);
+
+      // ── ENTERPRISE UPGRADE MIGRATION ────────────────────────────
+      // When an existing user upgrades to Enterprise through the
+      // contact-us flow, we must update their role + storage limit
+      // and cancel their old subscription — preserving ALL their data.
+      const sessionMeta = session.metadata || {};
+      if (sessionMeta.planName === 'ORG_ENTERPRISE' && sessionMeta.storageGB) {
+        const storageGB    = parseInt(sessionMeta.storageGB) || 1500;
+        const storageLimit = BigInt(storageGB) * BigInt(1024 * 1024 * 1024);
+
+        console.log(`🔄 Migrating existing user to Enterprise: ${user.email}`);
+        console.log(`   Storage: ${storageGB} GB | Old role: ${user.role}`);
+
+        // Update role + storage limit immediately
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            role:         'ORG_ENTERPRISE',
+            storageLimit,
+          },
+        });
+
+        console.log(`✅ Role updated to ORG_ENTERPRISE for: ${user.email}`);
+
+        // Cancel the old Stripe subscription cleanly (at period end so
+        // the user isn't double-charged — they keep access until period ends)
+        const oldSubscriptionId = sessionMeta.existingSubscriptionId || user.subscriptionId;
+        if (oldSubscriptionId && oldSubscriptionId !== subscriptionId) {
+          try {
+            await stripe.subscriptions.update(oldSubscriptionId, {
+              cancel_at_period_end: true,
+            });
+            console.log(`✅ Old subscription scheduled for cancellation: ${oldSubscriptionId}`);
+          } catch (subErr) {
+            // Non-fatal — old sub may already be cancelled or not exist
+            console.warn(`⚠️ Could not cancel old subscription ${oldSubscriptionId}:`, subErr.message);
+          }
+        }
+
+        // Mark lead as converted
+        if (sessionMeta.leadId) {
+          try {
+            await prisma.enterpriseLead.update({
+              where: { id: sessionMeta.leadId },
+              data:  { status: 'converted' },
+            });
+          } catch (e) { /* non-fatal */ }
+        }
+      }
     }
 
     // ✅ STEP 3: Get subscription details and plan name
@@ -333,6 +382,17 @@ const handleCheckoutCompleted = async (session) => {
       updateData.priceId = priceId;
       updateData.currentPeriodStart = new Date(subscription.current_period_start * 1000);
       updateData.currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+    }
+
+    // ── ENTERPRISE UPGRADE: ensure role + storage are always set correctly ──
+    // This runs for both new enterprise users AND existing users upgrading,
+    // acting as a safety net in case the migration block above was skipped.
+    const sessionMeta4 = session.metadata || {};
+    if (sessionMeta4.planName === 'ORG_ENTERPRISE' && sessionMeta4.storageGB) {
+      const storageGB    = parseInt(sessionMeta4.storageGB) || 1500;
+      updateData.role         = 'ORG_ENTERPRISE';
+      updateData.storageLimit = BigInt(storageGB) * BigInt(1024 * 1024 * 1024);
+      console.log(`📦 Enterprise: role=ORG_ENTERPRISE, storage=${storageGB}GB applied in updateData`);
     }
 
     // ── ORG_EVENTS: set 1-year expiry from today on initial purchase ──

@@ -23,11 +23,22 @@ const STORAGE_OPTIONS = [
   "Not sure yet",
 ];
 
-const EnterpriseContactModal = ({ isOpen, onClose }) => {
-  const [form, setForm]     = useState({ name: '', email: '', company: '', phone: '', teamSize: '', storageNeeds: '', message: '' });
+const EnterpriseContactModal = ({ isOpen, onClose, prefillName = '', prefillEmail = '' }) => {
+  const [form, setForm]     = useState({ name: prefillName, email: prefillEmail, company: '', phone: '', teamSize: '', storageNeeds: '', message: '' });
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState('');
   const [success, setSuccess] = useState(false);
+
+  // Sync prefill values if they arrive after initial render (e.g. from UpgradePlanModal)
+  useState(() => {
+    if (prefillName || prefillEmail) {
+      setForm(prev => ({
+        ...prev,
+        name:  prev.name  || prefillName,
+        email: prev.email || prefillEmail,
+      }));
+    }
+  });
 
   if (!isOpen) return null;
 
@@ -71,7 +82,7 @@ const EnterpriseContactModal = ({ isOpen, onClose }) => {
 
   const handleClose = () => {
     onClose();
-    setTimeout(() => { setForm({ name: '', email: '', company: '', phone: '', teamSize: '', storageNeeds: '', message: '' }); setSuccess(false); setError(''); }, 300);
+    setTimeout(() => { setForm({ name: prefillName, email: prefillEmail, company: '', phone: '', teamSize: '', storageNeeds: '', message: '' }); setSuccess(false); setError(''); }, 300);
   };
 
   return (
