@@ -307,6 +307,7 @@ const acceptInvitation = async (req, res) => {
         password: hashedPassword,
         role: invitation.role,
         status: 'active',
+        emailVerified: true,                       // ✅ Auto-verify — invite proves email is valid
         storageUsed: BigInt(0),                    // ✅ Set default
         storageLimit: BigInt(2147483648),          // ✅ Set default (2GB)
         subscriptionStatus: null,                  // ✅ Admin users don't need subscription
@@ -422,6 +423,7 @@ const acceptInvitationWithParams = async (req, res) => {
         password: hashedPassword,
         role: invitation.role,
         status: 'active',
+        emailVerified: true,  // ✅ Auto-verify — invite proves email is valid
       },
     });
 
