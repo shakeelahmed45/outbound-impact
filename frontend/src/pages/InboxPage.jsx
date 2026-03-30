@@ -238,11 +238,20 @@ const InboxPage = () => {
     if (folder === 'sent') {
       return msg.recipient?.name || msg.toEmail || 'Unknown';
     }
+    // ✅ For inbound external replies, use fromName/fromEmail (the external sender)
+    // not msg.sender (which is the OI user who originally sent the message)
+    if (msg.emailStatus === 'received' && msg.fromEmail) {
+      return msg.fromName || msg.fromEmail;
+    }
     return msg.sender?.name || msg.fromName || 'Unknown';
   };
 
   const getSenderLabel = (msg) => {
     if (folder === 'sent') return `To: ${msg.recipient?.name || msg.toEmail || 'Unknown'}`;
+    // ✅ For inbound replies, show the external sender's email
+    if (msg.emailStatus === 'received' && msg.fromEmail) {
+      return msg.fromName ? `${msg.fromName} <${msg.fromEmail}>` : msg.fromEmail;
+    }
     return msg.sender?.name || msg.fromName || 'Unknown';
   };
 
@@ -465,7 +474,10 @@ const InboxPage = () => {
               <div className="min-w-0 flex-1 mr-4">
                 <h3 className="font-bold truncate">{selectedMessage.subject}</h3>
                 <p className="text-white/80 text-sm truncate">
-                  {folder === 'sent' ? `To: ${selectedMessage.recipient?.name || selectedMessage.toEmail || 'Unknown'}` : `From: ${selectedMessage.sender?.name || selectedMessage.fromName || 'Unknown'}`}
+                  {folder === 'sent' ? `To: ${selectedMessage.recipient?.name || selectedMessage.toEmail || 'Unknown'}` : 
+                   (selectedMessage.emailStatus === 'received' && selectedMessage.fromEmail)
+                     ? `From: ${selectedMessage.fromName ? `${selectedMessage.fromName} <${selectedMessage.fromEmail}>` : selectedMessage.fromEmail}`
+                     : `From: ${selectedMessage.sender?.name || selectedMessage.fromName || 'Unknown'}`}
                 </p>
               </div>
               <button onClick={() => setSelectedMessage(null)} className="p-2 hover:bg-white/20 rounded-lg flex-shrink-0">

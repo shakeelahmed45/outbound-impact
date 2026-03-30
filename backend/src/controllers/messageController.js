@@ -396,6 +396,16 @@ const sendExternal = async (req, res) => {
       select: { id: true, name: true, email: true },
     });
 
+    // ✅ Generate a unique reply token so we can match inbound replies
+    // back to this exact message and the sender's OI inbox
+    const crypto = require('crypto');
+    const replyToken = crypto.randomBytes(16).toString('hex');
+
+    // Inbound reply-to address encodes the token
+    // Format: reply+{token}@inbound.outboundimpact.org
+    const inboundDomain = process.env.INBOUND_EMAIL_DOMAIN || 'inbound.outboundimpact.org';
+    const replyToAddress = `reply+${replyToken}@${inboundDomain}`;
+
     // Create message record first
     const message = await prisma.message.create({
       data: {
@@ -408,6 +418,7 @@ const sendExternal = async (req, res) => {
         fromName: sender?.name || 'Outbound Impact User',
         emailStatus: 'pending',
         parentId: parentId || null,
+        replyToken,  // ✅ store so inbound webhook can find this message
       },
     });
 
@@ -448,7 +459,10 @@ const sendExternal = async (req, res) => {
         const { data, error } = await resend.emails.send({
           from: `${sender?.name || 'Outbound Impact'} <noreply@outboundimpact.org>`,
           to: [to],
-          replyTo: sender?.email || 'support@outboundimpact.org',
+          // ✅ Reply-To points to our inbound address with the token encoded
+          // When the external user hits Reply, their email client sends to this address
+          // Our inbound webhook receives it and creates a Message record automatically
+          replyTo: replyToAddress,
           subject,
           html: `
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -460,8 +474,8 @@ const sendExternal = async (req, res) => {
                 <div style="color: #555; line-height: 1.6; white-space: pre-wrap;">${body}</div>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
                 <p style="color: #999; font-size: 12px;">
-                  Sent via <a href="https://outboundimpact.com" style="color: #800080;">Outbound Impact</a>
-                  ${sender?.email ? ` • Reply to: ${sender.email}` : ''}
+                  Sent via <a href="https://outboundimpact.net" style="color: #800080;">Outbound Impact</a>
+                  ${sender?.email ? ` • Sent by: ${sender.email}` : ''}
                 </p>
               </div>
             </div>
@@ -473,6 +487,7 @@ const sendExternal = async (req, res) => {
         } else {
           emailSent = true;
           emailId = data?.id;
+          console.log(`✅ External email sent to ${to} | replyToken: ${replyToken}`);
         }
       }
     } catch (emailErr) {

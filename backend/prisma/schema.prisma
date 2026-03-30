@@ -715,6 +715,7 @@ model Message {
   type        String   @default("internal")
 
   toEmail     String?
+  fromEmail   String?  // email address of external sender (for inbound replies)
   fromName    String?
 
   subject     String
@@ -728,8 +729,9 @@ model Message {
   parent      Message? @relation("MessageReplies", fields: [parentId], references: [id], onDelete: SetNull)
   replies     Message[] @relation("MessageReplies")
 
-  emailStatus String?  @default("pending")
-  emailId     String?
+  emailStatus  String?  @default("pending")
+  emailId      String?
+  replyToken   String?  @unique  // unique token encoded in reply-to address for inbound matching
 
   metadata    Json?
 
@@ -745,6 +747,7 @@ model Message {
   @@index([read])
   @@index([createdAt])
   @@index([parentId])
+  @@index([replyToken])
 }
 
 // ════════════════════════════════════════

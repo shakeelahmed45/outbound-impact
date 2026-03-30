@@ -8,6 +8,12 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const { resolveEffectiveUserId } = require('../middleware/resolveEffectiveUserId');
 const messageController = require('../controllers/messageController');
+const { handleInbound } = require('../controllers/inboundEmailController');
+
+// ── PUBLIC: Resend inbound email webhook (no auth — Resend servers call this) ──
+// External users reply to reply+{token}@inbound.outboundimpact.org
+// Resend receives it and POSTs the parsed email here
+router.post('/inbound', handleInbound);
 
 // GET /api/messages — list messages (inbox or sent)
 router.get('/', authMiddleware, resolveEffectiveUserId, messageController.getMessages);
