@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Calendar, Folder, Play, FileText, Music, Image as ImageIcon, Eye, Mic, ArrowLeft, Share2, Copy, Check, X, Lock, Loader2, Key, Shield, ExternalLink, Link } from 'lucide-react';
+import { Calendar, Folder, Play, FileText, Music, Image as ImageIcon, Eye, Mic, ArrowLeft, Share2, Copy, Check, X, Lock, Loader2, Key, Shield, ExternalLink, Link, LayoutGrid, List } from 'lucide-react';
 import axios from 'axios';
 import useAuthStore, { getEffectiveUserId } from '../store/authStore';
 import CampaignPushPrompt from '../components/CampaignPushPrompt';
@@ -352,6 +352,9 @@ const PublicCampaignViewer = () => {
 
   // 🔤 SORT STATE — available to all visitors
   const [sortOrder, setSortOrder] = useState('default'); // default | newest | oldest | az | za | views
+
+  // 📐 VIEW MODE — grid or list
+  const [viewMode, setViewMode] = useState('grid'); // grid | list
 
   // 📊 VIEW TRACKING
   const hasTrackedCampaign = useRef(false);
@@ -1509,114 +1512,200 @@ const PublicCampaignViewer = () => {
               </div>
             )}
 
-            {/* 🔤 Sort Controls — visible to all visitors */}
+            {/* 🔤 Sort Controls + View Toggle — visible to all visitors */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
               <p className="text-sm text-gray-500 font-medium">
                 {campaign.items.length} item{campaign.items.length !== 1 ? 's' : ''}
               </p>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider hidden sm:inline">Sort:</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    { key: 'default', label: 'Default' },
-                    { key: 'newest',  label: 'Newest' },
-                    { key: 'oldest',  label: 'Oldest' },
-                    { key: 'az',      label: 'A → Z' },
-                    { key: 'za',      label: 'Z → A' },
-                    { key: 'views',   label: 'Most Viewed' },
-                  ].map(opt => (
-                    <button
-                      key={opt.key}
-                      onClick={() => setSortOrder(opt.key)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                        sortOrder === opt.key
-                          ? 'text-white shadow-md'
-                          : 'bg-white text-gray-600 border border-gray-200 hover:border-primary hover:text-primary'
-                      }`}
-                      style={sortOrder === opt.key
-                        ? { background: 'linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))' }
-                        : {}}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* Sort buttons */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider hidden sm:inline">Sort:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { key: 'default', label: 'Default' },
+                      { key: 'newest',  label: 'Newest' },
+                      { key: 'oldest',  label: 'Oldest' },
+                      { key: 'az',      label: 'A → Z' },
+                      { key: 'za',      label: 'Z → A' },
+                      { key: 'views',   label: 'Most Viewed' },
+                    ].map(opt => (
+                      <button
+                        key={opt.key}
+                        onClick={() => setSortOrder(opt.key)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                          sortOrder === opt.key
+                            ? 'text-white shadow-md'
+                            : 'bg-white text-gray-600 border border-gray-200 hover:border-primary hover:text-primary'
+                        }`}
+                        style={sortOrder === opt.key
+                          ? { background: 'linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))' }
+                          : {}}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* View toggle */}
+                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 flex-shrink-0">
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow text-primary' : 'text-gray-400 hover:text-gray-600'}`}
+                    title="Grid view"
+                  >
+                    <LayoutGrid size={16} />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow text-primary' : 'text-gray-400 hover:text-gray-600'}`}
+                    title="List view"
+                  >
+                    <List size={16} />
+                  </button>
                 </div>
               </div>
             </div>
 
-            {/* 🎨 Items Grid with Drag-and-Drop */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {getOrderedItems().map((item) => (
-                <div
-                  key={item.id}
-                  draggable={isCustomizeMode && isCustomizeAllowed}
-                  onDragStart={(e) => isCustomizeMode && isCustomizeAllowed && handleDragStart(e, item)}
-                  onDragOver={(e) => isCustomizeMode && isCustomizeAllowed && handleDragOver(e)}
-                  onDrop={(e) => isCustomizeMode && isCustomizeAllowed && handleDrop(e, item)}
-                  onDragEnd={handleDragEnd}
-                  className={`bg-white rounded-2xl shadow-lg overflow-hidden transform transition relative ${
-                    isCustomizeMode && isCustomizeAllowed
-                      ? 'cursor-move hover:shadow-2xl border-2 border-dashed border-transparent hover:border-primary'
-                      : 'hover:scale-105 hover:shadow-2xl'
-                  } ${draggedItem?.id === item.id ? 'opacity-50' : ''}`}
-                >
-                  {/* 🎨 Drag Handle - Only show for account holder in customize mode */}
-                  {isCustomizeMode && isCustomizeAllowed && (
-                    <div className="absolute top-3 left-3 z-50 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-lg pointer-events-none">
-                      <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                      </svg>
-                    </div>
-                  )}
-
-                  {/* ✨ NEW badge — shown for 48 hours after upload */}
-                  {isNewItem(item) && !isCustomizeMode && (
-                    <div className="absolute top-3 left-3 z-40 flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-[10px] font-extrabold uppercase tracking-wider shadow-lg"
-                      style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
-                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse inline-block" />
-                      New
-                    </div>
-                  )}
-
-                  {/* Share Button */}
-                  {item.sharingEnabled && !isCustomizeMode && (
-                    <button
-                      onClick={(e) => handleShareClick(e, item)}
-                      className="absolute top-3 right-3 z-50 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white hover:scale-110 transition-all"
-                      title="Share this content"
-                    >
-                      <Share2 size={20} className="text-primary" />
-                    </button>
-                  )}
-
+            {/* 🎨 Items — Grid or List view */}
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {getOrderedItems().map((item) => (
                   <div
-                    onClick={() => !isCustomizeMode && openItem(item)}
-                    className={isCustomizeMode && isCustomizeAllowed ? 'pointer-events-none' : 'cursor-pointer'}
+                    key={item.id}
+                    draggable={isCustomizeMode && isCustomizeAllowed}
+                    onDragStart={(e) => isCustomizeMode && isCustomizeAllowed && handleDragStart(e, item)}
+                    onDragOver={(e) => isCustomizeMode && isCustomizeAllowed && handleDragOver(e)}
+                    onDrop={(e) => isCustomizeMode && isCustomizeAllowed && handleDrop(e, item)}
+                    onDragEnd={handleDragEnd}
+                    className={`bg-white rounded-2xl shadow-lg overflow-hidden transform transition relative ${
+                      isCustomizeMode && isCustomizeAllowed
+                        ? 'cursor-move hover:shadow-2xl border-2 border-dashed border-transparent hover:border-primary'
+                        : 'hover:scale-105 hover:shadow-2xl'
+                    } ${draggedItem?.id === item.id ? 'opacity-50' : ''}`}
                   >
-                    <div className="aspect-square w-full overflow-hidden bg-gray-100">
-                      {getThumbnail(item)}
-                    </div>
+                    {/* Drag Handle */}
+                    {isCustomizeMode && isCustomizeAllowed && (
+                      <div className="absolute top-3 left-3 z-50 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-lg pointer-events-none">
+                        <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                        </svg>
+                      </div>
+                    )}
 
-                    <div className="p-4">
-                      <h3 className="text-lg font-bold text-primary mb-2 truncate">
-                        {item.title}
-                      </h3>
-                      {item.description && (
-                        <p className="text-sm text-secondary line-clamp-2 mb-3">
-                          {item.description}
-                        </p>
-                      )}
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span className="px-2 py-1 bg-purple-100 text-primary rounded-full">
-                          {item.type}
-                        </span>
-                        <span>{new Date(item.createdAt).toLocaleDateString()}</span>
+                    {/* NEW badge */}
+                    {isNewItem(item) && !isCustomizeMode && (
+                      <div className="absolute top-3 left-3 z-40 flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-[10px] font-extrabold uppercase tracking-wider shadow-lg"
+                        style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse inline-block" />
+                        New
+                      </div>
+                    )}
+
+                    {/* Share Button */}
+                    {item.sharingEnabled && !isCustomizeMode && (
+                      <button
+                        onClick={(e) => handleShareClick(e, item)}
+                        className="absolute top-3 right-3 z-50 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white hover:scale-110 transition-all"
+                        title="Share this content"
+                      >
+                        <Share2 size={20} className="text-primary" />
+                      </button>
+                    )}
+
+                    <div
+                      onClick={() => !isCustomizeMode && openItem(item)}
+                      className={isCustomizeMode && isCustomizeAllowed ? 'pointer-events-none' : 'cursor-pointer'}
+                    >
+                      <div className="aspect-square w-full overflow-hidden bg-gray-100">
+                        {getThumbnail(item)}
+                      </div>
+                      <div className="p-4">
+                        <h3 className="text-lg font-bold text-primary mb-2 truncate">{item.title}</h3>
+                        {item.description && (
+                          <p className="text-sm text-secondary line-clamp-2 mb-3">{item.description}</p>
+                        )}
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                          <span className="px-2 py-1 bg-purple-100 text-primary rounded-full">{item.type}</span>
+                          <span>{new Date(item.createdAt).toLocaleDateString()}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              /* ── List view ── */
+              <div className="flex flex-col gap-3">
+                {getOrderedItems().map((item) => (
+                  <div
+                    key={item.id}
+                    draggable={isCustomizeMode && isCustomizeAllowed}
+                    onDragStart={(e) => isCustomizeMode && isCustomizeAllowed && handleDragStart(e, item)}
+                    onDragOver={(e) => isCustomizeMode && isCustomizeAllowed && handleDragOver(e)}
+                    onDrop={(e) => isCustomizeMode && isCustomizeAllowed && handleDrop(e, item)}
+                    onDragEnd={handleDragEnd}
+                    className={`bg-white rounded-xl shadow-md overflow-hidden flex items-center gap-4 p-3 transition relative ${
+                      isCustomizeMode && isCustomizeAllowed
+                        ? 'cursor-move hover:shadow-lg border-2 border-dashed border-transparent hover:border-primary'
+                        : 'hover:shadow-lg'
+                    } ${draggedItem?.id === item.id ? 'opacity-50' : ''}`}
+                  >
+                    {/* Drag handle */}
+                    {isCustomizeMode && isCustomizeAllowed && (
+                      <div className="flex-shrink-0 p-1.5 text-gray-400">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                        </svg>
+                      </div>
+                    )}
+
+                    {/* Thumbnail */}
+                    <div
+                      onClick={() => !isCustomizeMode && openItem(item)}
+                      className={`flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden bg-gray-100 ${isCustomizeMode ? '' : 'cursor-pointer'}`}
+                    >
+                      {getThumbnail(item)}
+                    </div>
+
+                    {/* Info */}
+                    <div
+                      onClick={() => !isCustomizeMode && openItem(item)}
+                      className={`flex-1 min-w-0 ${isCustomizeMode ? '' : 'cursor-pointer'}`}
+                    >
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h3 className="font-bold text-primary truncate text-sm sm:text-base">{item.title}</h3>
+                        {isNewItem(item) && !isCustomizeMode && (
+                          <span className="flex-shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full text-white text-[9px] font-extrabold uppercase"
+                            style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                            <span className="w-1 h-1 rounded-full bg-white animate-pulse" />New
+                          </span>
+                        )}
+                      </div>
+                      {item.description && (
+                        <p className="text-xs text-gray-500 line-clamp-1 mb-1.5">{item.description}</p>
+                      )}
+                      <div className="flex items-center gap-3 text-xs text-gray-400">
+                        <span className="px-1.5 py-0.5 bg-purple-100 text-primary rounded-full font-medium">{item.type}</span>
+                        <span>{new Date(item.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+
+                    {/* Share button */}
+                    {item.sharingEnabled && !isCustomizeMode && (
+                      <button
+                        onClick={(e) => handleShareClick(e, item)}
+                        className="flex-shrink-0 p-2 bg-gray-100 hover:bg-purple-100 rounded-full transition-all"
+                        title="Share"
+                      >
+                        <Share2 size={16} className="text-primary" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         ) : (
           <div className="bg-white rounded-3xl shadow-2xl p-12 text-center">

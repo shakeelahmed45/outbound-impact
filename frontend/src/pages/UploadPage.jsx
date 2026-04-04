@@ -47,6 +47,11 @@ const UploadPage = () => {
   const [preview, setPreview] = useState(null);
   const [showEditor, setShowEditor] = useState(false);
   const [trimMetadata, setTrimMetadata] = useState(null);
+
+  // ✅ Multiple image upload batch state
+  const [batchFiles, setBatchFiles] = useState([]); // [{ file, preview, title, status }]
+  const [batchUploading, setBatchUploading] = useState(false);
+  const [batchProgress, setBatchProgress] = useState(0); // 0-100 overall
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -205,9 +210,105 @@ const UploadPage = () => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileSelect(e.dataTransfer.files[0]);
+
+    const droppedFiles = Array.from(e.dataTransfer.files || []);
+    if (droppedFiles.length === 0) return;
+
+    // Multiple images dropped → batch mode
+    const allImages = droppedFiles.every(f => f.type.startsWith('image/'));
+    if (droppedFiles.length > 1 && allImages) {
+      handleMultipleImages(droppedFiles);
+      return;
+    }
+
+    // Single file → normal flow
+    if (droppedFiles[0]) handleFileSelect(droppedFiles[0]);
+  };
+
+  // ── Multiple image selection → batch mode ──────────────────────
+  const handleMultipleImages = (files) => {
+    setUploadType('IMAGE_BATCH');
+    const items = files.map((file) => ({
+      file,
+      preview: URL.createObjectURL(file),
+      title: file.name.replace(/\.[^/.]+$/, ''), // strip extension as default title
+      status: 'pending', // pending | uploading | done | error
+      error: null,
+    }));
+    setBatchFiles(items);
+  };
+
+  const updateBatchTitle = (index, newTitle) => {
+    setBatchFiles(prev => prev.map((item, i) => i === index ? { ...item, title: newTitle } : item));
+  };
+
+  const removeBatchFile = (index) => {
+    setBatchFiles(prev => {
+      const updated = prev.filter((_, i) => i !== index);
+      if (updated.length === 0) {
+        setUploadType(null);
+      }
+      return updated;
+    });
+  };
+
+  const handleBatchUpload = async () => {
+    if (!selectedCampaignId) {
+      showToast(`Please select a ${streamLabelLow} first`, 'error');
+      return;
+    }
+
+    const missingTitles = batchFiles.some(item => !item.title.trim());
+    if (missingTitles) {
+      showToast('Please enter a title for every image', 'error');
+      return;
+    }
+
+    setBatchUploading(true);
+    let completed = 0;
+
+    for (let i = 0; i < batchFiles.length; i++) {
+      const item = batchFiles[i];
+      // Mark as uploading
+      setBatchFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'uploading' } : f));
+
+      try {
+        const formData = new FormData();
+        formData.append('file', item.file);
+        formData.append('title', item.title.trim());
+        formData.append('description', '');
+        formData.append('type', 'IMAGE');
+        formData.append('sharingEnabled', 'true');
+
+        const response = await api.post('/upload/file', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 1800000,
+        });
+
+        if (response.data.status === 'success') {
+          const itemId = response.data.item.id;
+          await api.post('/campaigns/assign', { itemId, campaignId: selectedCampaignId });
+          setBatchFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'done' } : f));
+          completed++;
+          setBatchProgress(Math.round(((i + 1) / batchFiles.length) * 100));
+        }
+      } catch (err) {
+        setBatchFiles(prev => prev.map((f, idx) =>
+          idx === i ? { ...f, status: 'error', error: err.response?.data?.message || 'Upload failed' } : f
+        ));
+      }
+    }
+
+    setBatchUploading(false);
+    showToast(`${completed} of ${batchFiles.length} images uploaded!`, completed === batchFiles.length ? 'success' : 'error');
+
+    if (completed === batchFiles.length) {
+      setTimeout(() => {
+        setBatchFiles([]);
+        setBatchProgress(0);
+        setUploadType(null);
+        navigate('/dashboard/campaigns');
+      }, 1000);
     }
   };
 
@@ -926,12 +1027,21 @@ const UploadPage = () => {
               <p className="text-xl font-semibold text-gray-700 mb-2">
                 Drag and drop your files here
               </p>
-              <p className="text-gray-500 mb-6">or click to browse</p>
+              <p className="text-gray-500 mb-1">or click to browse</p>
+              <p className="text-xs text-gray-400 mb-6">Tip: drag multiple images at once to upload them in a batch</p>
               <input
                 type="file"
-                onChange={(e) => e.target.files[0] && handleFileSelect(e.target.files[0])}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  if (files.length > 1 && files.every(f => f.type.startsWith('image/'))) {
+                    handleMultipleImages(files);
+                  } else if (files[0]) {
+                    handleFileSelect(files[0]);
+                  }
+                }}
                 className="hidden"
                 id="file-upload"
+                multiple
               />
               <label
                 htmlFor="file-upload"
@@ -942,6 +1052,149 @@ const UploadPage = () => {
             </div>
           </>
         )}
+
+        {/* ── Multiple Image Batch Upload UI ── */}
+        {uploadType === 'IMAGE_BATCH' && (
+          <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="text-xl font-bold text-primary">Batch Image Upload</h3>
+                <p className="text-sm text-gray-500 mt-0.5">{batchFiles.length} image{batchFiles.length !== 1 ? 's' : ''} selected — add titles then upload</p>
+              </div>
+              <button
+                onClick={() => { setBatchFiles([]); setUploadType(null); }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                title="Cancel"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Stream selector */}
+            <div className="mb-5">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Add to {streamLabelLow}
+              </label>
+              <select
+                value={selectedCampaignId}
+                onChange={(e) => setSelectedCampaignId(e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+              >
+                <option value="">Select a {streamLabelLow}…</option>
+                {campaigns.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Image list with editable titles */}
+            <div className="space-y-3 mb-5 max-h-[50vh] overflow-y-auto pr-1">
+              {batchFiles.map((item, i) => (
+                <div key={i} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                  item.status === 'done'    ? 'border-green-200 bg-green-50' :
+                  item.status === 'error'   ? 'border-red-200 bg-red-50' :
+                  item.status === 'uploading' ? 'border-blue-200 bg-blue-50' :
+                  'border-gray-200 bg-gray-50'
+                }`}>
+                  {/* Thumbnail */}
+                  <img src={item.preview} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+
+                  {/* Title input */}
+                  <div className="flex-1 min-w-0">
+                    <input
+                      type="text"
+                      value={item.title}
+                      onChange={(e) => updateBatchTitle(i, e.target.value)}
+                      placeholder="Enter title…"
+                      disabled={item.status !== 'pending'}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-transparent disabled:border-transparent disabled:px-0 font-medium"
+                    />
+                    {item.status === 'error' && (
+                      <p className="text-xs text-red-600 mt-1">{item.error}</p>
+                    )}
+                  </div>
+
+                  {/* Status indicator or remove button */}
+                  <div className="flex-shrink-0">
+                    {item.status === 'pending' && (
+                      <button onClick={() => removeBatchFile(i)} className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg transition-colors" title="Remove">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                    {item.status === 'uploading' && (
+                      <svg className="w-5 h-5 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                    )}
+                    {item.status === 'done' && (
+                      <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                    {item.status === 'error' && (
+                      <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Overall progress bar */}
+            {batchUploading && (
+              <div className="mb-4">
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                  <span>Uploading…</span>
+                  <span>{batchProgress}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="h-2 rounded-full gradient-btn transition-all duration-300"
+                    style={{ width: `${batchProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => { setBatchFiles([]); setUploadType(null); }}
+                disabled={batchUploading}
+                className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-xl font-semibold text-sm hover:bg-gray-50 transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBatchUpload}
+                disabled={batchUploading || batchFiles.length === 0}
+                className="flex-1 gradient-btn text-white py-2.5 rounded-xl font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {batchUploading ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Uploading {batchFiles.filter(f => f.status === 'done').length}/{batchFiles.length}…
+                  </>
+                ) : (
+                  <>
+                    <Upload size={16} />
+                    Upload {batchFiles.length} Image{batchFiles.length !== 1 ? 's' : ''}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
         {uploadType === 'TEXT' && (
           <form onSubmit={handleTextPost} className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
             <div className="flex items-center justify-between mb-6">
@@ -1250,9 +1503,11 @@ const UploadPage = () => {
             >
               <Upload className="mx-auto mb-4 text-primary" size={48} />
               <p className="text-xl font-semibold text-gray-700 mb-2">
-                Drag and drop your {uploadType.toLowerCase()} file here
+                Drag and drop your {uploadType.toLowerCase()} file{uploadType === 'IMAGE' ? '(s)' : ''} here
               </p>
-              <p className="text-gray-500 mb-6">or click to browse</p>
+              <p className="text-gray-500 mb-6">
+                or click to browse{uploadType === 'IMAGE' ? ' — select multiple images at once' : ''}
+              </p>
               <input
                 type="file"
                 accept={
@@ -1260,9 +1515,18 @@ const UploadPage = () => {
                   uploadType === 'VIDEO' ? 'video/*' :
                   uploadType === 'AUDIO' ? 'audio/*' : '*'
                 }
-                onChange={(e) => e.target.files[0] && handleFileSelect(e.target.files[0])}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  if (uploadType === 'IMAGE' && files.length > 1) {
+                    // Multiple images selected → batch mode
+                    handleMultipleImages(files);
+                  } else if (files[0]) {
+                    handleFileSelect(files[0]);
+                  }
+                }}
                 className="hidden"
                 id="file-upload-selected"
+                multiple={uploadType === 'IMAGE'}
               />
               <label
                 htmlFor="file-upload-selected"
